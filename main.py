@@ -172,6 +172,13 @@ def main(stdscr):
                     if curs_x < max_x:
                         stdscr.move(curs_y, curs_x)
 
+            # Turn cursor on/off
+            if mode in ('cell_normal', 'insert'):
+                curses.curs_set(1)
+            else:
+                stdscr.move(max_y - 1, 0)
+                curses.curs_set(0)
+
             stdscr.refresh()
 
             try:
@@ -431,11 +438,6 @@ def main(stdscr):
                     if cell_cursor >= cell_hoffset + display_width:
                         cell_hoffset = cell_cursor - display_width + 1
 
-                # Turn cursor on/off
-                if mode in ('cell_normal', 'insert'):
-                    curses.curs_set(1)
-                else:
-                    curses.curs_set(0)
     finally:
         # Restore terminal settings
         termios.tcsetattr(fd, termios.TCSADRAIN, old)

@@ -1,7 +1,7 @@
-name,age,city,new_col_3
-John,30,New York,afjj
-Jane,25,Los Angeles,nan
-Bob,40,Chicago,nan jijjj
-nan,gg,nan jfj jj,nan jfdsfj fdsjfsdif
-nan,jj,nan dsijfidsfj,nan
-Alice,35,San Francisco jdis fsdji,nan
+name,age,city
+John,30,New York
+Jane,25 sdijf sdifj,Los Angeles
+nan,gg,nan jfj jj dsfjf sdf 
+dsjdsi,nandjsfijsdf,nandjsfijfsd
+nan,jj,nan dsijfidsfj
+Alice,35,San Francisco jdis fsdji
