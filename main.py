@@ -385,6 +385,28 @@ def main(stdscr):
                         widths[curr_col] = max_w
                     save_file()
                     break
+                elif key in (curses.KEY_ENTER, 10, 13):
+                    if not header_mode:
+                        df.iloc[curr_row, curr_col] = edited_value
+                        max_w = max(len(col_names[curr_col]), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else 0) + 2
+                        widths[curr_col] = max_w
+                        if curr_row < rows - 1:
+                            curr_row += 1
+                            edited_value = df.iloc[curr_row, curr_col]
+                            cell_cursor = len(edited_value)
+                            display_width = widths[curr_col] - 2
+                            cell_hoffset = max(0, cell_cursor - display_width + 1)
+                elif key == 9:  # Tab
+                    if not header_mode:
+                        df.iloc[curr_row, curr_col] = edited_value
+                        max_w = max(len(col_names[curr_col]), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else 0) + 2
+                        widths[curr_col] = max_w
+                        if curr_col < cols - 1:
+                            curr_col += 1
+                            edited_value = df.iloc[curr_row, curr_col]
+                            cell_cursor = len(edited_value)
+                            display_width = widths[curr_col] - 2
+                            cell_hoffset = max(0, cell_cursor - display_width + 1)
                 elif key == curses.KEY_BACKSPACE:
                     if cell_cursor > 0:
                         edited_value = edited_value[:cell_cursor-1] + edited_value[cell_cursor:]
@@ -409,11 +431,11 @@ def main(stdscr):
                     if cell_cursor >= cell_hoffset + display_width:
                         cell_hoffset = cell_cursor - display_width + 1
 
-            # Turn cursor on/off
-            if mode in ('cell_normal', 'insert'):
-                curses.curs_set(1)
-            else:
-                curses.curs_set(0)
+                # Turn cursor on/off
+                if mode in ('cell_normal', 'insert'):
+                    curses.curs_set(1)
+                else:
+                    curses.curs_set(0)
     finally:
         # Restore terminal settings
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
