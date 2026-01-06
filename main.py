@@ -93,8 +93,14 @@ def main(stdscr):
             except:
                 pass
             stdscr.refresh()
-            time.sleep(1)  # Show for 1 second
-            # No need to clear, next draw will clear
+            start_time = time.time()
+            stdscr.nodelay(True)
+            while time.time() - start_time < 1:
+                key = stdscr.getch()
+                if key == 3:  # Ctrl+C
+                    save_file()
+                    sys.exit(0)
+            stdscr.nodelay(False)
 
         while True:
             max_y, max_x = stdscr.getmaxyx()
@@ -230,6 +236,9 @@ def main(stdscr):
                 elif key == 3:  # Ctrl+C
                     save_file()
                     break
+                elif key == 20:  # Ctrl+T
+                    save_file()
+                    break
                 elif key == 23:  # Ctrl+W
                     header_mode = not header_mode
                     if header_mode:
@@ -357,6 +366,17 @@ def main(stdscr):
                         widths[curr_col] = max_w
                     save_file()
                     break
+                elif key == 20:  # Ctrl+T
+                    if header_mode:
+                        col_names[curr_col] = edited_value
+                        max_w = max(len(edited_value), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else len(edited_value)) + 2
+                        widths[curr_col] = max_w
+                    else:
+                        df.iloc[curr_row, curr_col] = edited_value
+                        max_w = max(len(col_names[curr_col]), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else 0) + 2
+                        widths[curr_col] = max_w
+                    save_file()
+                    break
                 elif key == 27:  # ESC
                     if header_mode:
                         col_names[curr_col] = edited_value
@@ -382,6 +402,17 @@ def main(stdscr):
                     save_file()
                     show_message("Saved!")
                 elif key == 3:  # Ctrl+C
+                    if header_mode:
+                        col_names[curr_col] = edited_value
+                        max_w = max(len(edited_value), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else len(edited_value)) + 2
+                        widths[curr_col] = max_w
+                    else:
+                        df.iloc[curr_row, curr_col] = edited_value
+                        max_w = max(len(col_names[curr_col]), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else 0) + 2
+                        widths[curr_col] = max_w
+                    save_file()
+                    break
+                elif key == 20:  # Ctrl+T
                     if header_mode:
                         col_names[curr_col] = edited_value
                         max_w = max(len(edited_value), max(len(df.iloc[r, curr_col]) for r in range(rows)) if rows > 0 else len(edited_value)) + 2
