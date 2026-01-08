@@ -253,7 +253,10 @@ class Orchestrator:
                     self.focus = 1
 
             elif self.focus == 2:
-                if ch == ord('j'):
+                if ch == 27:  # ESC -> command pane
+                    self.io_visible = True
+                    self.focus = 1
+                elif ch == ord('j'):
                     self.output.scroll_down()
                 elif ch == ord('k'):
                     self.output.scroll_up()
@@ -271,8 +274,10 @@ class Orchestrator:
                         self.output.set_lines(out)
                         # ensure grid reflects latest df
                         self.grid.df = self.state.df
-                    self.command.reset()
-                    self.focus = 0
+                        self.command.reset()
+                        self.command.mode = 'normal'
+                        self.io_visible = True
+                        self.focus = 1
                 else:
                     self.command.handle_key(ch)
 

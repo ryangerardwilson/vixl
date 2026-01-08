@@ -14,10 +14,24 @@ class CommandExecutor:
             'df': self.state.df,
             'np': np,
         }
+        import ast
+        old_out, old_err = sys.stdout, sys.stderr
         try:
-            old_out, old_err = sys.stdout, sys.stderr
             sys.stdout, sys.stderr = stdout, stderr
-            exec(code, env, env)
+
+            parsed = ast.parse(code)
+            last_value = None
+
+            if parsed.body and isinstance(parsed.body[-1], ast.Expr):
+                expr = ast.Expression(parsed.body.pop().value)
+                exec(compile(parsed, '<exec>', 'exec'), env, env)
+                last_value = eval(compile(expr, '<eval>', 'eval'), env, env)
+            else:
+                exec(code, env, env)
+
+            if last_value is not None:
+                print(last_value)
+
             self.state.df = env.get('df', self.state.df)
         except Exception as e:
             stderr.write(str(e))
