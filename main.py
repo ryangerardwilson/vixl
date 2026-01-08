@@ -4,11 +4,16 @@ import curses
 import sys
 import os
 import pandas as pd
+from app_state import AppState
 import time  # for napms alternative
 import termios
 
 os.environ['TERM'] = 'xterm-256color'
 os.environ.setdefault('ESCDELAY', '25')
+
+from app_state import AppState
+from orchestrator import Orchestrator
+
 
 def main(stdscr):
     # Disable terminal flow control (Ctrl+S, Ctrl+Q)
