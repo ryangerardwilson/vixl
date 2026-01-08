@@ -9,8 +9,9 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: python main.py <csv>")
         sys.exit(1)
-    df = pd.read_csv(sys.argv[1])
-    state = AppState(df)
+    path = sys.argv[1]
+    df = pd.read_csv(path)
+    state = AppState(df, path)
     curses.wrapper(lambda stdscr: Orchestrator(stdscr, state).run())
 
 
