@@ -113,16 +113,16 @@ def draw_input(win, buffer, cursor, mode, visual_start):
 
     sel_a = sel_b = None
     if mode == "visual" and visual_start is not None:
-        sel_a, sel_b = sorted((visual_start, cursor))
+        sel_a = min(visual_start, cursor)
+        sel_b = max(visual_start, cursor)
 
-    # draw text with visual highlight
     char_idx = 0
     for r, line in enumerate(lines[: h - 2]):
         for c, ch in enumerate(line[: w - 2]):
             attr = curses.A_REVERSE if sel_a is not None and sel_a <= char_idx < sel_b else 0
             win.addch(r + 1, c + 1, ch, attr)
             char_idx += 1
-        char_idx += 1  # newline
+        char_idx += 1
 
     status = f" -- {mode.upper()} --"
     win.addstr(h - 1, w - len(status) - 2, status)
@@ -152,6 +152,7 @@ def curses_main(stdscr, df):
     cursor = 0
     mode = "insert"
     pending = None
+    leader = False
     yank = ""
     visual_start = None
 
@@ -180,14 +181,16 @@ def curses_main(stdscr, df):
                 mode = "normal"
                 visual_start = None
             elif ch == ord('d'):
-                a, b = sorted((visual_start, cursor))
+                a = min(visual_start, cursor)
+                b = max(visual_start, cursor)
                 yank = buffer[a:b]
                 buffer = buffer[:a] + buffer[b:]
                 cursor = a
                 mode = "normal"
                 visual_start = None
             elif ch == ord('y'):
-                a, b = sorted((visual_start, cursor))
+                a = min(visual_start, cursor)
+                b = max(visual_start, cursor)
                 yank = buffer[a:b]
                 mode = "normal"
                 visual_start = None
@@ -195,7 +198,14 @@ def curses_main(stdscr, df):
                 cursor = handle_motion(ch, buffer, cursor)
 
         else:  # NORMAL MODE
-            if pending:
+            if leader:
+                if ch == ord('e'):
+                    row, col, lines = cursor_to_rowcol(buffer, cursor)
+                    cursor = rowcol_to_cursor(lines, row, len(lines[row]))
+                    mode = "insert"
+                leader = False
+
+            elif pending:
                 if pending == 'd' and ch == ord('d'):
                     row, col, lines = cursor_to_rowcol(buffer, cursor)
                     yank = lines[row] + "\n"
@@ -207,12 +217,29 @@ def curses_main(stdscr, df):
                     yank = lines[row] + "\n"
                 pending = None
 
+            elif ch == ord(','):
+                leader = True
+
             elif ch in (ord('d'), ord('y')):
                 pending = chr(ch)
 
             elif ch == ord('v'):
                 mode = "visual"
                 visual_start = cursor
+
+            elif ch == ord('o'):
+                row, col, lines = cursor_to_rowcol(buffer, cursor)
+                insert_at = rowcol_to_cursor(lines, row, len(lines[row]))
+                buffer = buffer[:insert_at] + "\n" + buffer[insert_at:]
+                cursor = insert_at + 1
+                mode = "insert"
+
+            elif ch == ord('O'):
+                row, col, lines = cursor_to_rowcol(buffer, cursor)
+                insert_at = rowcol_to_cursor(lines, row, 0)
+                buffer = buffer[:insert_at] + "\n" + buffer[insert_at:]
+                cursor = insert_at
+                mode = "insert"
 
             elif ch == ord('p'):
                 if yank:
