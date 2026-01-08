@@ -20,6 +20,7 @@ This is not an Excel UI clone. It is a power-user alternative optimized for work
 - Flat file structure (no directories)
 - One class per file
 - Fast feature velocity over architectural purity (v0)
+- Architectural clarity and separation (v1+)
 
 ---
 
@@ -174,9 +175,16 @@ Characteristics:
 
 ## 11. Mode System
 
+This section distinguishes between **v0 implemented modes** and **v1 formalized modes**.
+
 Modes implemented in v0:
 - Normal
 - Command
+
+Modes formalized in v1:
+- Insert
+- Cell edit
+- Header edit
 
 Insert is a **Normal-mode shortcut** that transitions into Command mode.
 
@@ -196,6 +204,8 @@ Each mode has a dedicated handler class.
 ---
 
 ## 12. Code Organization Rules
+
+These rules reflect **v0 constraints**, not permanent architectural doctrine.
 
 - All files live in the project root
 - Each file defines exactly one class
@@ -229,3 +239,19 @@ The project is successful when:
 - Common Excel workflows are keyboard-driven
 - Data manipulation is more transparent than Excel
 - main.py never grows with new features
+
+---
+
+## 15. v1 Scope & Direction
+
+v1 transitions the project from a fast-moving prototype into a stable, extensible editor while preserving the Vim-first, terminal-native philosophy.
+
+v1 characteristics:
+- Modular directory-based code organization
+- Clear separation between core state, UI, modes, and commands
+- Fully realized mode system (Insert, Cell edit, Header edit)
+- Undo/redo correctness guarantees across all mutations
+- Stable command surface for user workflows
+- Charts treated as first-class inspection commands
+
+Explicit non-goals remain unchanged unless stated elsewhere.

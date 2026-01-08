@@ -180,10 +180,10 @@ def curses_main(stdscr, df):
     df_scroll = 0
     out_scroll = 0
 
-    # ---- initial render so UI appears immediately ----
+    # ---- initial render so UI appears immediately (TERM last so cursor is correct) ----
     draw_table(table_win, list(df.columns), df.values.tolist(), table_h - 2, active=False)
-    draw_editor(term_win, buffer, cursor, mode, active=True)
     draw_output(out_win, output_lines, active=False)
+    draw_editor(term_win, buffer, cursor, mode, active=True)
 
     while True:
         ch = stdscr.getch()
@@ -191,6 +191,10 @@ def curses_main(stdscr, df):
         # cycle focus
         if ch == 23:  # Ctrl+W
             focus = (focus + 1) % 3
+            # redraw immediately so focus indicator updates
+            draw_table(table_win, list(df.columns), df.values.tolist()[df_scroll:], table_h - 2, active=(focus == 0))
+            draw_output(out_win, output_lines[out_scroll:], active=(focus == 2))
+            draw_editor(term_win, buffer, cursor, mode, active=(focus == 1))
             continue
 
         if mode == "insert":
