@@ -33,6 +33,7 @@ class Orchestrator:
         self.exec = CommandExecutor(app_state)
 
         self.focus = 0  # 0=df,1=cmd,2=out
+        self.io_visible = False
         self.command_history = []
 
         self.status_msg = None
@@ -87,7 +88,11 @@ class Orchestrator:
             pass
 
         self.grid.draw(self.layout.table_win, active=self.focus == 0)
-        self.output.draw(self.layout.output_win, active=False)
+        if self.io_visible:
+            self.output.draw(self.layout.output_win, active=False)
+        else:
+            self.layout.output_win.erase()
+            self.layout.output_win.refresh()
 
         sw = self.layout.status_win
         sw.erase()
@@ -125,7 +130,11 @@ class Orchestrator:
             pass
         sw.refresh()
 
-        self.command.draw(self.layout.command_win, active=self.focus == 1)
+        if self.io_visible:
+            self.command.draw(self.layout.command_win, active=self.focus == 1)
+        else:
+            self.layout.command_win.erase()
+            self.layout.command_win.refresh()
 
     def _leader_tick(self, now: float):
         # timeout handling
@@ -224,6 +233,7 @@ class Orchestrator:
                     self.grid.move_col_right()
                 elif ch == ord(':'):
                     # plain command entry, preserve existing buffer
+                    self.io_visible = True
                     self.focus = 1
                 elif ch == ord('i'):
                     # insert with context-aware prefill
@@ -239,6 +249,7 @@ class Orchestrator:
                         # column-level insert defaults to rename intent
                         cmd = f"df = df.rename(columns={{'{col}': '{col}'}})"
                     self.command.set_buffer(cmd)
+                    self.io_visible = True
                     self.focus = 1
 
             elif self.focus == 2:
@@ -251,6 +262,7 @@ class Orchestrator:
                 # command pane
                 if ch == 27 and self.command.mode == 'normal':  # ESC from normal -> back to DF
                     self.focus = 0
+                    self.io_visible = False
                 elif ch == 5:  # Ctrl-E execute
                     code = self.command.get_buffer().strip()
                     if code:
