@@ -1,6 +1,10 @@
 import sys
+import os
 import curses
 import pandas as pd
+
+# Make ESC snappy
+os.environ.setdefault('ESCDELAY', '25')
 from orchestrator import Orchestrator
 from app_state import AppState
 

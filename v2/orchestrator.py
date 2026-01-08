@@ -17,7 +17,7 @@ class Orchestrator:
         self.command = CommandPane()
         self.output = OutputPane()
         self.exec = CommandExecutor(app_state)
-        self.focus = 0  # 0=grid,1=command (output is display-only)
+        self.focus = 0  # 0=grid,1=command,2=output
         self.command_history = []
         self.history_idx = None
 
@@ -35,7 +35,12 @@ class Orchestrator:
         sw = self.layout.status_win
         sw.erase()
         h, w = sw.getmaxyx()
-        mode = "DF" if self.focus == 0 else f"CMD:{self.command.mode.upper()}"
+        if self.focus == 0:
+            mode = "DF"
+        elif self.focus == 1:
+            mode = f"CMD:{self.command.mode.upper()}"
+        else:
+            mode = "OUT"
         shape = f"{self.state.df.shape}"
         fname = self.state.file_path or ""
         text = f" {mode} | {fname} | {shape}"
@@ -74,8 +79,8 @@ class Orchestrator:
                 return
 
             if ch == 23:  # Ctrl-W
-                # toggle only between grid and command
-                self.focus = 1 if self.focus == 0 else 0
+                # cycle focus: grid -> command -> output
+                self.focus = (self.focus + 1) % 3
                 self.redraw()
                 continue
 
@@ -117,7 +122,11 @@ class Orchestrator:
                     self.command.set_buffer(cmd)
                     self.focus = 1
 
-
+            elif self.focus == 2:
+                if ch == ord('j'):
+                    self.output.scroll_down()
+                elif ch == ord('k'):
+                    self.output.scroll_up()
 
             else:  # command pane
                 if ch == 5:  # Ctrl-E execute
