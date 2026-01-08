@@ -46,7 +46,7 @@ def rowcol_to_cursor(lines, row, col):
     return idx + min(col, len(lines[row]))
 
 
-# -------- vim word motions --------
+# -------- motions --------
 
 def move_word_forward(buf, cur):
     n = len(buf)
@@ -67,23 +67,43 @@ def move_word_backward(buf, cur):
     return i
 
 
-def delete_to(buf, cur, new_cur):
-    if new_cur > cur:
-        return buf[:cur] + buf[new_cur:], cur
-    else:
-        return buf[:new_cur] + buf[cur:], new_cur
+def handle_motion(ch, buffer, cursor):
+    if ch == ord('h'):
+        return max(0, cursor - 1)
+    if ch == ord('l'):
+        return min(len(buffer), cursor + 1)
+    if ch == ord('w'):
+        return move_word_forward(buffer, cursor)
+    if ch == ord('b'):
+        return move_word_backward(buffer, cursor)
+    if ch == ord('0'):
+        row, col, lines = cursor_to_rowcol(buffer, cursor)
+        return rowcol_to_cursor(lines, row, 0)
+    if ch == ord('$'):
+        row, col, lines = cursor_to_rowcol(buffer, cursor)
+        return rowcol_to_cursor(lines, row, len(lines[row]))
+    if ch == ord('k'):
+        row, col, lines = cursor_to_rowcol(buffer, cursor)
+        if row > 0:
+            return rowcol_to_cursor(lines, row - 1, col)
+    if ch == ord('j'):
+        row, col, lines = cursor_to_rowcol(buffer, cursor)
+        if row < len(lines) - 1:
+            return rowcol_to_cursor(lines, row + 1, col)
+    return cursor
 
 
-# ----------------------------------
+# --------------------------------
 
-def draw_input(win, buffer, cursor, mode):
+def draw_input(win, buffer, cursor, mode, visual_start):
     win.erase()
     win.box()
     h, w = win.getmaxyx()
-    lines = buffer.split("\n")
 
+    lines = buffer.split("\n")
     idx = 0
     cur_row = cur_col = 0
+
     for r, line in enumerate(lines):
         if idx + len(line) >= cursor:
             cur_row = r
@@ -91,8 +111,18 @@ def draw_input(win, buffer, cursor, mode):
             break
         idx += len(line) + 1
 
+    sel_a = sel_b = None
+    if mode == "visual" and visual_start is not None:
+        sel_a, sel_b = sorted((visual_start, cursor))
+
+    # draw text with visual highlight
+    char_idx = 0
     for r, line in enumerate(lines[: h - 2]):
-        win.addstr(r + 1, 1, line[: w - 2])
+        for c, ch in enumerate(line[: w - 2]):
+            attr = curses.A_REVERSE if sel_a is not None and sel_a <= char_idx < sel_b else 0
+            win.addch(r + 1, c + 1, ch, attr)
+            char_idx += 1
+        char_idx += 1  # newline
 
     status = f" -- {mode.upper()} --"
     win.addstr(h - 1, w - len(status) - 2, status)
@@ -120,11 +150,13 @@ def curses_main(stdscr, df):
 
     buffer = ""
     cursor = 0
-    mode = "normal"
-    pending = None  # for commands like c?, d?
+    mode = "insert"
+    pending = None
+    yank = ""
+    visual_start = None
 
     draw_table(table_win, headers, rows, table_h - 2)
-    draw_input(input_win, buffer, cursor, mode)
+    draw_input(input_win, buffer, cursor, mode, visual_start)
 
     while True:
         ch = stdscr.getch()
@@ -143,50 +175,57 @@ def curses_main(stdscr, df):
                 buffer = buffer[:cursor] + chr(ch) + buffer[cursor:]
                 cursor += 1
 
+        elif mode == "visual":
+            if ch in (27, ord('v')):
+                mode = "normal"
+                visual_start = None
+            elif ch == ord('d'):
+                a, b = sorted((visual_start, cursor))
+                yank = buffer[a:b]
+                buffer = buffer[:a] + buffer[b:]
+                cursor = a
+                mode = "normal"
+                visual_start = None
+            elif ch == ord('y'):
+                a, b = sorted((visual_start, cursor))
+                yank = buffer[a:b]
+                mode = "normal"
+                visual_start = None
+            else:
+                cursor = handle_motion(ch, buffer, cursor)
+
         else:  # NORMAL MODE
             if pending:
-                if pending in ('d', 'c'):
-                    if ch == ord('w'):
-                        new = move_word_forward(buffer, cursor)
-                        buffer, cursor = delete_to(buffer, cursor, new)
-                        if pending == 'c':
-                            mode = 'insert'
+                if pending == 'd' and ch == ord('d'):
+                    row, col, lines = cursor_to_rowcol(buffer, cursor)
+                    yank = lines[row] + "\n"
+                    del lines[row]
+                    buffer = "\n".join(lines) if lines else ""
+                    cursor = rowcol_to_cursor(lines, min(row, len(lines) - 1), 0) if lines else 0
+                elif pending == 'y' and ch == ord('y'):
+                    row, col, lines = cursor_to_rowcol(buffer, cursor)
+                    yank = lines[row] + "\n"
                 pending = None
 
-            elif ch in (ord('d'), ord('c')):
+            elif ch in (ord('d'), ord('y')):
                 pending = chr(ch)
 
-            elif ch == ord('w'):
-                cursor = move_word_forward(buffer, cursor)
-            elif ch == ord('b'):
-                cursor = move_word_backward(buffer, cursor)
+            elif ch == ord('v'):
+                mode = "visual"
+                visual_start = cursor
+
+            elif ch == ord('p'):
+                if yank:
+                    buffer = buffer[:cursor] + yank + buffer[cursor:]
+                    cursor += len(yank)
+
             elif ch == ord('i'):
                 mode = "insert"
-            elif ch == ord('h'):
-                cursor = max(0, cursor - 1)
-            elif ch == ord('l'):
-                cursor = min(len(buffer), cursor + 1)
-            elif ch == ord('k'):
-                row, col, lines = cursor_to_rowcol(buffer, cursor)
-                if row > 0:
-                    cursor = rowcol_to_cursor(lines, row - 1, col)
-            elif ch == ord('j'):
-                row, col, lines = cursor_to_rowcol(buffer, cursor)
-                if row < len(lines) - 1:
-                    cursor = rowcol_to_cursor(lines, row + 1, col)
-            elif ch == ord('0'):
-                row, col, lines = cursor_to_rowcol(buffer, cursor)
-                cursor = rowcol_to_cursor(lines, row, 0)
-            elif ch == ord('$'):
-                row, col, lines = cursor_to_rowcol(buffer, cursor)
-                cursor = rowcol_to_cursor(lines, row, len(lines[row]))
-            elif ch == ord('x'):
-                if cursor < len(buffer):
-                    buffer = buffer[:cursor] + buffer[cursor + 1:]
-            elif ch == 27:
-                break
 
-        draw_input(input_win, buffer, cursor, mode)
+            else:
+                cursor = handle_motion(ch, buffer, cursor)
+
+        draw_input(input_win, buffer, cursor, mode, visual_start)
 
 
 def main():
