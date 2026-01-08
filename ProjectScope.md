@@ -2,6 +2,8 @@
 
 ## 1. Project Overview
 
+This document reflects the **current, implemented reality** of the project as of v0, not aspirational design.
+
 This project aims to build a **Vim-first, terminal-native spreadsheet editor** that replaces roughly 80% of Microsoft Excel’s day-to-day functionality for keyboard-driven users.
 
 The product prioritizes speed, scriptability, transparency, and tight integration with the Python data ecosystem.
@@ -84,7 +86,41 @@ Characteristics:
 
 ---
 
-## 7. Selection Model
+## 7. Navigation & Highlight Model
+
+Navigation and highlighting are finalized and stable.
+
+Supported highlight modes:
+- Cell-wise (h j k l)
+- Row-wise (J / K)
+- Column-wise (H / L)
+
+Rules:
+- Cursor never enters hidden rows
+- Navigation jumps over truncated regions (`...`)
+- Highlight is always visible
+
+---
+
+## 7.5 Insert Mode Philosophy
+
+Insert mode is **command-prefill only**, not a text editor.
+
+- `i` generates a Pandas mutation command based on highlight scope
+- Prefilled command opens in COMMAND mode
+- User edits and executes explicitly
+
+Examples:
+```
+# Cell
+df.loc[row, 'col'] = <value>
+
+# Row
+df.loc[row] = { ... }
+
+# Column
+df = df.rename(columns={'old': 'old'})
+```
 
 Selection mirrors Vim visual mode only.
 
@@ -137,6 +173,14 @@ Characteristics:
 ---
 
 ## 11. Mode System
+
+Modes implemented in v0:
+- Normal
+- Command
+
+Insert is a **Normal-mode shortcut** that transitions into Command mode.
+
+Cell/Header edit modes are deferred.
 
 The application is modal.
 

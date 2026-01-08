@@ -43,6 +43,8 @@ class AppState:
 
         # Command mode
         self.command_buffer = ''
+        self.command_cursor = 0
+        self.command_scroll = 0
         self.command_output = None
 
         # Display toggles
