@@ -24,7 +24,7 @@ class Orchestrator:
     # External editor integration
     # -----------------------------
     def edit_command_external(self, initial_command: str) -> str:
-        editor = os.environ.get("EDITOR", "vi")
+        editor = "vim"
 
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as f:
             f.write(initial_command)
@@ -34,7 +34,12 @@ class Orchestrator:
         curses.def_prog_mode()
         curses.endwin()
         try:
-            subprocess.call([editor, path])
+            subprocess.call([
+                editor,
+                "-u", os.path.expanduser("~/.vimrc"),
+                "+normal!G$A",
+                path,
+            ])
         finally:
             curses.reset_prog_mode()
             curses.noecho()
@@ -227,9 +232,21 @@ class Orchestrator:
                 self.handle_command_mode(10)
                 continue
 
-            # Insert alias 'i'
+            # Insert alias 'i' with scope-aware mutation prefill
             if self.state.mode == 'normal' and key == ord('i'):
-                initial = self.build_docstring_prefill()
+                r = self.state.curr_row
+                c = self.state.curr_col
+                col = self.state.col_names[c]
+                df = self.state.df
+
+                if self.state.highlight_mode == 'cell':
+                    snippet = f"df.loc[{r}, '{col}'] = {repr(df.iloc[r, c])}"
+                elif self.state.highlight_mode == 'row':
+                    snippet = f"df.loc[{r}] = {repr(df.loc[r].to_dict())}"
+                else:  # column
+                    snippet = f"df = df.rename(columns={{'{col}': '{col}'}})"
+
+                initial = self.build_docstring_prefill() + snippet + "\n"
                 edited = self.edit_command_external(initial)
                 if not edited:
                     self.state.mode = 'normal'
@@ -270,32 +287,50 @@ class Orchestrator:
                 continue
 
             if self.state.mode == 'normal':
+                # Horizontal navigation (always visible)
                 if key == ord('h') and self.state.curr_col > 0:
                     self.state.curr_col -= 1
                     if self.state.curr_col < self.state.col_offset:
                         self.state.col_offset = self.state.curr_col
                     self.state.highlight_mode = 'cell'
+
                 elif key == ord('l') and self.state.curr_col < self.state.cols - 1:
                     self.state.curr_col += 1
                     if self.state.curr_col >= self.state.col_offset + 1:
                         self.state.col_offset = max(0, self.state.curr_col - 1)
                     self.state.highlight_mode = 'cell'
-                elif key == ord('j') and self.state.curr_row < self.state.rows - 1:
-                    self.state.curr_row += 1
-                    self.state.highlight_mode = 'cell'
-                elif key == ord('k') and self.state.curr_row > 0:
-                    self.state.curr_row -= 1
-                    self.state.highlight_mode = 'cell'
-                elif key == ord('J') and self.state.curr_row < self.state.rows - 1:
-                    self.state.curr_row += 1
-                    self.state.highlight_mode = 'row'
-                elif key == ord('K') and self.state.curr_row > 0:
-                    self.state.curr_row -= 1
-                    self.state.highlight_mode = 'row'
+
+                # Vertical navigation (skip hidden rows)
+                elif key in (ord('j'), ord('J')):
+                    if not self.state.show_all_rows and self.state.rows > 20:
+                        if self.state.curr_row < 4:
+                            self.state.curr_row += 1
+                        elif self.state.curr_row == 4:
+                            self.state.curr_row = self.state.rows - 5
+                        elif self.state.curr_row < self.state.rows - 1:
+                            self.state.curr_row += 1
+                    elif self.state.curr_row < self.state.rows - 1:
+                        self.state.curr_row += 1
+                    self.state.highlight_mode = 'row' if key == ord('J') else 'cell'
+
+                elif key in (ord('k'), ord('K')):
+                    if not self.state.show_all_rows and self.state.rows > 20:
+                        if self.state.curr_row > self.state.rows - 5:
+                            self.state.curr_row -= 1
+                        elif self.state.curr_row == self.state.rows - 5:
+                            self.state.curr_row = 4
+                        elif self.state.curr_row > 0:
+                            self.state.curr_row -= 1
+                    elif self.state.curr_row > 0:
+                        self.state.curr_row -= 1
+                    self.state.highlight_mode = 'row' if key == ord('K') else 'cell'
+
+                # Column-wise jumps
                 elif key == ord('H') and self.state.curr_col > 0:
                     self.state.curr_col -= 1
                     self.state.col_offset = max(0, self.state.curr_col)
                     self.state.highlight_mode = 'column'
+
                 elif key == ord('L') and self.state.curr_col < self.state.cols - 1:
                     self.state.curr_col += 1
                     self.state.col_offset = max(0, self.state.curr_col)

@@ -1,5 +1,5 @@
 name,age,city,age2,age3,notes,extra1,extra2,extra3,extra4,extra5
-John,30,New York,60,303030,This is a very long note that should be truncated in display,a,b,c,d,e
+,30,New York,60,303030,This is a very long note that should be truncated in display,a,b,c,d,e
 Jane,25,Los Angeles,50,252525,Another extremely long string meant to test pandas truncation behavior,f,g,h,i,j
 Bob,40,Chicago,80,404040,Short note,k,l,m,n,o
 Alice3,35,San Francisco,70,353535,Yet another long descriptive text to overflow column width,p,q,r,s,t
