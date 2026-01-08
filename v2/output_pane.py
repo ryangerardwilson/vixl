@@ -23,5 +23,4 @@ class OutputPane:
                 pass
         if active:
             win.addnstr(h - 2, w - 9, " OUT ", 7)
-        win.box()
         win.refresh()

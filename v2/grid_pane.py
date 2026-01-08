@@ -100,5 +100,4 @@ class GridPane:
 
         if active:
             win.addnstr(h - 2, w - 8, " DF ", 6)
-        win.box()
         win.refresh()

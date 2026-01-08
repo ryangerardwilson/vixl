@@ -22,8 +22,30 @@ class Orchestrator:
         self.history_idx = None
 
     def redraw(self):
+        # cursor ownership: only command pane shows cursor
+        try:
+            curses.curs_set(1 if self.focus == 1 else 0)
+        except curses.error:
+            pass
+
         self.grid.draw(self.layout.table_win, active=self.focus == 0)
-        self.output.draw(self.layout.output_win, active=self.focus == 2)
+        self.output.draw(self.layout.output_win, active=False)
+
+        # status bar (must not steal cursor)
+        sw = self.layout.status_win
+        sw.erase()
+        h, w = sw.getmaxyx()
+        mode = "DF" if self.focus == 0 else f"CMD:{self.command.mode.upper()}"
+        shape = f"{self.state.df.shape}"
+        fname = self.state.file_path or ""
+        text = f" {mode} | {fname} | {shape}"
+        try:
+            sw.addnstr(0, 0, text.ljust(w), w, curses.A_REVERSE)
+        except curses.error:
+            pass
+        sw.refresh()
+
+        # draw command pane LAST so it owns the cursor
         self.command.draw(self.layout.command_win, active=self.focus == 1)
 
     def run(self):

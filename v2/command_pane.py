@@ -7,6 +7,7 @@ class CommandPane:
         self.cursor = 0
         self.mode = "normal"  # normal | insert | visual
         self.scroll = 0
+        self.hscroll = 0
         self.yank = ""
         self.visual_start = None
 
@@ -281,9 +282,12 @@ class CommandPane:
 
         visible = lines[self.scroll : self.scroll + max_visible]
 
+        text_w = w - (line_no_width + 3)
         for i, line in enumerate(visible):
             ln = self.scroll + i + 1
             row_idx = self.scroll + i
+            slice_start = self.hscroll
+            slice_end = slice_start + text_w
             try:
                 win.addnstr(i + 1, 1, f"{ln:>{line_no_width}} ", line_no_width + 1, curses.A_DIM)
 
@@ -292,16 +296,19 @@ class CommandPane:
                     start = min(self.visual_start, self.cursor)
                     end = max(self.visual_start, self.cursor)
 
-                    # compute absolute cursor offsets for this line
                     line_start = sum(len(l) + 1 for l in lines[:row_idx])
-                    line_end = line_start + len(line)
 
-                    for j, ch in enumerate(line[: w - (line_no_width + 3)]):
-                        abs_idx = line_start + j
+                    for j, ch in enumerate(line[slice_start:slice_end]):
+                        abs_idx = line_start + slice_start + j
                         attr = curses.A_REVERSE if start <= abs_idx < end else 0
                         win.addch(i + 1, 1 + line_no_width + 1 + j, ch, attr)
                 else:
-                    win.addnstr(i + 1, 1 + line_no_width + 1, line, w - (line_no_width + 3))
+                    win.addnstr(
+                        i + 1,
+                        1 + line_no_width + 1,
+                        line[slice_start:slice_end],
+                        text_w,
+                    )
             except curses.error:
                 pass
 
@@ -313,12 +320,18 @@ class CommandPane:
                 self.scroll = row
             elif row >= self.scroll + max_visible:
                 self.scroll = row - max_visible + 1
+            # horizontal scroll to keep cursor visible
+            text_w = w - (line_no_width + 3)
+            if col < self.hscroll:
+                self.hscroll = col
+            elif col >= self.hscroll + text_w:
+                self.hscroll = col - text_w + 1
+
             cy = 1 + (row - self.scroll)
-            cx = 1 + line_no_width + 1 + col
+            cx = 1 + line_no_width + 1 + (col - self.hscroll)
             try:
-                win.move(cy, min(cx, w - 2))
+                win.move(cy, max(1 + line_no_width + 1, min(cx, w - 2)))
             except curses.error:
                 pass
 
-        win.box()
         win.refresh()
