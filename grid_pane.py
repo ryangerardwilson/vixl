@@ -156,27 +156,30 @@ class GridPane:
 
                 win.addnstr(y, x, cell, cw, attr)
 
-                # === PERFECT CURSOR RENDERING - ALIGNED WITH RJUST PADDING ===
+                # === FINAL CURSOR RENDERING - PERFECT ALIGNMENT FOR BOTH MODES ===
                 if editing and r == edit_row and c == edit_col and edit_cursor is not None:
                     visible_len = len(visible)
-                    text_start_x = x + (cw - visible_len)  # exact left padding from rjust
+                    text_start_x = x + (cw - visible_len)  # padding from rjust
 
                     relative_pos = edit_cursor - edit_hscroll
 
                     if insert_mode:
-                        # Thin blinking cursor (between characters or at end)
+                        # Thin insert cursor - can be at end
                         pos = max(0, min(relative_pos, visible_len))
                         cx = text_start_x + pos
                         cx = max(x, min(x + cw - 1, cx))
                         win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
                     else:
-                        # Block cursor on the actual character in cell_normal mode
-                        if visible_len > 0:
-                            pos = max(0, min(relative_pos, visible_len - 1))
-                            cx = text_start_x + pos
-                            cx = max(x, min(x + cw - 1, cx))
+                        # Normal mode block cursor - identical positioning to insert
+                        pos = max(0, min(relative_pos, visible_len))
+                        cx = text_start_x + pos
+                        cx = max(x, min(x + cw - 1, cx))
+                        if pos < visible_len:
                             ch = visible[pos]
                             win.addch(y, cx, ch, curses.A_REVERSE)
+                        else:
+                            # At absolute end: reverse space (consistent with insert)
+                            win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
 
                 x += cw + 1
             y += 1

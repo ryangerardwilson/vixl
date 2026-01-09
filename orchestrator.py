@@ -209,14 +209,13 @@ class Orchestrator:
                     moved = True
 
             if moved:
-                # Symmetric scrolling - identical to insert mode
+                # FINAL PERFECT SCROLLING - Vim-like on right edge
                 if self.cell_cursor < self.cell_hscroll:
                     self.cell_hscroll = self.cell_cursor
-                elif self.cell_cursor > self.cell_hscroll + cw - 1:
-                    self.cell_hscroll = self.cell_cursor - (cw - 1)
+                elif self.cell_cursor >= self.cell_hscroll + cw:  # >= allows cursor on last char perfectly
+                    self.cell_hscroll = self.cell_cursor - cw + 1
 
-                # Correct max_scroll - no +1
-                max_scroll = max(0, buf_len - cw) if buf_len > cw else 0
+                max_scroll = max(0, buf_len - cw + 1) if buf_len >= cw else 0
                 self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
                 return
 
@@ -311,7 +310,7 @@ class Orchestrator:
         elif self.cell_cursor > self.cell_hscroll + cw - 1:
             self.cell_hscroll = self.cell_cursor - (cw - 1)
 
-        max_scroll = max(0, len(self.cell_buffer) - cw) if len(self.cell_buffer) > cw else 0
+        max_scroll = max(0, len(self.cell_buffer) - cw + 1) if len(self.cell_buffer) >= cw else 0
         self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
 
     # ---------------- UI ----------------
