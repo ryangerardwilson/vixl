@@ -118,7 +118,11 @@ class Orchestrator:
             if ch == 27:
                 if self.has_sentinel_space and self.cell_buffer.endswith(' '):
                     self.cell_buffer = self.cell_buffer[:-1]
-                    self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer))
+                # clamp cursor to real characters only
+                if self.cell_buffer:
+                    self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer) - 1)
+                else:
+                    self.cell_cursor = 0
                 self.has_sentinel_space = False
                 self.df_mode = 'cell_normal'
                 return
@@ -150,10 +154,15 @@ class Orchestrator:
         # ----- cell normal -----
         if self.df_mode == 'cell_normal':
             s = self.cell_buffer
+            buf_len = len(s)
             if ch == ord('h'):
-                self.cell_cursor = max(0, self.cell_cursor - 1)
+                # move left only within real characters
+                if self.cell_cursor > 0:
+                    self.cell_cursor -= 1
             elif ch == ord('l'):
-                self.cell_cursor = min(len(s), self.cell_cursor + 1)
+                # move right only within real characters
+                if buf_len > 0 and self.cell_cursor < buf_len - 1:
+                    self.cell_cursor += 1
             elif ch == ord('w'):
                 i = self.cell_cursor
                 while i < len(s) and not s[i].isspace():
