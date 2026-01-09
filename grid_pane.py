@@ -147,22 +147,24 @@ class GridPane:
                     cursor = edit_cursor
                     cell_right_edge = x + cw - 1
 
+                    # clamp visible length to cell width
+                    visible_len = min(buf_len, cw)
+
                     if insert_mode:
                         # insert mode: cursor is the insertion GAP (vim-correct)
-                        gap_index = max(0, min(buf_len, cursor))
-                        text_start_x = x + (cw - buf_len)
+                        gap_index = max(0, min(cursor, visible_len))
+                        text_start_x = x + (cw - visible_len)
                         visual_x = text_start_x + gap_index
                         visual_x = max(x, min(x + cw - 1, visual_x))
                         win.addnstr(y, visual_x, ' ', 1, curses.A_REVERSE)
                     else:
-                        # cell normal mode: cursor is ON character at insertion_index - 1
-                        char_index = max(0, min(buf_len - 1, cursor - 1))
-                        # compute real text bounds
-                        text_start_x = x + (cw - buf_len)
-                        text_end_x = cell_right_edge
-                        visual_x = text_start_x + char_index
-                        visual_x = max(text_start_x, min(text_end_x, visual_x))
-                        win.addnstr(y, visual_x, text[char_index], 1, curses.A_REVERSE)
+                        # normal mode: cursor is ON visible character
+                        if visible_len > 0:
+                            char_index = max(0, min(visible_len - 1, cursor - 1))
+                            text_start_x = x + (cw - visible_len)
+                            visual_x = text_start_x + char_index
+                            visual_x = max(x, min(x + cw - 1, visual_x))
+                            win.addnstr(y, visual_x, text[char_index], 1, curses.A_REVERSE)
                 x += cw + 1
             y += 1
             if y >= h - 1:
