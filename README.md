@@ -1,40 +1,60 @@
 # Vixl
 
-Vixl is a **Vim-first, terminal-native spreadsheet editor** designed for fast, explicit manipulation of tabular data using the Python data ecosystem.
+Vixl is a **Vim-first, terminal-native spreadsheet editor** for fast, explicit manipulation of tabular data using Pandas and NumPy.
 
-This repository currently contains a **single flat implementation** of the application, reflecting the active, runnable state of the project.
+It is designed for users who prefer keyboard-driven workflows and want full transparency over how their data is transformed.
 
-Earlier versioned directories (such as `v2/`) were used during development but have been flattened into the project root to preserve the v0 design constraint of **no directory-based architecture**.
+---
 
 ## Running the App
 
-Run the application directly via the root entrypoint:
+Run the application via the root entrypoint:
 
 ```bash
-python main.py <csv-file>
+python main.py <csv-or-parquet-file>
 ```
+
+- CSV and Parquet files are supported
+- If the file does not exist, a blank file is created automatically
+
+---
+
+## Features
+
+- Vim-style modal navigation
+- Command-driven DataFrame mutation
+- Pandas (`pd`) and NumPy (`np`) preloaded in execution context
+- Safe handling of empty tables
+- Content-aware, auto-sized columns
+- Right-aligned cell rendering
+- Persistent global command history (`~/.vixl_history`)
+- Explicit save and save-on-exit
+
+---
 
 ## Code Layout
 
-All Python files live in the project root, following the v0 rules:
+The repository reflects the current, runnable implementation of Vixl.
 
-- One class per file
-- Product-responsibility-based filenames
-- Flat structure (no packages)
+All Python files live in the project root:
 
-Key files:
-
-- `main.py` – Application entrypoint (CLI parsing + bootstrap)
-- `orchestrator.py` – Main event loop and coordination
-- `app_state.py` – Core application state
+- `main.py` – application entrypoint and bootstrap
+- `orchestrator.py` – main event loop and coordination
+- `app_state.py` – core application state and invariants
+- `file_type_handler.py` – file loading and saving logic
+- `command_executor.py` – command execution sandbox
 - `grid_pane.py`, `command_pane.py`, `output_pane.py` – UI panes
 
-## Design Principles
+Each file represents a clear product responsibility, with one primary class per file.
 
-- Vim-style modal interaction
-- Terminal-only (curses-based TUI)
-- Pandas DataFrame as the core data model
-- Explicit, command-driven data mutation
-- Thin root entrypoint; logic lives in versioned implementations
+---
 
-For the authoritative description of scope and philosophy, see `ProjectScope.md`.
+## Philosophy
+
+- Terminal-native, curses-based UI
+- Vim-inspired modal interaction
+- Explicit, inspectable data manipulation
+- Dense, information-first rendering
+- Minimal hidden behavior
+
+For a detailed description of scope and constraints, see `ProjectScope.md`.

@@ -35,16 +35,15 @@ class Orchestrator:
         self.focus = 0  # 0=df,1=cmd,2=out
         self.io_visible = False
         import os
-        self.command_history = []
         self.history_idx = None
-        self.global_history_path = os.path.expanduser('~/.vixl_history')
-        self.global_history = []
-        if os.path.exists(self.global_history_path):
+        self.history_path = os.path.expanduser('~/.vixl_history')
+        self.history = []
+        if os.path.exists(self.history_path):
             try:
-                with open(self.global_history_path, 'r', encoding='utf-8') as f:
-                    self.global_history = [l.rstrip('\n') for l in f if l.strip()][-100:]
+                with open(self.history_path, 'r', encoding='utf-8') as f:
+                    self.history = [l.rstrip('\n') for l in f if l.strip()][-100:]
             except Exception:
-                self.global_history = []
+                self.history = []
 
         self.status_msg = None
         self.status_msg_until = 0
@@ -78,7 +77,7 @@ class Orchestrator:
                 + "\n".join(self.output.lines)
             )
         elif seq == ',yio':
-            last = self.command_history[-1] if self.command_history else ""
+            last = self.history[-1] if self.history else ""
             content = last + "\n\n" + "\n".join(self.output.lines)
 
         if content:
@@ -267,25 +266,23 @@ class Orchestrator:
                 # command pane
                 # history navigation (normal mode only)
                 if self.command.mode == 'normal' and ch == 16:  # Ctrl-P
-                    combined = self.command_history + [h for h in self.global_history if h not in self.command_history]
-                    if combined:
+                    if self.history:
                         if self.history_idx is None:
-                            self.history_idx = len(combined) - 1
+                            self.history_idx = len(self.history) - 1
                         else:
                             self.history_idx = max(0, self.history_idx - 1)
-                        self.command.set_buffer(combined[self.history_idx])
+                        self.command.set_buffer(self.history[self.history_idx])
                     self.redraw()
                     continue
 
                 if self.command.mode == 'normal' and ch == 14:  # Ctrl-N
-                    combined = self.command_history + [h for h in self.global_history if h not in self.command_history]
                     if self.history_idx is not None:
                         self.history_idx += 1
-                        if self.history_idx >= len(combined):
+                        if self.history_idx >= len(self.history):
                             self.history_idx = None
                             self.command.set_buffer("")
                         else:
-                            self.command.set_buffer(combined[self.history_idx])
+                            self.command.set_buffer(self.history[self.history_idx])
                     self.redraw()
                     continue
 
@@ -297,17 +294,15 @@ class Orchestrator:
                     if code:
                         out = self.exec.execute(code)
                         if getattr(self.exec, '_last_success', False):
-                            self.command_history.append(code)
-                            self.history_idx = None
-                            # persist to global history
-                            if not self.global_history or self.global_history[-1] != code:
-                                self.global_history.append(code)
-                                self.global_history = self.global_history[-100:]
+                            if not self.history or self.history[-1] != code:
+                                self.history.append(code)
+                                self.history = self.history[-100:]
                                 try:
-                                    with open(self.global_history_path, 'w', encoding='utf-8') as f:
-                                        f.write("\n".join(self.global_history) + "\n")
+                                    with open(self.history_path, 'w', encoding='utf-8') as f:
+                                        f.write("\n".join(self.history) + "\n")
                                 except Exception:
                                     pass
+                            self.history_idx = None
                         self.output.set_lines(out)
                         self.grid.df = self.state.df
                         self.command.reset()

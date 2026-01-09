@@ -47,11 +47,26 @@ class GridPane:
     def draw(self, win, active=False):
         win.erase()
         h, w = win.getmaxyx()
-        CELL_W = 12
-        col_w = CELL_W + 1
+        # compute dynamic column widths
+        widths = []
+        for col in self.df.columns:
+            max_len = len(str(col))
+            for v in self.df[col]:
+                s = '' if v is None else str(v)
+                max_len = max(max_len, len(s))
+            widths.append(min(20, max_len + 2))
 
         max_rows = h - 3
-        max_cols = max(1, (w - 4) // col_w)
+        # estimate max columns that fit by greedy width sum
+        avail_w = w - 4
+        max_cols = 0
+        used = 0
+        for cw in widths[self.col_offset:]:
+            if used + cw + 1 > avail_w:
+                break
+            used += cw + 1
+            max_cols += 1
+        max_cols = max(1, max_cols)
 
         # adjust viewport
         if self.curr_row < self.row_offset:
@@ -70,9 +85,10 @@ class GridPane:
         # header
         x = 4
         for c in visible_cols:
-            name = str(self.df.columns[c])[:CELL_W].rjust(CELL_W)
-            win.addnstr(1, x, name, CELL_W, curses.A_BOLD)
-            x += col_w
+            cw = widths[c]
+            name = str(self.df.columns[c])[:cw].rjust(cw)
+            win.addnstr(1, x, name, cw, curses.A_BOLD)
+            x += cw + 1
 
         # rows
         y = 2
@@ -80,9 +96,10 @@ class GridPane:
             win.addnstr(y, 0, str(r).rjust(3), 3)
             x = 4
             for c in visible_cols:
+                cw = widths[c]
                 val = self.df.iloc[r, c]
                 text = '' if val is None else str(val)
-                cell = text[:CELL_W].rjust(CELL_W)
+                cell = text[:cw].rjust(cw)
 
                 attr = 0
                 if self.highlight_mode == 'row' and r == self.curr_row:
@@ -92,8 +109,8 @@ class GridPane:
                 elif self.highlight_mode == 'cell' and r == self.curr_row and c == self.curr_col:
                     attr = curses.A_REVERSE
 
-                win.addnstr(y, x, cell, CELL_W, attr)
-                x += col_w
+                win.addnstr(y, x, cell, cw, attr)
+                x += cw + 1
             y += 1
             if y >= h - 1:
                 break
