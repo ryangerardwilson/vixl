@@ -1,6 +1,7 @@
 import io
 import sys
 import numpy as np
+import pandas as pd
 
 
 class CommandExecutor:
@@ -8,11 +9,13 @@ class CommandExecutor:
         self.state = app_state
 
     def execute(self, code):
+        self._last_success = False
         stdout = io.StringIO()
         stderr = io.StringIO()
         env = {
             'df': self.state.df,
             'np': np,
+            'pd': pd,
         }
         import ast
         old_out, old_err = sys.stdout, sys.stderr
@@ -33,6 +36,10 @@ class CommandExecutor:
                 print(last_value)
 
             self.state.df = env.get('df', self.state.df)
+            self._last_success = True
+            # ensure grid-safe invariant
+            if hasattr(self.state, 'ensure_non_empty'):
+                self.state.ensure_non_empty()
         except Exception as e:
             stderr.write(str(e))
         finally:

@@ -34,7 +34,17 @@ class Orchestrator:
 
         self.focus = 0  # 0=df,1=cmd,2=out
         self.io_visible = False
+        import os
         self.command_history = []
+        self.history_idx = None
+        self.global_history_path = os.path.expanduser('~/.vixl_history')
+        self.global_history = []
+        if os.path.exists(self.global_history_path):
+            try:
+                with open(self.global_history_path, 'r', encoding='utf-8') as f:
+                    self.global_history = [l.rstrip('\n') for l in f if l.strip()][-100:]
+            except Exception:
+                self.global_history = []
 
         self.status_msg = None
         self.status_msg_until = 0
@@ -44,7 +54,6 @@ class Orchestrator:
         self.leader_start = 0.0
 
     def _execute_leader(self, seq: str):
-        # pane switching leaders
         if seq == ',o':
             self.focus = 2
             return
@@ -137,11 +146,9 @@ class Orchestrator:
             self.layout.command_win.refresh()
 
     def _leader_tick(self, now: float):
-        # timeout handling
         if self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
             if self.leader_seq in LEADER_COMMANDS:
                 self._execute_leader(self.leader_seq)
-            # clear leader state regardless (complete or incomplete)
             self.leader_seq = None
 
     def run(self):
@@ -153,8 +160,11 @@ class Orchestrator:
             ch = self.stdscr.getch()
             now = time.time()
 
+            leader_enabled = not (self.focus == 1 and self.command.mode == 'insert')
+
             if ch == -1:
-                self._leader_tick(now)
+                if leader_enabled:
+                    self._leader_tick(now)
                 self.redraw()
                 continue
 
@@ -163,7 +173,7 @@ class Orchestrator:
                 break
             if ch == 19:  # Ctrl-S
                 try:
-                    self.state.save()
+                    self.state.file_handler.save(self.state.df)
                 except Exception:
                     pass
                 self.status_msg = "Saved"
@@ -172,13 +182,12 @@ class Orchestrator:
                 continue
             if ch == 20:  # Ctrl-T
                 try:
-                    self.state.save()
+                    self.state.file_handler.save(self.state.df)
                 except Exception:
                     pass
                 return
 
             if ch == 23:  # Ctrl-W
-                # cancel any in-progress leader to avoid UI glitch
                 self.leader_seq = None
                 if self.status_msg_until == float('inf'):
                     self.status_msg = None
@@ -188,17 +197,13 @@ class Orchestrator:
                 continue
 
             # leader handling
-            if self.leader_seq is not None:
+            if leader_enabled and self.leader_seq is not None:
                 if 0 <= ch <= 0x10FFFF:
-                    # extend leader sequence
                     self.leader_seq += chr(ch)
-                    self.leader_start = now  # reset timeout on each valid key
+                    self.leader_start = now
 
-                    # invalid prefix -> cancel immediately
                     if self.leader_seq not in LEADER_PREFIXES:
                         self.leader_seq = None
-
-                    # complete and not a prefix of any longer command -> execute now
                     elif (self.leader_seq in LEADER_COMMANDS and
                           not any(p != self.leader_seq and p.startswith(self.leader_seq)
                                   for p in LEADER_COMMANDS)):
@@ -207,7 +212,7 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            if ch == ord(','):
+            if leader_enabled and ch == ord(','):
                 self.leader_seq = ','
                 self.leader_start = now
                 self.redraw()
@@ -232,11 +237,9 @@ class Orchestrator:
                 elif ch == ord('L'):
                     self.grid.move_col_right()
                 elif ch == ord(':'):
-                    # plain command entry, preserve existing buffer
                     self.io_visible = True
                     self.focus = 1
                 elif ch == ord('i'):
-                    # insert with context-aware prefill
                     r = self.grid.curr_row
                     c = self.grid.curr_col
                     col = self.state.df.columns[c]
@@ -246,14 +249,13 @@ class Orchestrator:
                     elif self.grid.highlight_mode == 'row':
                         cmd = f"df.loc[{r}] = {repr(df.iloc[r].to_dict())}"
                     else:
-                        # column-level insert defaults to rename intent
                         cmd = f"df = df.rename(columns={{'{col}': '{col}'}})"
                     self.command.set_buffer(cmd)
                     self.io_visible = True
                     self.focus = 1
 
             elif self.focus == 2:
-                if ch == 27:  # ESC -> command pane
+                if ch == 27:
                     self.io_visible = True
                     self.focus = 1
                 elif ch == ord('j'):
@@ -263,16 +265,50 @@ class Orchestrator:
 
             else:
                 # command pane
-                if ch == 27 and self.command.mode == 'normal':  # ESC from normal -> back to DF
+                # history navigation (normal mode only)
+                if self.command.mode == 'normal' and ch == 16:  # Ctrl-P
+                    combined = self.command_history + [h for h in self.global_history if h not in self.command_history]
+                    if combined:
+                        if self.history_idx is None:
+                            self.history_idx = len(combined) - 1
+                        else:
+                            self.history_idx = max(0, self.history_idx - 1)
+                        self.command.set_buffer(combined[self.history_idx])
+                    self.redraw()
+                    continue
+
+                if self.command.mode == 'normal' and ch == 14:  # Ctrl-N
+                    combined = self.command_history + [h for h in self.global_history if h not in self.command_history]
+                    if self.history_idx is not None:
+                        self.history_idx += 1
+                        if self.history_idx >= len(combined):
+                            self.history_idx = None
+                            self.command.set_buffer("")
+                        else:
+                            self.command.set_buffer(combined[self.history_idx])
+                    self.redraw()
+                    continue
+
+                if ch == 27 and self.command.mode == 'normal':
                     self.focus = 0
                     self.io_visible = False
                 elif ch == 5:  # Ctrl-E execute
                     code = self.command.get_buffer().strip()
                     if code:
-                        self.command_history.append(code)
                         out = self.exec.execute(code)
+                        if getattr(self.exec, '_last_success', False):
+                            self.command_history.append(code)
+                            self.history_idx = None
+                            # persist to global history
+                            if not self.global_history or self.global_history[-1] != code:
+                                self.global_history.append(code)
+                                self.global_history = self.global_history[-100:]
+                                try:
+                                    with open(self.global_history_path, 'w', encoding='utf-8') as f:
+                                        f.write("\n".join(self.global_history) + "\n")
+                                except Exception:
+                                    pass
                         self.output.set_lines(out)
-                        # ensure grid reflects latest df
                         self.grid.df = self.state.df
                         self.command.reset()
                         self.command.mode = 'normal'

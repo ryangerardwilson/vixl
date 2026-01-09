@@ -77,7 +77,10 @@ class CommandPane:
             if ch == 27:  # ESC
                 self.mode = "normal"
                 return None
-            if ch in (curses.KEY_BACKSPACE, 127):
+            if ch == 9:  # Tab -> indent
+                self.buffer = self.buffer[: self.cursor] + "    " + self.buffer[self.cursor :]
+                self.cursor += 4
+            elif ch in (curses.KEY_BACKSPACE, 127):
                 if self.cursor > 0:
                     self.buffer = self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
                     self.cursor -= 1
