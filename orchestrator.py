@@ -114,8 +114,12 @@ class Orchestrator:
     def _handle_df_key(self, ch):
         # ----- cell insert -----
         if self.df_mode == 'cell_insert':
-            # Esc -> cell normal
+            # Esc -> cell normal (remove sentinel space)
             if ch == 27:
+                if self.has_sentinel_space and self.cell_buffer.endswith(' '):
+                    self.cell_buffer = self.cell_buffer[:-1]
+                    self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer))
+                self.has_sentinel_space = False
                 self.df_mode = 'cell_normal'
                 return
 
