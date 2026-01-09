@@ -119,6 +119,10 @@ class Orchestrator:
         if self.df_mode == 'cell_insert':
             # Esc -> cell normal (no dummy space model)
             if ch == 27:
+                # exit insert: trim spaces, move cursor left (vim semantics)
+                self.cell_buffer = self.cell_buffer.strip()
+                self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer))
+                self.cell_cursor = max(0, self.cell_cursor - 1)
                 self.df_mode = 'cell_normal'
                 return
 
@@ -158,10 +162,10 @@ class Orchestrator:
 
                 if state == 'leader':
                     if ch == ord('e'):
-                        # ,e → append with trailing space
-                        if self.cell_buffer and not self.cell_buffer.endswith(' '):
+                        # ,e → append with sentinel space for stable cursor
+                        if not self.cell_buffer.endswith(' '):
                             self.cell_buffer += ' '
-                        self.cell_cursor = len(self.cell_buffer)
+                        self.cell_cursor = len(self.cell_buffer) - 1
                         self.df_mode = 'cell_insert'
                         return
                     if ch == ord('c'):
@@ -192,13 +196,11 @@ class Orchestrator:
                 return
 
             if ch == ord('h'):
-                # move left only within real characters
-                if self.cell_cursor > 0:
-                    self.cell_cursor -= 1
+                # move left (insertion index)
+                self.cell_cursor = max(0, self.cell_cursor - 1)
             elif ch == ord('l'):
-                # move right only within real characters
-                if buf_len > 0 and self.cell_cursor < buf_len - 1:
-                    self.cell_cursor += 1
+                # move right (insertion index)
+                self.cell_cursor = min(len(self.cell_buffer), self.cell_cursor + 1)
             elif ch == ord('w'):
                 i = self.cell_cursor
                 while i < len(s) and not s[i].isspace():
@@ -214,9 +216,10 @@ class Orchestrator:
                     i -= 1
                 self.cell_cursor = i
             elif ch == ord('i'):
-                # disabled: explicit commands only
-                self.status_msg = "Use ,e or ,cc to edit cell"
-                self.status_msg_until = time.time() + 2
+                # enter insert mode like vim 'i': insert before character under cursor
+                # normal-mode cursor is on char at (cell_cursor - 1)
+                self.cell_cursor = max(0, self.cell_cursor - 1)
+                self.df_mode = 'cell_insert'
                 return
             elif ch == 27:
                 r, c = self.grid.curr_row, self.grid.curr_col
@@ -249,12 +252,12 @@ class Orchestrator:
 
                 if state == 'leader':
                     if ch == ord('e'):
-                        # ,e from hover → append with trailing space
+                        # ,e from hover → append with sentinel space
                         self.cell_col = col
                         self.cell_buffer = base
-                        if self.cell_buffer and not self.cell_buffer.endswith(' '):
+                        if not self.cell_buffer.endswith(' '):
                             self.cell_buffer += ' '
-                        self.cell_cursor = len(self.cell_buffer)
+                        self.cell_cursor = len(self.cell_buffer) - 1
                         self.df_mode = 'cell_insert'
                         return
                     if ch == ord('c'):
