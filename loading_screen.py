@@ -1,3 +1,4 @@
+# ~/Apps/vixl/loading_screen.py
 import curses
 import threading
 import time
@@ -87,7 +88,7 @@ class LoadingScreen:
         while not self.state.aborted:
             self.draw()
             ch = self.stdscr.getch()
-            if ch == 24:
+            if ch == 24:  # Ctrl+X
                 self.state.aborted = True
                 break
             now = time.time()
@@ -101,47 +102,62 @@ class LoadingScreen:
         now = time.time()
         self.stdscr.erase()
 
-        # phase transitions
+        # Phase transitions
         elapsed = now - self.phase_start
-        if self.phase == self.PHASE_RAIN and elapsed > 0.4:
+
+        if self.phase == self.PHASE_RAIN and elapsed > 0.3:         # Reduced by ~30% from 0.8s → 0.56s
             self.phase = self.PHASE_INTERFERE
             self.phase_start = now
-        elif self.phase == self.PHASE_INTERFERE and elapsed > 0.7:
+
+        elif self.phase == self.PHASE_INTERFERE and elapsed > 0.2:   # Still 0.4s subtle interference
             self.phase = self.PHASE_TAKEOVER
             self.phase_start = now
-        elif self.phase == self.PHASE_TAKEOVER and self.takeover_idx >= len(self.logo_cols):
-            self.phase = self.PHASE_FREEZE
-            self.phase_start = now
-        elif self.phase == self.PHASE_FREEZE:
+            self.takeover_idx = 0
+
+        elif self.phase == self.PHASE_TAKEOVER:
+            # Fast takeover: multiple columns per frame
+            cols_per_frame = 10  # Keeps takeover very quick (~0.2–0.4s even for wide logos)
+
+            target_idx = self.takeover_idx + cols_per_frame
+            while (self.takeover_idx < len(self.logo_cols) and
+                   self.takeover_idx < target_idx):
+                col = self.logo_cols[self.takeover_idx]
+                for (y, x), ch in self.logo_mask.items():
+                    if x == col:
+                        try:
+                            self.stdscr.addch(y, x, ch)
+                        except curses.error:
+                            pass
+                self.takeover_idx += 1
+
+            if self.takeover_idx >= len(self.logo_cols):
+                self.phase = self.PHASE_FREEZE
+                self.phase_start = now
+
+        elif self.phase == self.PHASE_FREEZE and elapsed > 0.2:      # Quick freeze
             self.phase = self.PHASE_HOLD
             self.logo_fully_revealed_time = now
             self.phase_start = now
 
-        # draw rain
+        # Draw matrix rain
         for s in self.streams:
             s.advance(now)
             y = int(s.head_y)
             ch = self.GLYPHS[s.glyph_idx]
             if self.phase >= self.PHASE_INTERFERE and (y, s.x) in self.logo_mask:
-                # suppressed inside logo
-                continue
+                continue  # Suppress rain inside logo area during/after interference
             if 0 <= y < self.h and 0 <= s.x < self.w:
                 try:
                     self.stdscr.addch(y, s.x, ch)
                 except curses.error:
                     pass
 
-        # takeover
-        if self.phase == self.PHASE_TAKEOVER:
-            col = self.logo_cols[self.takeover_idx]
-            for (y, x), ch in self.logo_mask.items():
-                if x == col:
-                    self.stdscr.addch(y, x, ch)
-            self.takeover_idx += 1
-
-        # freeze / hold: draw logo clean
+        # Draw full logo in freeze/hold phases
         if self.phase in (self.PHASE_FREEZE, self.PHASE_HOLD):
             for (y, x), ch in self.logo_mask.items():
-                self.stdscr.addch(y, x, ch)
+                try:
+                    self.stdscr.addch(y, x, ch)
+                except curses.error:
+                    pass
 
         self.stdscr.refresh()
