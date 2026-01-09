@@ -2,10 +2,27 @@ import curses
 
 
 class GridPane:
+    # color pair IDs
+    PAIR_CELL_ACTIVE = 1
+    PAIR_CURSOR_INSERT = 2
+    PAIR_CURSOR_NORMAL_BG = 3
+    PAIR_CURSOR_NORMAL_CHAR = 4
+    PAIR_CELL_ACTIVE_TEXT = 5
     MAX_COL_WIDTH = 40
 
     def __init__(self, df):
         self.df = df
+        # init colors once
+        try:
+            curses.start_color()
+            curses.use_default_colors()
+            curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
+            curses.init_pair(self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE)
+            curses.init_pair(self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, curses.COLOR_BLACK)
+            curses.init_pair(self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            curses.init_pair(self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        except curses.error:
+            pass
         self.curr_row = 0
         self.curr_col = 0
         self.row_offset = 0
@@ -46,7 +63,7 @@ class GridPane:
         self.highlight_mode = 'column'
 
     # ---------- rendering ----------
-    def draw(self, win, active=False):
+    def draw(self, win, active=False, editing=False, insert_mode=False, edit_row=None, edit_col=None, edit_buffer=None, edit_cursor=None):
         win.erase()
         h, w = win.getmaxyx()
         # compute dynamic column widths
@@ -99,19 +116,48 @@ class GridPane:
             x = 4
             for c in visible_cols:
                 cw = widths[c]
-                val = self.df.iloc[r, c]
-                text = '' if val is None else str(val)
+                # determine cell text
+                if editing and r == edit_row and c == edit_col:
+                    text = edit_buffer or ''
+                else:
+                    val = self.df.iloc[r, c]
+                    text = '' if val is None else str(val)
+
                 cell = text[:cw].rjust(cw)
 
                 attr = 0
-                if self.highlight_mode == 'row' and r == self.curr_row:
-                    attr = curses.A_REVERSE
-                elif self.highlight_mode == 'column' and c == self.curr_col:
-                    attr = curses.A_REVERSE
-                elif self.highlight_mode == 'cell' and r == self.curr_row and c == self.curr_col:
-                    attr = curses.A_REVERSE
+                # apply grid highlight only in df:normal (no editing)
+                active_cell = False
+                if not editing:
+                    active_cell = (
+                        (self.highlight_mode == 'row' and r == self.curr_row)
+                        or (self.highlight_mode == 'column' and c == self.curr_col)
+                        or (self.highlight_mode == 'cell' and r == self.curr_row and c == self.curr_col)
+                    )
+
+                if active_cell:
+                    attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
 
                 win.addnstr(y, x, cell, cw, attr)
+
+                # vim-like cursor rendering
+                if editing and r == edit_row and c == edit_col and edit_cursor is not None:
+                    # right-aligned block cursor rendered in the GAP between characters
+                    buf_len = len(text)
+                    cursor = edit_cursor
+                    cell_right_edge = x + cw - 1
+
+                    # insert mode cursor represents NEXT insertion point
+                    cursor_gap = cursor + 1 if insert_mode else cursor
+
+                    # visual gap position (never obscure glyphs)
+                    visual_gap_x = cell_right_edge - (buf_len - cursor_gap)
+
+                    # clamp to cell bounds
+                    visual_gap_x = max(x, min(cell_right_edge, visual_gap_x))
+
+                    # draw block cursor in gap using space only (text already rendered once)
+                    win.addnstr(y, visual_gap_x, ' ', 1, curses.A_REVERSE)
                 x += cw + 1
             y += 1
             if y >= h - 1:

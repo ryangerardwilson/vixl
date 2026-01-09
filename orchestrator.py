@@ -1,6 +1,8 @@
 import curses
 import time
 import subprocess
+import pandas as pd
+
 from grid_pane import GridPane
 from command_pane import CommandPane
 from output_pane import OutputPane
@@ -32,8 +34,24 @@ class Orchestrator:
         self.output = OutputPane()
         self.exec = CommandExecutor(app_state)
 
-        self.focus = 0  # 0=df,1=cmd,2=out
+        self.focus = 0  # 0=df, 1=cmd, 2=out
         self.io_visible = False
+
+        # ---- DF cell editing state ----
+        self.df_mode = 'normal'  # normal | cell_insert | cell_normal
+        self.last_nav = None     # hjkl | HJKL | other
+        self.cell_buffer = ""
+        self.cell_cursor = 0
+        self.cell_col = None
+        self.has_sentinel_space = False
+
+        # ---- status / leader ----
+        self.status_msg = None
+        self.status_msg_until = 0
+        self.leader_seq = None
+        self.leader_start = 0.0
+
+        # ---- history ----
         import os
         self.history_idx = None
         self.history_path = os.path.expanduser('~/.vixl_history')
@@ -45,14 +63,19 @@ class Orchestrator:
             except Exception:
                 self.history = []
 
-        self.status_msg = None
-        self.status_msg_until = 0
+    # ---------------- helpers ----------------
 
-        # leader state
-        self.leader_seq = None
-        self.leader_start = 0.0
+    def _coerce_cell_value(self, col, text):
+        dtype = self.state.df[col].dtype
+        if pd.api.types.is_integer_dtype(dtype):
+            return int(text)
+        if pd.api.types.is_float_dtype(dtype):
+            return float(text)
+        if pd.api.types.is_bool_dtype(dtype):
+            return text.lower() in ('1', 'true', 'yes')
+        return text
 
-    def _execute_leader(self, seq: str):
+    def _execute_leader(self, seq):
         if seq == ',o':
             self.focus = 2
             return
@@ -60,34 +83,163 @@ class Orchestrator:
             self.focus = 0
             return
 
-        content = ""
+        content = ''
         if seq == ',ya':
             if self.focus == 0:
                 content = self.state.df.to_string()
             elif self.focus == 1:
                 content = self.command.get_buffer()
             else:
-                content = "\n".join(self.output.lines)
+                content = '\n'.join(self.output.lines)
         elif seq == ',yap':
             content = (
-                self.state.df.to_string()
-                + "\n\n"
-                + self.command.get_buffer()
-                + "\n\n"
-                + "\n".join(self.output.lines)
+                self.state.df.to_string() + '\n\n'
+                + self.command.get_buffer() + '\n\n'
+                + '\n'.join(self.output.lines)
             )
         elif seq == ',yio':
-            last = self.history[-1] if self.history else ""
-            content = last + "\n\n" + "\n".join(self.output.lines)
+            last = self.history[-1] if self.history else ''
+            content = last + '\n\n' + '\n'.join(self.output.lines)
 
         if content:
             try:
                 subprocess.run(['wl-copy'], input=content, text=True)
                 self.status_msg = f"{seq} → copied"
-                self.status_msg_until = time.time() + 5.0
+                self.status_msg_until = time.time() + 5
             except Exception:
-                self.status_msg = None
-                self.status_msg_until = 0
+                pass
+
+    # ---------------- DF handling ----------------
+
+    def _handle_df_key(self, ch):
+        # ----- cell insert -----
+        if self.df_mode == 'cell_insert':
+            # Esc -> cell normal
+            if ch == 27:
+                self.df_mode = 'cell_normal'
+                return
+
+            # Backspace handling (KEY_BACKSPACE, DEL, Ctrl-H)
+            if ch in (curses.KEY_BACKSPACE, 127, 8):
+                if self.cell_cursor > 0:
+                    self.cell_buffer = (
+                        self.cell_buffer[:self.cell_cursor - 1]
+                        + self.cell_buffer[self.cell_cursor:]
+                    )
+                    self.cell_cursor -= 1
+                return
+
+            # Printable character insertion
+            if 0 <= ch <= 0x10FFFF:
+                try:
+                    ch_str = chr(ch)
+                except ValueError:
+                    return
+                self.cell_buffer = (
+                    self.cell_buffer[:self.cell_cursor]
+                    + ch_str
+                    + self.cell_buffer[self.cell_cursor:]
+                )
+                self.cell_cursor += 1
+            return
+
+        # ----- cell normal -----
+        if self.df_mode == 'cell_normal':
+            s = self.cell_buffer
+            if ch == ord('h'):
+                self.cell_cursor = max(0, self.cell_cursor - 1)
+            elif ch == ord('l'):
+                self.cell_cursor = min(len(s), self.cell_cursor + 1)
+            elif ch == ord('w'):
+                i = self.cell_cursor
+                while i < len(s) and not s[i].isspace():
+                    i += 1
+                while i < len(s) and s[i].isspace():
+                    i += 1
+                self.cell_cursor = i
+            elif ch == ord('b'):
+                i = max(0, self.cell_cursor - 1)
+                while i > 0 and s[i].isspace():
+                    i -= 1
+                while i > 0 and not s[i-1].isspace():
+                    i -= 1
+                self.cell_cursor = i
+            elif ch == ord('i'):
+                # enter insert mode from cell normal, add sentinel if needed
+                if not self.has_sentinel_space:
+                    self.cell_buffer = self.cell_buffer + ' '
+                    self.has_sentinel_space = True
+                self.df_mode = 'cell_insert'
+            elif ch == 27:
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col = self.cell_col
+                try:
+                    commit_val = s
+                    if self.has_sentinel_space and commit_val.endswith(' '):
+                        commit_val = commit_val[:-1]
+                    val = self._coerce_cell_value(col, commit_val)
+                    self.state.df.iloc[r, c] = val
+                except Exception:
+                    self.status_msg = f"Invalid value for column '{col}'"
+                    self.status_msg_until = time.time() + 3
+                self.df_mode = 'normal'
+                self.cell_buffer = ""
+                self.has_sentinel_space = False
+            return
+
+        # ----- normal df -----
+        if ch in (ord('h'), ord('j'), ord('k'), ord('l')):
+            self.last_nav = 'hjkl'
+        elif ch in (ord('H'), ord('J'), ord('K'), ord('L')):
+            self.last_nav = 'HJKL'
+        else:
+            self.last_nav = 'other'
+
+        if ch == ord('h'):
+            self.grid.move_left()
+        elif ch == ord('l'):
+            self.grid.move_right()
+        elif ch == ord('j'):
+            self.grid.move_down()
+        elif ch == ord('k'):
+            self.grid.move_up()
+        elif ch == ord('J'):
+            self.grid.move_row_down()
+        elif ch == ord('K'):
+            self.grid.move_row_up()
+        elif ch == ord('H'):
+            self.grid.move_col_left()
+        elif ch == ord('L'):
+            self.grid.move_col_right()
+        elif ch == ord(':'):
+            self.io_visible = True
+            self.focus = 1
+        elif ch == ord('i'):
+            if self.last_nav == 'HJKL':
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col = self.state.df.columns[c]
+                df = self.state.df
+                if self.grid.highlight_mode == 'cell':
+                    cmd = f"df.loc[{r}, '{col}'] = {repr(df.iloc[r, c])}"
+                elif self.grid.highlight_mode == 'row':
+                    cmd = f"df.loc[{r}] = {repr(df.iloc[r].to_dict())}"
+                else:
+                    cmd = f"df = df.rename(columns={{'{col}': '{col}'}})"
+                self.command.set_buffer(cmd)
+                self.io_visible = True
+                self.focus = 1
+            else:
+                r, c = self.grid.curr_row, self.grid.curr_col
+                self.cell_col = self.state.df.columns[c]
+                val = self.state.df.iloc[r, c]
+                base = '' if val is None else str(val)
+                # add sentinel space for insert mode
+                self.cell_buffer = base + ' '
+                self.cell_cursor = len(base)
+                self.has_sentinel_space = True
+                self.df_mode = 'cell_insert'
+
+    # ---------------- UI ----------------
 
     def redraw(self):
         try:
@@ -95,7 +247,17 @@ class Orchestrator:
         except curses.error:
             pass
 
-        self.grid.draw(self.layout.table_win, active=self.focus == 0)
+        self.grid.draw(
+            self.layout.table_win,
+            active=self.focus == 0,
+            editing=(self.focus == 0 and self.df_mode in ('cell_insert', 'cell_normal')),
+            insert_mode=(self.focus == 0 and self.df_mode == 'cell_insert'),
+            edit_row=self.grid.curr_row,
+            edit_col=self.grid.curr_col,
+            edit_buffer=self.cell_buffer,
+            edit_cursor=self.cell_cursor,
+        )
+
         if self.io_visible:
             self.output.draw(self.layout.output_win, active=False)
         else:
@@ -106,31 +268,27 @@ class Orchestrator:
         sw.erase()
         h, w = sw.getmaxyx()
 
-        try:
-            mem_bytes = int(self.state.df.memory_usage(deep=True).sum())
-            mem = f"{mem_bytes/1024/1024:.1f}MB"
-        except Exception:
-            mem = "?MB"
-
         now = time.time()
         if self.status_msg and now < self.status_msg_until:
             text = f" {self.status_msg}"
         else:
-            if self.status_msg and now >= self.status_msg_until:
-                self.status_msg = None
-                self.status_msg_until = 0
             if self.leader_seq:
                 text = f" {self.leader_seq}"
             else:
                 if self.focus == 0:
-                    mode = "DF"
+                    if self.df_mode == 'cell_insert':
+                        mode = 'DF:CELL-INSERT'
+                    elif self.df_mode == 'cell_normal':
+                        mode = 'DF:CELL-NORMAL'
+                    else:
+                        mode = 'DF'
                 elif self.focus == 1:
                     mode = f"CMD:{self.command.mode.upper()}"
                 else:
-                    mode = "OUT"
-                fname = self.state.file_path or ""
+                    mode = 'OUT'
+                fname = self.state.file_path or ''
                 shape = f"{self.state.df.shape}"
-                text = f" {mode} | {fname} | {shape} | {mem}"
+                text = f" {mode} | {fname} | {shape}"
 
         try:
             sw.addnstr(0, 0, text.ljust(w), w)
@@ -144,11 +302,7 @@ class Orchestrator:
             self.layout.command_win.erase()
             self.layout.command_win.refresh()
 
-    def _leader_tick(self, now: float):
-        if self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
-            if self.leader_seq in LEADER_COMMANDS:
-                self._execute_leader(self.leader_seq)
-            self.leader_seq = None
+    # ---------------- main loop ----------------
 
     def run(self):
         self.stdscr.clear()
@@ -162,52 +316,24 @@ class Orchestrator:
             leader_enabled = not (self.focus == 1 and self.command.mode == 'insert')
 
             if ch == -1:
-                if leader_enabled:
-                    self._leader_tick(now)
-                self.redraw()
-                continue
-
-            # global
-            if ch == 24:  # Ctrl-X
-                break
-            if ch == 19:  # Ctrl-S
-                try:
-                    self.state.file_handler.save(self.state.df)
-                except Exception:
-                    pass
-                self.status_msg = "Saved"
-                self.status_msg_until = time.time() + 5.0
-                self.redraw()
-                continue
-            if ch == 20:  # Ctrl-T
-                try:
-                    self.state.file_handler.save(self.state.df)
-                except Exception:
-                    pass
-                return
-
-            if ch == 23:  # Ctrl-W
-                self.leader_seq = None
-                if self.status_msg_until == float('inf'):
-                    self.status_msg = None
-                    self.status_msg_until = 0
-                self.focus = (self.focus + 1) % 3
-                self.redraw()
-                continue
-
-            # leader handling
-            if leader_enabled and self.leader_seq is not None:
-                if 0 <= ch <= 0x10FFFF:
-                    self.leader_seq += chr(ch)
-                    self.leader_start = now
-
-                    if self.leader_seq not in LEADER_PREFIXES:
-                        self.leader_seq = None
-                    elif (self.leader_seq in LEADER_COMMANDS and
-                          not any(p != self.leader_seq and p.startswith(self.leader_seq)
-                                  for p in LEADER_COMMANDS)):
+                if leader_enabled and self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
+                    if self.leader_seq in LEADER_COMMANDS:
                         self._execute_leader(self.leader_seq)
-                        self.leader_seq = None
+                    self.leader_seq = None
+                self.redraw()
+                continue
+
+            if ch == 24:
+                break
+
+            if leader_enabled and self.leader_seq is not None:
+                self.leader_seq += chr(ch)
+                self.leader_start = now
+                if self.leader_seq not in LEADER_PREFIXES:
+                    self.leader_seq = None
+                elif self.leader_seq in LEADER_COMMANDS:
+                    self._execute_leader(self.leader_seq)
+                    self.leader_seq = None
                 self.redraw()
                 continue
 
@@ -217,98 +343,20 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            # pane-specific
             if self.focus == 0:
-                if ch == ord('h'):
-                    self.grid.move_left()
-                elif ch == ord('l'):
-                    self.grid.move_right()
-                elif ch == ord('j'):
-                    self.grid.move_down()
-                elif ch == ord('k'):
-                    self.grid.move_up()
-                elif ch == ord('J'):
-                    self.grid.move_row_down()
-                elif ch == ord('K'):
-                    self.grid.move_row_up()
-                elif ch == ord('H'):
-                    self.grid.move_col_left()
-                elif ch == ord('L'):
-                    self.grid.move_col_right()
-                elif ch == ord(':'):
-                    self.io_visible = True
-                    self.focus = 1
-                elif ch == ord('i'):
-                    r = self.grid.curr_row
-                    c = self.grid.curr_col
-                    col = self.state.df.columns[c]
-                    df = self.state.df
-                    if self.grid.highlight_mode == 'cell':
-                        cmd = f"df.loc[{r}, '{col}'] = {repr(df.iloc[r, c])}"
-                    elif self.grid.highlight_mode == 'row':
-                        cmd = f"df.loc[{r}] = {repr(df.iloc[r].to_dict())}"
-                    else:
-                        cmd = f"df = df.rename(columns={{'{col}': '{col}'}})"
-                    self.command.set_buffer(cmd)
-                    self.io_visible = True
-                    self.focus = 1
-
+                self._handle_df_key(ch)
             elif self.focus == 2:
                 if ch == 27:
-                    self.io_visible = True
                     self.focus = 1
+                    self.io_visible = True
                 elif ch == ord('j'):
                     self.output.scroll_down()
                 elif ch == ord('k'):
                     self.output.scroll_up()
-
             else:
-                # command pane
-                # history navigation (normal mode only)
-                if self.command.mode == 'normal' and ch == 16:  # Ctrl-P
-                    if self.history:
-                        if self.history_idx is None:
-                            self.history_idx = len(self.history) - 1
-                        else:
-                            self.history_idx = max(0, self.history_idx - 1)
-                        self.command.set_buffer(self.history[self.history_idx])
-                    self.redraw()
-                    continue
-
-                if self.command.mode == 'normal' and ch == 14:  # Ctrl-N
-                    if self.history_idx is not None:
-                        self.history_idx += 1
-                        if self.history_idx >= len(self.history):
-                            self.history_idx = None
-                            self.command.set_buffer("")
-                        else:
-                            self.command.set_buffer(self.history[self.history_idx])
-                    self.redraw()
-                    continue
-
                 if ch == 27 and self.command.mode == 'normal':
                     self.focus = 0
                     self.io_visible = False
-                elif ch == 5:  # Ctrl-E execute
-                    code = self.command.get_buffer().strip()
-                    if code:
-                        out = self.exec.execute(code)
-                        if getattr(self.exec, '_last_success', False):
-                            if not self.history or self.history[-1] != code:
-                                self.history.append(code)
-                                self.history = self.history[-100:]
-                                try:
-                                    with open(self.history_path, 'w', encoding='utf-8') as f:
-                                        f.write("\n".join(self.history) + "\n")
-                                except Exception:
-                                    pass
-                            self.history_idx = None
-                        self.output.set_lines(out)
-                        self.grid.df = self.state.df
-                        self.command.reset()
-                        self.command.mode = 'normal'
-                        self.io_visible = True
-                        self.focus = 1
                 else:
                     self.command.handle_key(ch)
 
