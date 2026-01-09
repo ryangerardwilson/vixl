@@ -43,8 +43,10 @@ class Orchestrator:
         self.cell_buffer = ""
         self.cell_cursor = 0
         self.cell_col = None
+        # explicit cell command model (no dummy space)
         self.has_sentinel_space = False
-        self.cell_leader_pending = False
+        # cell-local leader state: None | 'leader' | 'c' | 'd'
+        self.cell_leader_state = None
 
         # ---- status / leader ----
         self.status_msg = None
@@ -115,7 +117,7 @@ class Orchestrator:
     def _handle_df_key(self, ch):
         # ----- cell insert -----
         if self.df_mode == 'cell_insert':
-            # Esc -> cell normal (keep dummy space per design)
+            # Esc -> cell normal (no dummy space model)
             if ch == 27:
                 self.df_mode = 'cell_normal'
                 return
@@ -149,19 +151,44 @@ class Orchestrator:
             s = self.cell_buffer
             buf_len = len(s)
 
-            # cell-local leader handling
-            if self.cell_leader_pending:
-                self.cell_leader_pending = False
-                if ch == ord('e'):
-                    # append (vim-like A)
+            # cell-local leader handling (explicit commands)
+            if self.cell_leader_state:
+                state = self.cell_leader_state
+                self.cell_leader_state = None
+
+                if state == 'leader':
+                    if ch == ord('e'):
+                        # ,e → append with trailing space
+                        if self.cell_buffer and not self.cell_buffer.endswith(' '):
+                            self.cell_buffer += ' '
+                        self.cell_cursor = len(self.cell_buffer)
+                        self.df_mode = 'cell_insert'
+                        return
+                    if ch == ord('c'):
+                        self.cell_leader_state = 'c'
+                        return
+                    if ch == ord('d'):
+                        self.cell_leader_state = 'd'
+                        return
+                    return
+
+                if state == 'c' and ch == ord('c'):
+                    # ,cc → change cell
+                    self.cell_buffer = ""
+                    self.cell_cursor = 0
                     self.df_mode = 'cell_insert'
-                    # cursor to end of real text (before dummy space)
-                    self.cell_cursor = max(0, len(self.cell_buffer) - 1)
+                    return
+
+                if state == 'd' and ch == ord('c'):
+                    # ,dc → delete cell
+                    self.cell_buffer = ""
+                    self.cell_cursor = 0
+                    return
+
                 return
 
             if ch == ord(','):
-                # start cell-local leader
-                self.cell_leader_pending = True
+                self.cell_leader_state = 'leader'
                 return
 
             if ch == ord('h'):
@@ -187,11 +214,10 @@ class Orchestrator:
                     i -= 1
                 self.cell_cursor = i
             elif ch == ord('i'):
-                # enter insert mode from cell normal, add sentinel if needed
-                if not self.has_sentinel_space:
-                    self.cell_buffer = self.cell_buffer + ' '
-                    self.has_sentinel_space = True
-                self.df_mode = 'cell_insert'
+                # disabled: explicit commands only
+                self.status_msg = "Use ,e or ,cc to edit cell"
+                self.status_msg_until = time.time() + 2
+                return
             elif ch == 27:
                 r, c = self.grid.curr_row, self.grid.curr_col
                 col = self.cell_col
@@ -210,6 +236,55 @@ class Orchestrator:
             return
 
         # ----- normal df -----
+        # cell commands from hover (explicit only)
+        if self.df_mode == 'normal':
+            # cell-command leader handling in hover mode
+            if self.cell_leader_state:
+                state = self.cell_leader_state
+                self.cell_leader_state = None
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col = self.state.df.columns[c]
+                val = self.state.df.iloc[r, c]
+                base = '' if val is None else str(val)
+
+                if state == 'leader':
+                    if ch == ord('e'):
+                        # ,e from hover → append with trailing space
+                        self.cell_col = col
+                        self.cell_buffer = base
+                        if self.cell_buffer and not self.cell_buffer.endswith(' '):
+                            self.cell_buffer += ' '
+                        self.cell_cursor = len(self.cell_buffer)
+                        self.df_mode = 'cell_insert'
+                        return
+                    if ch == ord('c'):
+                        self.cell_leader_state = 'c'
+                        return
+                    if ch == ord('d'):
+                        self.cell_leader_state = 'd'
+                        return
+                    return
+
+                if state == 'c' and ch == ord('c'):
+                    # ,cc from hover → change
+                    self.cell_col = col
+                    self.cell_buffer = ''
+                    self.cell_cursor = 0
+                    self.df_mode = 'cell_insert'
+                    return
+
+                if state == 'd' and ch == ord('c'):
+                    # ,dc from hover → delete immediately
+                    try:
+                        self.state.df.iloc[r, c] = self._coerce_cell_value(col, '')
+                    except Exception:
+                        self.state.df.iloc[r, c] = ''
+                    return
+
+            if ch == ord(','):
+                self.cell_leader_state = 'leader'
+                return
+
         if ch in (ord('h'), ord('j'), ord('k'), ord('l')):
             self.last_nav = 'hjkl'
         elif ch in (ord('H'), ord('J'), ord('K'), ord('L')):
@@ -335,10 +410,10 @@ class Orchestrator:
             ch = self.stdscr.getch()
             now = time.time()
 
-            # global leader disabled inside cell_normal (cell-local leader takes precedence)
+            # global leader disabled when DF pane may handle cell commands
             leader_enabled = not (
                 (self.focus == 1 and self.command.mode == 'insert') or
-                (self.focus == 0 and self.df_mode == 'cell_normal')
+                (self.focus == 0)
             )
 
             if ch == -1:
@@ -363,11 +438,17 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            if leader_enabled and ch == ord(','):
-                self.leader_seq = ','
-                self.leader_start = now
-                self.redraw()
-                continue
+            if ch == ord(','):
+                # DF pane gets first chance to consume ',' for cell commands
+                if self.focus == 0:
+                    self._handle_df_key(ch)
+                    self.redraw()
+                    continue
+                if leader_enabled:
+                    self.leader_seq = ','
+                    self.leader_start = now
+                    self.redraw()
+                    continue
 
             if self.focus == 0:
                 self._handle_df_key(ch)
