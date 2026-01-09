@@ -22,6 +22,11 @@ class FileTypeHandler:
         if self.ext == '.csv':
             return pd.read_csv(self.path)
         elif self.ext == '.parquet':
+            # Parquet files must be non-empty to be valid
+            if os.path.getsize(self.path) == 0:
+                df = pd.DataFrame()
+                self._write(df)
+                return df
             return pd.read_parquet(self.path)
 
         print("Unsupported file type (use .csv or .parquet)")

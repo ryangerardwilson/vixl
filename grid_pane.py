@@ -2,6 +2,8 @@ import curses
 
 
 class GridPane:
+    MAX_COL_WIDTH = 40
+
     def __init__(self, df):
         self.df = df
         self.curr_row = 0
@@ -54,7 +56,7 @@ class GridPane:
             for v in self.df[col]:
                 s = '' if v is None else str(v)
                 max_len = max(max_len, len(s))
-            widths.append(min(20, max_len + 2))
+            widths.append(min(self.MAX_COL_WIDTH, max_len + 2))
 
         max_rows = h - 3
         # estimate max columns that fit by greedy width sum

@@ -16,9 +16,23 @@ def main():
 
     path = sys.argv[1]
     handler = FileTypeHandler(path)
-    df = handler.load_or_create()
-    state = AppState(df, path, handler)
-    curses.wrapper(lambda stdscr: Orchestrator(stdscr, state).run())
+
+    from loading_screen import LoadingScreen, LoadState
+
+    load_state = LoadState()
+
+    def load_df():
+        return handler.load_or_create()
+
+    def curses_main(stdscr):
+        loader = LoadingScreen(stdscr, load_df, load_state)
+        loader.run()
+        if load_state.aborted:
+            return
+        state = AppState(load_state.df, path, handler)
+        Orchestrator(stdscr, state).run()
+
+    curses.wrapper(curses_main)
 
 
 if __name__ == '__main__':
