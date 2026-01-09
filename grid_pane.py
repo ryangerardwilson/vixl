@@ -1,3 +1,4 @@
+# ~/Apps/vixl/grid_pane.py
 import curses
 
 
@@ -155,23 +156,27 @@ class GridPane:
 
                 win.addnstr(y, x, cell, cw, attr)
 
-                # cursor rendering
+                # === PERFECT CURSOR RENDERING - ALIGNED WITH RJUST PADDING ===
                 if editing and r == edit_row and c == edit_col and edit_cursor is not None:
-                    buf_len = len(text)
-                    visible_len = min(buf_len - edit_hscroll, cw)
-                    text_start_x = x + (cw - visible_len)
+                    visible_len = len(visible)
+                    text_start_x = x + (cw - visible_len)  # exact left padding from rjust
+
+                    relative_pos = edit_cursor - edit_hscroll
 
                     if insert_mode:
-                        gap = max(0, min(edit_cursor - edit_hscroll, visible_len))
-                        cx = text_start_x + gap
+                        # Thin blinking cursor (between characters or at end)
+                        pos = max(0, min(relative_pos, visible_len))
+                        cx = text_start_x + pos
                         cx = max(x, min(x + cw - 1, cx))
                         win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
                     else:
-                        if buf_len > 0 and visible_len > 0:
-                            char_index = max(0, min(visible_len - 1, edit_cursor - edit_hscroll - 1))
-                            cx = text_start_x + char_index
+                        # Block cursor on the actual character in cell_normal mode
+                        if visible_len > 0:
+                            pos = max(0, min(relative_pos, visible_len - 1))
+                            cx = text_start_x + pos
                             cx = max(x, min(x + cw - 1, cx))
-                            win.addnstr(y, cx, visible[char_index], 1, curses.A_REVERSE)
+                            ch = visible[pos]
+                            win.addch(y, cx, ch, curses.A_REVERSE)
 
                 x += cw + 1
             y += 1

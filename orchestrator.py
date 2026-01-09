@@ -1,3 +1,4 @@
+# ~/Apps/vixl/orchestrator.py
 import curses
 import time
 import subprocess
@@ -43,9 +44,7 @@ class Orchestrator:
         self.cell_cursor = 0
         self.cell_hscroll = 0
         self.cell_col = None
-
-        # cell-local leader state: None | 'leader' | 'c' | 'd'
-        self.cell_leader_state = None
+        self.cell_leader_state = None  # None | 'leader' | 'c' | 'd'
 
         # ---- status / leader ----
         self.status_msg = None
@@ -55,7 +54,6 @@ class Orchestrator:
 
         # ---- history ----
         import os
-        self.history_idx = None
         self.history_path = os.path.expanduser('~/.vixl_history')
         self.history = []
         if os.path.exists(self.history_path):
@@ -113,24 +111,26 @@ class Orchestrator:
 
     # ---------------- DF handling ----------------
 
-    def _enter_cell_normal_from_hover(self):
-        r, c = self.grid.curr_row, self.grid.curr_col
-        self.cell_col = self.state.df.columns[c]
-        val = self.state.df.iloc[r, c]
-        self.cell_buffer = '' if val is None else str(val)
-        self.cell_cursor = max(0, len(self.cell_buffer))
-        self.df_mode = 'cell_normal'
-
     def _handle_df_key(self, ch):
         # ---------- cell insert ----------
         if self.df_mode == 'cell_insert':
             if ch == 27:  # Esc
-                # trim whitespace and exit to cell_normal
                 self.cell_buffer = self.cell_buffer.strip()
-                self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer))
-                self.cell_cursor = max(0, self.cell_cursor - 1)
+
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col = self.cell_col
+                try:
+                    val = self._coerce_cell_value(col, self.cell_buffer)
+                    self.state.df.iloc[r, c] = val
+                except Exception:
+                    self.status_msg = f"Invalid value for column '{col}'"
+                    self.status_msg_until = time.time() + 3
+
+                # Clean reset for normal mode
+                self.cell_cursor = 0
                 self.cell_hscroll = 0
                 self.df_mode = 'cell_normal'
+
                 return
 
             if ch in (curses.KEY_BACKSPACE, 127, 8):
@@ -140,12 +140,7 @@ class Orchestrator:
                         + self.cell_buffer[self.cell_cursor:]
                     )
                     self.cell_cursor -= 1
-                # auto horizontal scroll
-                cw = self.grid.MAX_COL_WIDTH
-                if self.cell_cursor < self.cell_hscroll:
-                    self.cell_hscroll = self.cell_cursor
-                elif self.cell_cursor > self.cell_hscroll + cw - 1:
-                    self.cell_hscroll = self.cell_cursor - (cw - 1)
+                self._autoscroll_insert()
                 return
 
             if 0 <= ch <= 0x10FFFF:
@@ -159,26 +154,17 @@ class Orchestrator:
                     + self.cell_buffer[self.cell_cursor:]
                 )
                 self.cell_cursor += 1
-                # auto horizontal scroll
-                cw = self.grid.MAX_COL_WIDTH
-                if self.cell_cursor < self.cell_hscroll:
-                    self.cell_hscroll = self.cell_cursor
-                elif self.cell_cursor > self.cell_hscroll + cw - 1:
-                    self.cell_hscroll = self.cell_cursor - (cw - 1)
+                self._autoscroll_insert()
             return
 
         # ---------- cell normal ----------
         if self.df_mode == 'cell_normal':
-            s = self.cell_buffer
-
-            # cell-local leader
             if self.cell_leader_state:
                 state = self.cell_leader_state
                 self.cell_leader_state = None
 
                 if state == 'leader':
                     if ch == ord('e'):
-                        # append helper with sentinel space
                         if not self.cell_buffer.endswith(' '):
                             self.cell_buffer += ' '
                         self.cell_cursor = len(self.cell_buffer) - 1
@@ -195,57 +181,62 @@ class Orchestrator:
                 if state == 'c' and ch == ord('c'):
                     self.cell_buffer = ''
                     self.cell_cursor = 0
+                    self.cell_hscroll = 0
                     self.df_mode = 'cell_insert'
                     return
 
                 if state == 'd' and ch == ord('c'):
-                    # delete only, stay in cell_normal
                     self.cell_buffer = ''
                     self.cell_cursor = 0
+                    self.cell_hscroll = 0
                     return
 
             if ch == ord(','):
                 self.cell_leader_state = 'leader'
                 return
 
+            buf_len = len(self.cell_buffer)
+            cw = self.grid.MAX_COL_WIDTH
+
+            moved = False
             if ch == ord('h'):
-                self.cell_cursor = max(0, self.cell_cursor - 1)
+                if self.cell_cursor > 0:
+                    self.cell_cursor -= 1
+                    moved = True
             elif ch == ord('l'):
-                max_pos = max(len(self.cell_buffer) - 1, 0)
-                self.cell_cursor = min(max_pos, self.cell_cursor + 1)
-            elif ch == ord('i'):
-                # vim-like insert before cursor
-                self.cell_cursor = max(0, self.cell_cursor - 1)
+                if self.cell_cursor < buf_len:
+                    self.cell_cursor += 1
+                    moved = True
+
+            if moved:
+                # Symmetric scrolling - identical to insert mode
+                if self.cell_cursor < self.cell_hscroll:
+                    self.cell_hscroll = self.cell_cursor
+                elif self.cell_cursor > self.cell_hscroll + cw - 1:
+                    self.cell_hscroll = self.cell_cursor - (cw - 1)
+
+                # Correct max_scroll - no +1
+                max_scroll = max(0, buf_len - cw) if buf_len > cw else 0
+                self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+                return
+
+            if ch == ord('i'):
                 self.df_mode = 'cell_insert'
                 return
 
-            # auto horizontal scroll in cell_normal
-            cw = self.grid.MAX_COL_WIDTH
-            if self.cell_cursor < self.cell_hscroll:
-                self.cell_hscroll = self.cell_cursor
-            elif self.cell_cursor > self.cell_hscroll + cw - 1:
-                self.cell_hscroll = self.cell_cursor - (cw - 1)
-            elif ch == 27:
-                # commit cell and return to df normal
-                r, c = self.grid.curr_row, self.grid.curr_col
-                col = self.cell_col
-                try:
-                    val = self._coerce_cell_value(col, self.cell_buffer)
-                    self.state.df.iloc[r, c] = val
-                except Exception:
-                    self.status_msg = f"Invalid value for column '{col}'"
-                    self.status_msg_until = time.time() + 3
+            if ch == 27:  # Esc - exit cell editing
                 self.df_mode = 'normal'
                 self.cell_buffer = ''
+                self.cell_hscroll = 0
+                return
+
             return
 
         # ---------- df normal (hover) ----------
         if self.df_mode == 'normal':
-            # cell-local leader from hover
             if self.cell_leader_state:
                 state = self.cell_leader_state
                 self.cell_leader_state = None
-
                 r, c = self.grid.curr_row, self.grid.curr_col
                 col = self.state.df.columns[c]
                 val = self.state.df.iloc[r, c]
@@ -272,6 +263,7 @@ class Orchestrator:
                     self.cell_col = col
                     self.cell_buffer = ''
                     self.cell_cursor = 0
+                    self.cell_hscroll = 0
                     self.df_mode = 'cell_insert'
                     return
 
@@ -291,7 +283,6 @@ class Orchestrator:
                 self.status_msg_until = time.time() + 2
                 return
 
-            # navigation
             if ch == ord('h'):
                 self.grid.move_left()
             elif ch == ord('l'):
@@ -312,6 +303,16 @@ class Orchestrator:
                 self.io_visible = True
                 self.focus = 1
             return
+
+    def _autoscroll_insert(self):
+        cw = self.grid.MAX_COL_WIDTH
+        if self.cell_cursor < self.cell_hscroll:
+            self.cell_hscroll = self.cell_cursor
+        elif self.cell_cursor > self.cell_hscroll + cw - 1:
+            self.cell_hscroll = self.cell_cursor - (cw - 1)
+
+        max_scroll = max(0, len(self.cell_buffer) - cw) if len(self.cell_buffer) > cw else 0
+        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
 
     # ---------------- UI ----------------
 
