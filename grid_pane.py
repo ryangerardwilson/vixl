@@ -2,7 +2,6 @@ import curses
 
 
 class GridPane:
-    # color pair IDs
     PAIR_CELL_ACTIVE = 1
     PAIR_CURSOR_INSERT = 2
     PAIR_CURSOR_NORMAL_BG = 3
@@ -12,7 +11,6 @@ class GridPane:
 
     def __init__(self, df):
         self.df = df
-        # init colors once
         try:
             curses.start_color()
             curses.use_default_colors()
@@ -23,11 +21,12 @@ class GridPane:
             curses.init_pair(self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE)
         except curses.error:
             pass
+
         self.curr_row = 0
         self.curr_col = 0
         self.row_offset = 0
         self.col_offset = 0
-        self.highlight_mode = 'cell'  # cell | row | column
+        self.highlight_mode = 'cell'
 
     # ---------- navigation ----------
     def move_left(self):
@@ -63,10 +62,22 @@ class GridPane:
         self.highlight_mode = 'column'
 
     # ---------- rendering ----------
-    def draw(self, win, active=False, editing=False, insert_mode=False, edit_row=None, edit_col=None, edit_buffer=None, edit_cursor=None):
+    def draw(
+        self,
+        win,
+        active=False,
+        editing=False,
+        insert_mode=False,
+        edit_row=None,
+        edit_col=None,
+        edit_buffer=None,
+        edit_cursor=None,
+        edit_hscroll=0,
+    ):
         win.erase()
         h, w = win.getmaxyx()
-        # compute dynamic column widths
+
+        # compute column widths
         widths = []
         for col in self.df.columns:
             max_len = len(str(col))
@@ -76,8 +87,8 @@ class GridPane:
             widths.append(min(self.MAX_COL_WIDTH, max_len + 2))
 
         max_rows = h - 3
-        # estimate max columns that fit by greedy width sum
         avail_w = w - 4
+
         max_cols = 0
         used = 0
         for cw in widths[self.col_offset:]:
@@ -116,60 +127,57 @@ class GridPane:
             x = 4
             for c in visible_cols:
                 cw = widths[c]
-                # determine cell text
+
+                # base text
                 if editing and r == edit_row and c == edit_col:
                     text = edit_buffer or ''
                 else:
                     val = self.df.iloc[r, c]
                     text = '' if val is None else str(val)
 
-                cell = text[:cw].rjust(cw)
+                # horizontal scroll for edited cell
+                if editing and r == edit_row and c == edit_col:
+                    visible = text[edit_hscroll: edit_hscroll + cw]
+                else:
+                    visible = text[:cw]
+
+                cell = visible.rjust(cw)
 
                 attr = 0
-                # apply grid highlight only in df:normal (no editing)
-                active_cell = False
                 if not editing:
                     active_cell = (
                         (self.highlight_mode == 'row' and r == self.curr_row)
                         or (self.highlight_mode == 'column' and c == self.curr_col)
                         or (self.highlight_mode == 'cell' and r == self.curr_row and c == self.curr_col)
                     )
-
-                if active_cell:
-                    attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
+                    if active_cell:
+                        attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
 
                 win.addnstr(y, x, cell, cw, attr)
 
-                # vim-like cursor rendering
+                # cursor rendering
                 if editing and r == edit_row and c == edit_col and edit_cursor is not None:
-                    # right-aligned block cursor rendered in the GAP between characters
                     buf_len = len(text)
-                    cursor = edit_cursor
-                    cell_right_edge = x + cw - 1
-
-                    # clamp visible length to cell width
-                    visible_len = min(buf_len, cw)
+                    visible_len = min(buf_len - edit_hscroll, cw)
+                    text_start_x = x + (cw - visible_len)
 
                     if insert_mode:
-                        # insert mode: cursor is the insertion GAP (vim-correct)
-                        gap_index = max(0, min(cursor, visible_len))
-                        text_start_x = x + (cw - visible_len)
-                        visual_x = text_start_x + gap_index
-                        visual_x = max(x, min(x + cw - 1, visual_x))
-                        win.addnstr(y, visual_x, ' ', 1, curses.A_REVERSE)
+                        gap = max(0, min(edit_cursor - edit_hscroll, visible_len))
+                        cx = text_start_x + gap
+                        cx = max(x, min(x + cw - 1, cx))
+                        win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
                     else:
-                        # normal mode: cursor is ON visible character
-                        if visible_len > 0:
-                            char_index = max(0, min(visible_len - 1, cursor - 1))
-                            text_start_x = x + (cw - visible_len)
-                            visual_x = text_start_x + char_index
-                            visual_x = max(x, min(x + cw - 1, visual_x))
-                            win.addnstr(y, visual_x, text[char_index], 1, curses.A_REVERSE)
+                        if buf_len > 0 and visible_len > 0:
+                            char_index = max(0, min(visible_len - 1, edit_cursor - edit_hscroll - 1))
+                            cx = text_start_x + char_index
+                            cx = max(x, min(x + cw - 1, cx))
+                            win.addnstr(y, cx, visible[char_index], 1, curses.A_REVERSE)
+
                 x += cw + 1
             y += 1
             if y >= h - 1:
                 break
 
         if active:
-            win.addnstr(h - 2, w - 8, " DF ", 6)
+            win.addnstr(h - 2, w - 8, ' DF ', 6)
         win.refresh()
