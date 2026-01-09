@@ -30,6 +30,21 @@ python main.py <csv-or-parquet-file>
 - Persistent global command history (`~/.vixl_history`)
 - Explicit save and save-on-exit
 
+### df Mode: Normal vs Insert
+
+In **df mode**, interaction is strictly modal and scoped to the grid:
+
+- **df Normal mode** is used for navigation and selection only. It never mutates data.
+- **df Insert mode** never edits the grid. Instead, it generates a context-aware Pandas mutation command and opens it in the command pane.
+
+For example, pressing `i` on a cell pre-fills a command such as:
+
+```python
+df.iloc[row, col] = value
+```
+
+Users edit and execute the command explicitly in **command pane Insert mode**. The grid is a navigation and visualization surface, never a text editor.
+
 ---
 
 ## Code Layout

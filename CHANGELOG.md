@@ -11,6 +11,9 @@
 - Pandas (`pd`) and NumPy (`np`) preloaded in the command execution context.
 
 ### Changed
+- Formalized df Normal mode vs df Insert mode semantics.
+- Clarified distinction between df Insert mode and command pane Insert mode.
+- df Insert mode strictly pre-fills Pandas mutation commands; the grid never acts as a text editor.
 - DataFrame grid display now uses content-aware column widths, capped at 20 characters.
 - All grid cells and column headers are right-aligned for improved readability.
 - Command history navigation (`Ctrl-P` / `Ctrl-N`) now treats the history file as the single source of truth.

@@ -103,11 +103,18 @@ Rules:
 
 ## 8. Insert & Command Interaction
 
-Insert mode is command-prefill oriented, not a free-form spreadsheet editor.
+In **df mode**, interaction is strictly modal and intentional.
+
+- **df Normal mode** is used for navigation and selection only
+- **df Insert mode** is an intent-to-command bridge, not a free-form spreadsheet editor
+
+Behavior of df Insert mode:
 
 - `i` generates a context-aware Pandas mutation command
-- Prefilled command opens in the command pane
-- Users edit and execute explicitly
+- The prefilled command opens in the command pane
+- Users edit and execute explicitly in **command pane Insert mode**
+
+The grid is a navigation and visualization surface, never a text editor. All text entry occurs in the command pane, and all data mutation flows through explicit Python commands.
 
 Selection mirrors Vim visual mode semantics.
 
