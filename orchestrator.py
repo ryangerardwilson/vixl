@@ -44,6 +44,7 @@ class Orchestrator:
         self.cell_cursor = 0
         self.cell_col = None
         self.has_sentinel_space = False
+        self.cell_leader_pending = False
 
         # ---- status / leader ----
         self.status_msg = None
@@ -114,16 +115,8 @@ class Orchestrator:
     def _handle_df_key(self, ch):
         # ----- cell insert -----
         if self.df_mode == 'cell_insert':
-            # Esc -> cell normal (remove sentinel space)
+            # Esc -> cell normal (keep dummy space per design)
             if ch == 27:
-                if self.has_sentinel_space and self.cell_buffer.endswith(' '):
-                    self.cell_buffer = self.cell_buffer[:-1]
-                # clamp cursor to real characters only
-                if self.cell_buffer:
-                    self.cell_cursor = min(self.cell_cursor, len(self.cell_buffer) - 1)
-                else:
-                    self.cell_cursor = 0
-                self.has_sentinel_space = False
                 self.df_mode = 'cell_normal'
                 return
 
@@ -155,6 +148,22 @@ class Orchestrator:
         if self.df_mode == 'cell_normal':
             s = self.cell_buffer
             buf_len = len(s)
+
+            # cell-local leader handling
+            if self.cell_leader_pending:
+                self.cell_leader_pending = False
+                if ch == ord('e'):
+                    # append (vim-like A)
+                    self.df_mode = 'cell_insert'
+                    # cursor to end of real text (before dummy space)
+                    self.cell_cursor = max(0, len(self.cell_buffer) - 1)
+                return
+
+            if ch == ord(','):
+                # start cell-local leader
+                self.cell_leader_pending = True
+                return
+
             if ch == ord('h'):
                 # move left only within real characters
                 if self.cell_cursor > 0:
@@ -326,7 +335,11 @@ class Orchestrator:
             ch = self.stdscr.getch()
             now = time.time()
 
-            leader_enabled = not (self.focus == 1 and self.command.mode == 'insert')
+            # global leader disabled inside cell_normal (cell-local leader takes precedence)
+            leader_enabled = not (
+                (self.focus == 1 and self.command.mode == 'insert') or
+                (self.focus == 0 and self.df_mode == 'cell_normal')
+            )
 
             if ch == -1:
                 if leader_enabled and self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
