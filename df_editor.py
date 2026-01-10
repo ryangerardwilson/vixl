@@ -1,5 +1,4 @@
 import curses
-import time
 import pandas as pd
 
 
@@ -192,8 +191,10 @@ class DfEditor:
             base = '' if (val is None or pd.isna(val)) else str(val)
 
             total_rows = len(self.state.df)
+            total_cols = len(self.state.df.columns)
             visible_rows = max(1, self.paginator.page_end - self.paginator.page_start)
-            jump = max(1, round(visible_rows * 0.05))
+            jump_rows = max(1, round(visible_rows * 0.05))
+            jump_cols = max(1, round(max(1, total_cols) * 0.05))
 
             if self.df_leader_state:
                 state = self.df_leader_state
@@ -224,6 +225,16 @@ class DfEditor:
                         self.grid.row_offset = 0
                         self.grid.curr_row = 0
                         self.grid.highlight_mode = 'cell'
+                        return
+                    if ch == ord('h'):
+                        if total_cols == 0:
+                            return
+                        self.grid.curr_col = 0
+                        return
+                    if ch == ord('l'):
+                        if total_cols == 0:
+                            return
+                        self.grid.curr_col = total_cols - 1
                         return
 
             if self.cell_leader_state:
@@ -300,7 +311,7 @@ class DfEditor:
 
             if ch == 10:  # Ctrl+J jump down 5% of visible
                 if total_rows > 0:
-                    target = min(total_rows - 1, self.grid.curr_row + jump)
+                    target = min(total_rows - 1, self.grid.curr_row + jump_rows)
                     self.paginator.ensure_row_visible(target)
                     self.grid.row_offset = 0
                     self.grid.curr_row = target
@@ -308,10 +319,22 @@ class DfEditor:
 
             if ch == 11:  # Ctrl+K jump up 5% of visible
                 if total_rows > 0:
-                    target = max(0, self.grid.curr_row - jump)
+                    target = max(0, self.grid.curr_row - jump_rows)
                     self.paginator.ensure_row_visible(target)
                     self.grid.row_offset = 0
                     self.grid.curr_row = target
+                return
+
+            if ch == 8:  # Ctrl+H jump left 5% of cols
+                if total_cols > 0:
+                    target = max(0, self.grid.curr_col - jump_cols)
+                    self.grid.curr_col = target
+                return
+
+            if ch == 12:  # Ctrl+L jump right 5% of cols
+                if total_cols > 0:
+                    target = min(total_cols - 1, self.grid.curr_col + jump_cols)
+                    self.grid.curr_col = target
                 return
 
             if ch == ord('h'):
