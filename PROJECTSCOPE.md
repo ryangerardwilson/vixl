@@ -145,7 +145,40 @@ Characteristics:
 
 ## 11. Command History
 
-- Command history is persisted globally at `~/.config/vixl/history.log`
+### Architecture
+- Entry: `main.py` → `LoadingScreen` → `Orchestrator`
+- Layout: table + shared bottom strip (status/command/prompt); overlays for output/shortcuts (content-sized, ≤50% terminal height).
+- Execution: sandboxed `df`; natural commands auto-commit; extension calls require explicit commit (`(df, True)` or `commit_df=True` + `df = ...`).
+- Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
+- History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N).
+- Extensions: loaded from `~/.config/vixl/extensions/`; config at `~/.config/vixl/config.py` (AUTO_COMMIT flag).
+
+### Features
+- No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
+- Single-line command bar; Enter/Ctrl+E executes; Esc cancels; Ctrl+P/Ctrl+N history.
+- Output modal appears only when there is output; shortcuts modal via `?`; both close with Esc/q/Enter; j/k scroll.
+- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`.
+- Save-As flow: inline prompt on Ctrl+S/Ctrl+T when unsaved; validates .csv/.parquet; Ctrl+T exits only after successful save.
+- Overlays auto-size to content up to 50% of terminal height, centered.
+
+### Non-features / removed
+- Leader command system removed.
+- Multi-line command pane removed.
+- Output pane no longer side-by-side (modal only).
+
+### Keymap (canonical)
+- Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
+- Command bar: : enter; Enter/Ctrl+E execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
+- Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
+- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; ? shortcuts.
+- Cell insert: type; Backspace; Esc commits to cell_normal.
+- Cell normal: h/l move within buffer; , e / , c c / , d c / , n r; i insert; Esc back to df normal.
+
+### File locations
+- History: `~/.config/vixl/history.log`
+- Extensions: `~/.config/vixl/extensions/`
+- Config: `~/.config/vixl/config.py` (AUTO_COMMIT)
+- Default df: created in `main.py` when no arg is provided.
 - The history file is the single source of truth
 - Only successful commands are recorded
 - Non-adjacent duplicate commands are allowed
