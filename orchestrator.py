@@ -399,6 +399,21 @@ class Orchestrator:
         if self.overlay_visible:
             self._draw_overlay()
 
+    def _open_overlay(self, lines):
+        max_h = min(self.layout.H // 2, self.layout.H - 2)
+        content_h = len(lines) + 2  # box padding
+        overlay_h = max(3, min(content_h, max_h))
+        overlay_y = max(0, (self.layout.table_h - overlay_h) // 2)
+
+        self.layout.overlay_h = overlay_h
+        self.layout.overlay_win = curses.newwin(overlay_h, self.layout.W, overlay_y, 0)
+        self.layout.overlay_win.leaveok(True)
+
+        self.overlay_lines = lines
+        self.overlay_scroll = 0
+        self.overlay_visible = True
+        self.focus = 2
+
     def _show_shortcuts(self):
         lines = [
             "Shortcuts",
@@ -440,10 +455,7 @@ class Orchestrator:
             "  , e / , c c / , d c / , n r",
             "  i - insert; Esc - back to df normal",
         ]
-        self.overlay_lines = lines
-        self.overlay_scroll = 0
-        self.overlay_visible = True
-        self.focus = 2
+        self._open_overlay(lines)
 
     def _draw_overlay(self):
         win = self.layout.overlay_win
@@ -487,10 +499,12 @@ class Orchestrator:
             return
 
         lines = self.exec.execute(code)
-        self.overlay_lines = lines
-        self.overlay_scroll = 0
-        self.overlay_visible = bool(lines)
-        self.focus = 2 if self.overlay_visible else 0
+        if lines:
+            self._open_overlay(lines)
+        else:
+            self.overlay_visible = False
+            self.overlay_lines = []
+            self.focus = 0
 
         # clear command bar after execution
         self.command.reset()
@@ -544,6 +558,9 @@ class Orchestrator:
         while True:
             ch = self.stdscr.getch()
 
+            if ch in (3, 24):
+                break
+
             if self.overlay_visible:
                 self._handle_overlay_key(ch)
                 self.redraw()
@@ -552,9 +569,6 @@ class Orchestrator:
             if ch == -1:
                 self.redraw()
                 continue
-
-            if ch in (3, 24):
-                break
 
             if self.focus == 0 and ch in (19, 20):  # Ctrl+S / Ctrl+T
                 saved = self._save_df()
