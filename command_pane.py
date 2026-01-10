@@ -74,7 +74,7 @@ class CommandPane:
     def draw(self, win, active=False):
         win.erase()
         h, w = win.getmaxyx()
-        prompt = ": "
+        prompt = ":"
         text_w = max(1, w - len(prompt) - 1)
 
         # adjust scroll to keep cursor visible

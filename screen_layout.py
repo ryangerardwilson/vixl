@@ -16,8 +16,8 @@ class ScreenLayout:
 
         # shared strip for status or command line
         self.status_win = curses.newwin(self.status_h, self.W, self.table_h, 0)
-        # do not let status bar steal cursor
-        self.status_win.leaveok(True)
+        # allow cursor to be positioned when command line is active
+        self.status_win.leaveok(False)
 
         # overlay is a centered modal window over the table region
         self.overlay_h = max(3, min(10, self.H - 2))
