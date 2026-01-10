@@ -10,6 +10,7 @@ from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
 from config_paths import HISTORY_PATH, ensure_config_dirs
 from file_type_handler import FileTypeHandler
+from pagination import Paginator
 
 
 
@@ -28,10 +29,7 @@ class Orchestrator:
         self.grid = GridPane(app_state.df)
 
         # ---- pagination ----
-        self.page_size = 1000
-        self.page_index = 0
-        self.total_rows = len(self.state.df)
-        self._clamp_page()
+        self.paginator = Paginator(total_rows=len(self.state.df), page_size=1000)
 
         self.command = CommandPane()
         self.exec = CommandExecutor(app_state)
@@ -204,6 +202,8 @@ class Orchestrator:
                         self.state.df.iloc[insert_at:],
                     ], ignore_index=True)
                     self.grid.df = self.state.df
+                    self.paginator.update_total_rows(len(self.state.df))
+                    self.paginator.ensure_row_visible(insert_at)
                     self.grid.curr_row = insert_at
                     self.grid.highlight_mode = 'cell'
                     return
@@ -322,6 +322,8 @@ class Orchestrator:
                         self.state.df.iloc[insert_at:],
                     ], ignore_index=True)
                     self.grid.df = self.state.df
+                    self.paginator.update_total_rows(len(self.state.df))
+                    self.paginator.ensure_row_visible(insert_at)
                     self.grid.curr_row = insert_at
                     self.grid.highlight_mode = 'cell'
                     return
@@ -345,23 +347,21 @@ class Orchestrator:
             elif ch == ord('l'):
                 self.grid.move_right()
             elif ch == ord('j'):
-                if self.grid.curr_row + 1 >= self.page_end:
-                    if self.page_end < self.total_rows:
-                        self.page_index += 1
-                        self._clamp_page()
+                if self.grid.curr_row + 1 >= self.paginator.page_end:
+                    if self.paginator.page_end < self.paginator.total_rows:
+                        self.paginator.next_page()
                         self.grid.row_offset = 0
-                        self.grid.curr_row = self.page_start
+                        self.grid.curr_row = self.paginator.page_start
                     else:
-                        self.grid.curr_row = self.total_rows - 1
+                        self.grid.curr_row = max(0, self.paginator.total_rows - 1)
                 else:
                     self.grid.move_down()
             elif ch == ord('k'):
-                if self.grid.curr_row - 1 < self.page_start:
-                    if self.page_index > 0:
-                        self.page_index -= 1
-                        self._clamp_page()
+                if self.grid.curr_row - 1 < self.paginator.page_start:
+                    if self.paginator.page_index > 0:
+                        self.paginator.prev_page()
                         self.grid.row_offset = 0
-                        self.grid.curr_row = self.page_end - 1
+                        self.grid.curr_row = max(self.paginator.page_start, self.paginator.page_end - 1)
                     else:
                         self.grid.curr_row = 0
                 else:
@@ -416,8 +416,8 @@ class Orchestrator:
                 edit_buffer=self.cell_buffer,
                 edit_cursor=self.cell_cursor,
                 edit_hscroll=self.cell_hscroll,
-                page_start=self.page_start,
-                page_end=self.page_end,
+                page_start=self.paginator.page_start,
+                page_end=self.paginator.page_end,
             )
 
             sw = self.layout.status_win
@@ -466,8 +466,8 @@ class Orchestrator:
                             mode = 'DF'
                         fname = os.path.basename(self.state.file_path) if self.state.file_path else ''
                         shape = f"{self.state.df.shape}"
-                        page_total = max(1, (self.total_rows - 1) // self.page_size + 1) if self.total_rows else 1
-                        page_info = f"Page {self.page_index + 1}/{page_total} rows {self.page_start}-{max(self.page_start, self.page_end - 1)} of {self.total_rows}"
+                        page_total = self.paginator.page_count
+                        page_info = f"Page {self.paginator.page_index + 1}/{page_total} rows {self.paginator.page_start}-{max(self.paginator.page_start, self.paginator.page_end - 1)} of {self.paginator.total_rows}"
                         text = f" {mode} | {fname} | {shape} | {page_info}"
 
                     try:
@@ -557,12 +557,6 @@ class Orchestrator:
         # no helper footer; rely on memorized keys
         win.refresh()
 
-    def _clamp_page(self):
-        max_page = max(0, (self.total_rows - 1) // self.page_size) if self.total_rows > 0 else 0
-        self.page_index = max(0, min(self.page_index, max_page))
-        self.page_start = self.page_index * self.page_size
-        self.page_end = min(self.total_rows, self.page_start + self.page_size)
-
     def _handle_overlay_key(self, ch):
         max_visible = max(0, self.layout.overlay_h - 2)
         max_scroll = max(0, len(self.overlay_lines) - max_visible)
@@ -599,10 +593,10 @@ class Orchestrator:
 
         # sync grid with latest df and clamp cursor within bounds
         self.grid.df = self.state.df
-        self.total_rows = len(self.state.df)
-        self._clamp_page()
+        self.paginator.update_total_rows(len(self.state.df))
         self.grid.curr_row = min(self.grid.curr_row, max(0, len(self.grid.df) - 1))
         self.grid.curr_col = min(self.grid.curr_col, max(0, len(self.grid.df.columns) - 1))
+        self.paginator.ensure_row_visible(self.grid.curr_row)
 
         if getattr(self.exec, '_last_success', False):
             self.history.append(code)
