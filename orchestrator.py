@@ -1,6 +1,7 @@
 # ~/Apps/vixl/orchestrator.py
 import curses
 import time
+import os
 import pandas as pd
 
 from grid_pane import GridPane
@@ -463,7 +464,7 @@ class Orchestrator:
                             mode = 'CMD'
                         else:
                             mode = 'DF'
-                        fname = self.state.file_path or ''
+                        fname = os.path.basename(self.state.file_path) if self.state.file_path else ''
                         shape = f"{self.state.df.shape}"
                         page_total = max(1, (self.total_rows - 1) // self.page_size + 1) if self.total_rows else 1
                         page_info = f"Page {self.page_index + 1}/{page_total} rows {self.page_start}-{max(self.page_start, self.page_end - 1)} of {self.total_rows}"

@@ -108,8 +108,10 @@ class GridPane:
                 max_len = max(max_len, len(s))
             widths.append(min(self.MAX_COL_WIDTH, max_len + 2))
 
+        row_w = max(3, len(str(max(page_end - 1, 0))) + 1)
+
         max_rows = h - 3
-        avail_w = w - 4
+        avail_w = w - (row_w + 1)
 
         max_cols = 0
         used = 0
@@ -150,7 +152,7 @@ class GridPane:
         visible_cols = range(self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols))
 
         # header
-        x = 4
+        x = row_w + 1
         for c in visible_cols:
             cw = widths[c]
             name = str(df_slice.columns[c])[:cw].rjust(cw)
@@ -160,8 +162,8 @@ class GridPane:
         # rows
         y = 2
         for r in visible_rows:
-            win.addnstr(y, 0, str(r).rjust(3), 3)
-            x = 4
+            win.addnstr(y, 0, str(r).rjust(row_w), row_w)
+            x = row_w + 1
             local_r = r - page_start
             for c in visible_cols:
                 cw = widths[c]
