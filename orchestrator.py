@@ -13,7 +13,8 @@ from pagination import Paginator
 from history_manager import HistoryManager
 from df_editor import DfEditor
 from save_prompt import SavePrompt
-from overlay import OverlayView, build_shortcuts_lines
+from overlay import OverlayView
+from shortcut_help_handler import ShortcutHelpHandler
 
 
 class Orchestrator:
@@ -248,7 +249,7 @@ class Orchestrator:
                     self.command.activate()
                     self.focus = 1
                 elif ch == ord('?'):
-                    self.overlay.open(build_shortcuts_lines())
+                    self.overlay.open(ShortcutHelpHandler.get_lines())
                     self.focus = 2
                 else:
                     self.df_editor.handle_key(ch)

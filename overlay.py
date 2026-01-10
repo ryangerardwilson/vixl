@@ -2,50 +2,6 @@ import curses
 from typing import List
 
 
-def build_shortcuts_lines() -> List[str]:
-    return [
-        "Shortcuts",
-        "",
-        "Global",
-        "  Ctrl+C / Ctrl+X - exit",
-        "  Ctrl+S (df) - save",
-        "  Ctrl+T (df) - save & exit",
-        "  ? - show shortcuts",
-        "",
-        "Overlay (output)",
-        "  Esc / q / Enter - close",
-        "  j / k - scroll",
-        "",
-        "Command bar",
-        "  : (from df) - enter",
-        "  Enter / Ctrl+E - execute",
-        "  Esc - cancel",
-        "  Ctrl+P / Ctrl+N - history prev/next",
-        "  Backspace, Left/Right, Home/End - edit/move",
-        "",
-        "DF normal",
-        "  h / j / k / l - move",
-        "  H / L - column highlight",
-        "  J / K - row highlight",
-        "  : - open command bar",
-        "  i - edit cell (preload)",
-        "  , e - edit cell (preload)",
-        "  , c c - edit cell empty",
-        "  , d c - clear cell",
-        "  , n r - insert row below",
-        "  , y - copy df to clipboard (TSV)",
-        "  ? - shortcuts",
-        "",
-        "DF cell_insert",
-        "  Type to edit; Backspace deletes; Esc commits to cell_normal",
-        "",
-        "DF cell_normal",
-        "  h / l - move cursor within buffer",
-        "  , e / , c c / , d c / , n r",
-        "  i - insert; Esc - back to df normal",
-    ]
-
-
 class OverlayView:
     def __init__(self, layout):
         self.layout = layout
