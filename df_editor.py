@@ -191,18 +191,40 @@ class DfEditor:
             val = self.state.df.iloc[r, c]
             base = '' if (val is None or pd.isna(val)) else str(val)
 
+            total_rows = len(self.state.df)
+            visible_rows = max(1, self.paginator.page_end - self.paginator.page_start)
+            jump = max(1, round(visible_rows * 0.05))
+
             if self.df_leader_state:
                 state = self.df_leader_state
                 self.df_leader_state = None
-                if state == 'leader' and ch == ord('y'):
-                    try:
-                        import subprocess
-                        tsv_data = self.state.df.to_csv(sep='\t', index=False)
-                        subprocess.run(['wl-copy'], input=tsv_data, text=True, check=True)
-                        self._set_status("DF copied", 3)
-                    except Exception:
-                        self._set_status("Copy failed", 3)
-                    return
+                if state == 'leader':
+                    if ch == ord('y'):
+                        try:
+                            import subprocess
+                            tsv_data = self.state.df.to_csv(sep='\t', index=False)
+                            subprocess.run(['wl-copy'], input=tsv_data, text=True, check=True)
+                            self._set_status("DF copied", 3)
+                        except Exception:
+                            self._set_status("Copy failed", 3)
+                        return
+                    if ch == ord('j'):
+                        if total_rows == 0:
+                            return
+                        target = total_rows - 1
+                        self.paginator.ensure_row_visible(target)
+                        self.grid.row_offset = 0
+                        self.grid.curr_row = target
+                        self.grid.highlight_mode = 'cell'
+                        return
+                    if ch == ord('k'):
+                        if total_rows == 0:
+                            return
+                        self.paginator.ensure_row_visible(0)
+                        self.grid.row_offset = 0
+                        self.grid.curr_row = 0
+                        self.grid.highlight_mode = 'cell'
+                        return
 
             if self.cell_leader_state:
                 state = self.cell_leader_state
@@ -274,6 +296,22 @@ class DfEditor:
                     self.cell_buffer += ' '
                 self.cell_cursor = len(self.cell_buffer) - 1
                 self.mode = 'cell_insert'
+                return
+
+            if ch == 10:  # Ctrl+J jump down 5% of visible
+                if total_rows > 0:
+                    target = min(total_rows - 1, self.grid.curr_row + jump)
+                    self.paginator.ensure_row_visible(target)
+                    self.grid.row_offset = 0
+                    self.grid.curr_row = target
+                return
+
+            if ch == 11:  # Ctrl+K jump up 5% of visible
+                if total_rows > 0:
+                    target = max(0, self.grid.curr_row - jump)
+                    self.paginator.ensure_row_visible(target)
+                    self.grid.row_offset = 0
+                    self.grid.curr_row = target
                 return
 
             if ch == ord('h'):
