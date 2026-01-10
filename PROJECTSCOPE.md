@@ -165,7 +165,7 @@ Characteristics:
 - Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
 - Command bar: : enter; Enter/Ctrl+E execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
 - Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
-- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; , y copy df to clipboard (TSV via wl-copy); ? shortcuts.
+- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; , h first col; , l last col; , k first row; , j last row; , y copy df to clipboard (TSV via wl-copy); ? shortcuts.
 - Cell insert: type; Backspace; Esc commits to cell_normal.
 - Cell normal: h/l move within buffer; , e / , c c / , d c / , n r; i insert; Esc back to df normal.
 
