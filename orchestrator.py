@@ -1,7 +1,6 @@
 # ~/Apps/vixl/orchestrator.py
 import curses
 import time
-import subprocess
 import pandas as pd
 
 from grid_pane import GridPane
@@ -10,15 +9,6 @@ from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
 from config_paths import HISTORY_PATH, ensure_config_dirs
 
-LEADER_COMMANDS = {
-    ',ya': 'ACTIVE',
-    ',yap': 'ALL',
-    ',yio': 'IO',
-    ',o': 'OUT',
-    ',df': 'DF',
-}
-LEADER_PREFIXES = {p[:i] for p in LEADER_COMMANDS for i in range(1, len(p) + 1)}
-LEADER_TIMEOUT = 1.0
 
 
 class Orchestrator:
@@ -49,11 +39,9 @@ class Orchestrator:
         self.cell_col = None
         self.cell_leader_state = None  # None | 'leader' | 'c' | 'd'
 
-        # ---- status / leader ----
+        # ---- status ----
         self.status_msg = None
         self.status_msg_until = 0
-        self.leader_seq = None
-        self.leader_start = 0.0
 
         # ---- history ----
         import os
@@ -98,45 +86,6 @@ class Orchestrator:
             return text.lower() in ('1', 'true', 'yes')
         return text
 
-    def _execute_leader(self, seq):
-        if seq == ',o':
-            if self.overlay_lines:
-                self.overlay_visible = True
-                self.focus = 2
-                self.overlay_scroll = 0
-            else:
-                self.status_msg = "No output to show"
-                self.status_msg_until = time.time() + 3
-            return
-        if seq == ',df':
-            self.focus = 0
-            return
-
-        content = ''
-        if seq == ',ya':
-            if self.focus == 0:
-                content = self.state.df.to_string()
-            elif self.focus == 1:
-                content = self.command.get_buffer()
-            else:
-                content = '\n'.join(self.overlay_lines)
-        elif seq == ',yap':
-            content = (
-                self.state.df.to_string() + '\n\n'
-                + self.command.get_buffer() + '\n\n'
-                + '\n'.join(self.overlay_lines)
-            )
-        elif seq == ',yio':
-            last = self.history[-1] if self.history else ''
-            content = last + '\n\n' + '\n'.join(self.overlay_lines)
-
-        if content:
-            try:
-                subprocess.run(['wl-copy'], input=content, text=True)
-                self.status_msg = f"{seq} → copied"
-                self.status_msg_until = time.time() + 5
-            except Exception:
-                pass
 
     # ---------------- DF handling ----------------
 
@@ -375,6 +324,8 @@ class Orchestrator:
             elif ch == ord(':'):
                 self.command.activate()
                 self.focus = 1
+            elif ch == ord('?'):
+                self._show_shortcuts()
             return
 
     def _autoscroll_insert(self):
@@ -424,23 +375,20 @@ class Orchestrator:
                 if self.status_msg and now < self.status_msg_until:
                     text = f" {self.status_msg}"
                 else:
-                    if self.leader_seq:
-                        text = f" {self.leader_seq}"
-                    else:
-                        if self.focus == 0:
-                            if self.df_mode == 'cell_insert':
-                                mode = 'DF:CELL-INSERT'
-                            elif self.df_mode == 'cell_normal':
-                                mode = 'DF:CELL-NORMAL'
-                            else:
-                                mode = 'DF'
-                        elif self.focus == 1:
-                            mode = 'CMD'
+                    if self.focus == 0:
+                        if self.df_mode == 'cell_insert':
+                            mode = 'DF:CELL-INSERT'
+                        elif self.df_mode == 'cell_normal':
+                            mode = 'DF:CELL-NORMAL'
                         else:
                             mode = 'DF'
-                        fname = self.state.file_path or ''
-                        shape = f"{self.state.df.shape}"
-                        text = f" {mode} | {fname} | {shape}"
+                    elif self.focus == 1:
+                        mode = 'CMD'
+                    else:
+                        mode = 'DF'
+                    fname = self.state.file_path or ''
+                    shape = f"{self.state.df.shape}"
+                    text = f" {mode} | {fname} | {shape}"
 
                 try:
                     sw.addnstr(0, 0, text.ljust(w), w)
@@ -451,6 +399,51 @@ class Orchestrator:
         if self.overlay_visible:
             self._draw_overlay()
 
+    def _show_shortcuts(self):
+        lines = [
+            "Shortcuts",
+            "",
+            "Global",
+            "  Ctrl+C / Ctrl+X - exit",
+            "  Ctrl+S (df) - save",
+            "  Ctrl+T (df) - save & exit",
+            "  ? - show shortcuts",
+            "",
+            "Overlay (output)",
+            "  Esc / q / Enter - close",
+            "  j / k - scroll",
+            "",
+            "Command bar",
+            "  : (from df) - enter",
+            "  Enter / Ctrl+E - execute",
+            "  Esc - cancel",
+            "  Ctrl+P / Ctrl+N - history prev/next",
+            "  Backspace, Left/Right, Home/End - edit/move",
+            "",
+            "DF normal",
+            "  h / j / k / l - move",
+            "  H / L - column highlight",
+            "  J / K - row highlight",
+            "  : - open command bar",
+            "  i - edit cell (preload)",
+            "  , e - edit cell (preload)",
+            "  , c c - edit cell empty",
+            "  , d c - clear cell",
+            "  , n r - insert row below",
+            "  ? - shortcuts",
+            "",
+            "DF cell_insert",
+            "  Type to edit; Backspace deletes; Esc commits to cell_normal",
+            "",
+            "DF cell_normal",
+            "  h / l - move cursor within buffer",
+            "  , e / , c c / , d c / , n r",
+            "  i - insert; Esc - back to df normal",
+        ]
+        self.overlay_lines = lines
+        self.overlay_scroll = 0
+        self.overlay_visible = True
+        self.focus = 2
 
     def _draw_overlay(self):
         win = self.layout.overlay_win
@@ -550,20 +543,13 @@ class Orchestrator:
 
         while True:
             ch = self.stdscr.getch()
-            now = time.time()
 
             if self.overlay_visible:
                 self._handle_overlay_key(ch)
                 self.redraw()
                 continue
 
-            leader_enabled = False
-
             if ch == -1:
-                if leader_enabled and self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
-                    if self.leader_seq in LEADER_COMMANDS:
-                        self._execute_leader(self.leader_seq)
-                    self.leader_seq = None
                 self.redraw()
                 continue
 
@@ -577,23 +563,6 @@ class Orchestrator:
                     break
                 continue
 
-            if leader_enabled and self.leader_seq is not None:
-                self.leader_seq += chr(ch)
-                self.leader_start = now
-                if self.leader_seq not in LEADER_PREFIXES:
-                    self.leader_seq = None
-                elif self.leader_seq in LEADER_COMMANDS:
-                    self._execute_leader(self.leader_seq)
-                    self.leader_seq = None
-                self.redraw()
-                continue
-
-            if ch == ord(',') and leader_enabled:
-                self.leader_seq = ','
-                self.leader_start = now
-                self.redraw()
-                continue
-
             if self.focus == 0:
                 self._handle_df_key(ch)
             elif self.focus == 1:
@@ -602,5 +571,6 @@ class Orchestrator:
                     self._execute_command_buffer()
                 elif result == "cancel":
                     self.focus = 0
+
             self.redraw()
 
