@@ -11,6 +11,7 @@ from screen_layout import ScreenLayout
 from config_paths import HISTORY_PATH, ensure_config_dirs
 from file_type_handler import FileTypeHandler
 from pagination import Paginator
+from history_manager import HistoryManager
 
 
 
@@ -61,32 +62,9 @@ class Orchestrator:
         self.status_msg_until = 0
 
         # ---- history ----
-        import os
-        self.history_path = HISTORY_PATH
-        self.history = []
-
         legacy_path = os.path.expanduser('~/.vixl_history')
-        if os.path.exists(self.history_path):
-            try:
-                with open(self.history_path, 'r', encoding='utf-8') as f:
-                    self.history = [l.rstrip('\n') for l in f if l.strip()][-100:]
-            except Exception:
-                self.history = []
-        elif os.path.exists(legacy_path):
-            try:
-                with open(legacy_path, 'r', encoding='utf-8') as f:
-                    data = [l.rstrip('\n') for l in f if l.strip()]
-                self.history = data[-100:]
-                with open(self.history_path, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(data) + ('\n' if data else ''))
-            except Exception:
-                self.history = []
-        else:
-            try:
-                with open(self.history_path, 'w', encoding='utf-8') as f:
-                    f.write('')
-            except Exception:
-                self.history = []
+        self.history_mgr = HistoryManager(HISTORY_PATH, legacy_path=legacy_path, max_items=100)
+        self.history = self.history_mgr.load()
 
         # share history with command pane
         self.command.set_history(self.history)
@@ -599,14 +577,9 @@ class Orchestrator:
         self.paginator.ensure_row_visible(self.grid.curr_row)
 
         if getattr(self.exec, '_last_success', False):
-            self.history.append(code)
-            self.history = self.history[-100:]
-            self.command.set_history(self.history)
-            try:
-                with open(self.history_path, 'a', encoding='utf-8') as f:
-                    f.write(code + '\n')
-            except Exception:
-                pass
+            self.history_mgr.append(code)
+            self.command.set_history(self.history_mgr.items)
+            self.history_mgr.persist(code)
             self.status_msg = "Command executed"
         else:
             self.status_msg = "Command failed"
