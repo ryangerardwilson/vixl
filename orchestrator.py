@@ -424,6 +424,41 @@ class Orchestrator:
 
         # ---------------- helpers ----------------
 
+    def _execute_command_buffer(self):
+        code = self.command.get_buffer().strip()
+        self.io_visible = True
+
+        if not code:
+            self.output.set_lines([])
+            self.status_msg = "No command to execute"
+            self.status_msg_until = time.time() + 3
+            return
+
+        lines = self.exec.execute(code)
+        self.output.set_lines(lines)
+
+        # keep command pane in normal mode after execution
+        self.command.mode = 'normal'
+        self.command.cursor = len(self.command.buffer)
+
+        # sync grid with latest df and clamp cursor within bounds
+        self.grid.df = self.state.df
+        self.grid.curr_row = min(self.grid.curr_row, max(0, len(self.grid.df) - 1))
+        self.grid.curr_col = min(self.grid.curr_col, max(0, len(self.grid.df.columns) - 1))
+
+        if getattr(self.exec, '_last_success', False):
+            self.history.append(code)
+            self.history = self.history[-100:]
+            try:
+                with open(self.history_path, 'a', encoding='utf-8') as f:
+                    f.write(code + '\n')
+            except Exception:
+                pass
+            self.status_msg = "Command executed"
+        else:
+            self.status_msg = "Command failed"
+        self.status_msg_until = time.time() + 3
+
     def _save_df(self):
         handler = getattr(self.state, 'file_handler', None)
         if handler is None:
@@ -506,7 +541,9 @@ class Orchestrator:
                 elif ch == ord('k'):
                     self.output.scroll_up()
             else:
-                if ch == 27 and self.command.mode == 'normal':
+                if ch == 5:  # Ctrl+E
+                    self._execute_command_buffer()
+                elif ch == 27 and self.command.mode == 'normal':
                     self.focus = 0
                     self.io_visible = False
                 else:
