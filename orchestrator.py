@@ -391,40 +391,44 @@ class Orchestrator:
         sw.erase()
         h, w = sw.getmaxyx()
 
-        now = time.time()
-        if self.status_msg and now < self.status_msg_until:
-            text = f" {self.status_msg}"
+        cmd_active = (self.focus == 1 and self.command.active)
+
+        if cmd_active:
+            self.command.draw(sw, active=True)
         else:
-            if self.leader_seq:
-                text = f" {self.leader_seq}"
+            now = time.time()
+            if self.status_msg and now < self.status_msg_until:
+                text = f" {self.status_msg}"
             else:
-                if self.overlay_visible:
-                    mode = 'OVERLAY'
-                elif self.focus == 0:
-                    if self.df_mode == 'cell_insert':
-                        mode = 'DF:CELL-INSERT'
-                    elif self.df_mode == 'cell_normal':
-                        mode = 'DF:CELL-NORMAL'
+                if self.leader_seq:
+                    text = f" {self.leader_seq}"
+                else:
+                    if self.overlay_visible:
+                        mode = 'OVERLAY'
+                    elif self.focus == 0:
+                        if self.df_mode == 'cell_insert':
+                            mode = 'DF:CELL-INSERT'
+                        elif self.df_mode == 'cell_normal':
+                            mode = 'DF:CELL-NORMAL'
+                        else:
+                            mode = 'DF'
+                    elif self.focus == 1:
+                        mode = 'CMD'
                     else:
                         mode = 'DF'
-                elif self.focus == 1:
-                    mode = 'CMD'
-                else:
-                    mode = 'DF'
-                fname = self.state.file_path or ''
-                shape = f"{self.state.df.shape}"
-                text = f" {mode} | {fname} | {shape}"
+                    fname = self.state.file_path or ''
+                    shape = f"{self.state.df.shape}"
+                    text = f" {mode} | {fname} | {shape}"
 
-        try:
-            sw.addnstr(0, 0, text.ljust(w), w)
-        except curses.error:
-            pass
-        sw.refresh()
-
-        self.command.draw(self.layout.cmd_win, active=(self.focus == 1 and self.command.active))
+            try:
+                sw.addnstr(0, 0, text.ljust(w), w)
+            except curses.error:
+                pass
+            sw.refresh()
 
         if self.overlay_visible:
             self._draw_overlay()
+
 
     def _draw_overlay(self):
         win = self.layout.overlay_win

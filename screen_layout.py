@@ -6,21 +6,18 @@ class ScreenLayout:
         self.stdscr = stdscr
         self.H, self.W = stdscr.getmaxyx()
 
-        # layout: table (main), status bar (1 line), command bar (1 line), optional overlay
+        # layout: table (main), shared bottom strip (status or command), optional overlay
         self.status_h = 1
-        self.cmd_h = 1
-
-        self.table_h = max(1, self.H - self.status_h - self.cmd_h)
+        self.table_h = max(1, self.H - self.status_h)
 
         self.table_win = curses.newwin(self.table_h, self.W, 0, 0)
         # grid pane must never own cursor
         self.table_win.leaveok(True)
 
+        # shared strip for status or command line
         self.status_win = curses.newwin(self.status_h, self.W, self.table_h, 0)
         # do not let status bar steal cursor
         self.status_win.leaveok(True)
-
-        self.cmd_win = curses.newwin(self.cmd_h, self.W, self.table_h + self.status_h, 0)
 
         # overlay is a centered modal window over the table region
         self.overlay_h = max(3, min(10, self.H - 2))
