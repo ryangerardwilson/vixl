@@ -377,6 +377,28 @@ class Orchestrator:
             self.layout.command_win.erase()
             self.layout.command_win.refresh()
 
+        # ---------------- helpers ----------------
+
+    def _save_df(self):
+        handler = getattr(self.state, 'file_handler', None)
+        if handler is None:
+            self.status_msg = "No file handler available"
+            self.status_msg_until = time.time() + 4
+            return False
+
+        try:
+            if hasattr(self.state, 'ensure_non_empty'):
+                self.state.ensure_non_empty()
+            handler.save(self.state.df)
+            fname = self.state.file_path or ''
+            self.status_msg = f"Saved {fname}" if fname else "Saved"
+            self.status_msg_until = time.time() + 3
+            return True
+        except Exception as e:
+            self.status_msg = f"Save failed: {e}"[: self.layout.W - 2]
+            self.status_msg_until = time.time() + 4
+            return False
+
     # ---------------- main loop ----------------
 
     def run(self):
@@ -403,6 +425,13 @@ class Orchestrator:
 
             if ch == 24:
                 break
+
+            if self.focus == 0 and ch in (19, 20):  # Ctrl+S / Ctrl+T
+                saved = self._save_df()
+                self.redraw()
+                if ch == 20 and saved:
+                    break
+                continue
 
             if leader_enabled and self.leader_seq is not None:
                 self.leader_seq += chr(ch)
@@ -439,3 +468,4 @@ class Orchestrator:
                     self.command.handle_key(ch)
 
             self.redraw()
+
