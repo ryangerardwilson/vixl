@@ -43,6 +43,50 @@ class GridPane:
             max_len = max(max_len, len(s))
         return min(self.MAX_COL_WIDTH, max_len + 2)
 
+    def adjust_col_viewport(self, win=None):
+        """Force column viewport adjustment so curr_col is visible.
+        Call this after big cursor jumps (especially to last/first column)."""
+        if len(self.df.columns) == 0:
+            self.col_offset = 0
+            return
+
+        # Use real window dimensions if available
+        if win is not None:
+            h, w = win.getmaxyx()
+        else:
+            h, w = 24, 120  # reasonable fallback
+
+        row_w = max(3, len(str(len(self.df))) + 1)
+        avail_w = max(20, w - (row_w + 1))  # prevent tiny/negative avail width
+
+        # Calculate approximate visible columns
+        widths = [self.get_col_width(i) for i in range(len(self.df.columns))]
+
+        visible_count = 0
+        used = 0
+        for cw in widths[self.col_offset:]:
+            if used + cw + 1 > avail_w:
+                break
+            used += cw + 1
+            visible_count += 1
+
+        visible_count = max(1, visible_count)
+
+        # Core adjustment
+        if self.curr_col < self.col_offset:
+            self.col_offset = self.curr_col
+        elif self.curr_col >= self.col_offset + visible_count:
+            self.col_offset = self.curr_col - visible_count + 1
+
+        # ────────────────────────────────────────────────────────────────
+        # CRITICAL SAFETY: Never allow negative offset or overflow
+        # This prevents crashes on repeated left jumps (Ctrl+H)
+        # ────────────────────────────────────────────────────────────────
+        self.col_offset = max(0, self.col_offset)
+
+        max_possible_offset = max(0, len(self.df.columns) - visible_count)
+        self.col_offset = min(self.col_offset, max_possible_offset)
+
     # ---------- navigation ----------
     def move_left(self):
         self.curr_col = max(0, self.curr_col - 1)
@@ -122,7 +166,14 @@ class GridPane:
             max_cols += 1
         max_cols = max(1, max_cols)
 
-        # adjust viewport
+        # ────────────────────────────────────────────────────────────────
+        # Safety net - prevent negative or invalid offset on every draw
+        # This protects against all kinds of jumps (Ctrl+H/L, ,h, ,l)
+        # ────────────────────────────────────────────────────────────────
+        self.col_offset = max(0, self.col_offset)
+        self.col_offset = min(self.col_offset, len(self.df.columns) - max_cols)
+
+        # Row adjustment
         local_curr = self.curr_row - page_start
         if local_curr < 0:
             local_curr = 0
@@ -139,11 +190,14 @@ class GridPane:
         elif local_curr >= self.row_offset + max_rows:
             self.row_offset = local_curr - max_rows + 1
 
+        # Column adjustment (runs every draw)
         if self.curr_col < self.col_offset:
             self.col_offset = self.curr_col
         elif self.curr_col >= self.col_offset + max_cols:
             self.col_offset = self.curr_col - max_cols + 1
 
+        # Final safety after all adjustments
+        self.col_offset = max(0, self.col_offset)
 
         visible_rows = range(
             page_start + self.row_offset,
@@ -164,18 +218,15 @@ class GridPane:
         for r in visible_rows:
             win.addnstr(y, 0, str(r).rjust(row_w), row_w)
             x = row_w + 1
-            local_r = r - page_start
             for c in visible_cols:
                 cw = widths[c]
 
-                # base text
                 if editing and r == edit_row and c == edit_col:
                     text = edit_buffer or ''
                 else:
                     val = self.df.iloc[r, c]
                     text = '' if (val is None or pd.isna(val)) else str(val)
 
-                # horizontal scroll for edited cell
                 if editing and r == edit_row and c == edit_col:
                     visible = text[edit_hscroll: edit_hscroll + cw]
                 else:
@@ -195,29 +246,23 @@ class GridPane:
 
                 win.addnstr(y, x, cell, cw, attr)
 
-                # === FINAL CURSOR RENDERING - PERFECT ALIGNMENT FOR BOTH MODES ===
+                # Cursor rendering
                 if editing and r == edit_row and c == edit_col and edit_cursor is not None:
                     visible_len = len(visible)
-                    text_start_x = x + (cw - visible_len)  # padding from rjust
+                    text_start_x = x + (cw - visible_len)
 
                     relative_pos = edit_cursor - edit_hscroll
+                    pos = max(0, min(relative_pos, visible_len))
+                    cx = text_start_x + pos
+                    cx = max(x, min(x + cw - 1, cx))
 
                     if insert_mode:
-                        # Thin insert cursor - can be at end
-                        pos = max(0, min(relative_pos, visible_len))
-                        cx = text_start_x + pos
-                        cx = max(x, min(x + cw - 1, cx))
                         win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
                     else:
-                        # Normal mode block cursor - identical positioning to insert
-                        pos = max(0, min(relative_pos, visible_len))
-                        cx = text_start_x + pos
-                        cx = max(x, min(x + cw - 1, cx))
                         if pos < visible_len:
                             ch = visible[pos]
                             win.addch(y, cx, ch, curses.A_REVERSE)
                         else:
-                            # At absolute end: reverse space (consistent with insert)
                             win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
 
                 x += cw + 1
