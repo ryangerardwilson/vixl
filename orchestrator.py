@@ -13,6 +13,7 @@ from pagination import Paginator
 from history_manager import HistoryManager
 from df_editor import DfEditor
 from save_prompt import SavePrompt
+from overlay import OverlayView, build_shortcuts_lines
 
 
 class Orchestrator:
@@ -36,9 +37,9 @@ class Orchestrator:
         self.exec = CommandExecutor(app_state)
 
         self.focus = 0  # 0=df, 1=cmd, 2=overlay
-        self.overlay_visible = False
-        self.overlay_lines = []
-        self.overlay_scroll = 0
+
+        # ---- overlay ----
+        self.overlay = OverlayView(self.layout)
 
         # ---- save-as prompt ----
         self.save_prompt = SavePrompt(self.state, FileTypeHandler, self._set_status)
@@ -69,7 +70,7 @@ class Orchestrator:
 
     def redraw(self):
         try:
-            if self.overlay_visible:
+            if self.overlay.visible:
                 curses.curs_set(0)
             elif self.save_prompt.active:
                 curses.curs_set(1)
@@ -78,7 +79,7 @@ class Orchestrator:
         except curses.error:
             pass
 
-        if not self.overlay_visible:
+        if not self.overlay.visible:
             self.grid.draw(
                 self.layout.table_win,
                 active=(self.focus == 0),
@@ -134,97 +135,10 @@ class Orchestrator:
                         pass
                     sw.refresh()
 
-        if self.overlay_visible:
-            self._draw_overlay()
+        if self.overlay.visible:
+            self.overlay.draw()
 
-    def _open_overlay(self, lines):
-        max_h = min(self.layout.H // 2, self.layout.H - 2)
-        content_h = len(lines) + 2  # box padding
-        overlay_h = max(3, min(content_h, max_h))
-        overlay_y = max(0, (self.layout.table_h - overlay_h) // 2)
-
-        self.layout.overlay_h = overlay_h
-        self.layout.overlay_win = curses.newwin(overlay_h, self.layout.W, overlay_y, 0)
-        self.layout.overlay_win.leaveok(True)
-
-        self.overlay_lines = lines
-        self.overlay_scroll = 0
-        self.overlay_visible = True
-        self.focus = 2
-
-    def _show_shortcuts(self):
-        lines = [
-            "Shortcuts",
-            "",
-            "Global",
-            "  Ctrl+C / Ctrl+X - exit",
-            "  Ctrl+S (df) - save",
-            "  Ctrl+T (df) - save & exit",
-            "  ? - show shortcuts",
-            "",
-            "Overlay (output)",
-            "  Esc / q / Enter - close",
-            "  j / k - scroll",
-            "",
-            "Command bar",
-            "  : (from df) - enter",
-            "  Enter / Ctrl+E - execute",
-            "  Esc - cancel",
-            "  Ctrl+P / Ctrl+N - history prev/next",
-            "  Backspace, Left/Right, Home/End - edit/move",
-            "",
-            "DF normal",
-            "  h / j / k / l - move",
-            "  H / L - column highlight",
-            "  J / K - row highlight",
-            "  : - open command bar",
-            "  i - edit cell (preload)",
-            "  , e - edit cell (preload)",
-            "  , c c - edit cell empty",
-            "  , d c - clear cell",
-            "  , n r - insert row below",
-            "  , y - copy df to clipboard (TSV)",
-            "  ? - shortcuts",
-            "",
-            "DF cell_insert",
-            "  Type to edit; Backspace deletes; Esc commits to cell_normal",
-            "",
-            "DF cell_normal",
-            "  h / l - move cursor within buffer",
-            "  , e / , c c / , d c / , n r",
-            "  i - insert; Esc - back to df normal",
-        ]
-        self._open_overlay(lines)
-
-    def _draw_overlay(self):
-        win = self.layout.overlay_win
-        win.erase()
-        h, w = win.getmaxyx()
-        win.box()
-
-        max_visible = max(0, h - 2)
-        start = self.overlay_scroll
-        end = start + max_visible
-        for i, line in enumerate(self.overlay_lines[start:end]):
-            try:
-                win.addnstr(1 + i, 1, line, w - 2)
-            except curses.error:
-                pass
-
-        win.refresh()
-
-    def _handle_overlay_key(self, ch):
-        max_visible = max(0, self.layout.overlay_h - 2)
-        max_scroll = max(0, len(self.overlay_lines) - max_visible)
-
-        if ch in (27, ord('q'), 10, 13):
-            self.overlay_visible = False
-            self.focus = 0
-            return
-        if ch == ord('j'):
-            self.overlay_scroll = min(max_scroll, self.overlay_scroll + 1)
-        elif ch == ord('k'):
-            self.overlay_scroll = max(0, self.overlay_scroll - 1)
+    # ---------------- command exec ----------------
 
     def _execute_command_buffer(self):
         code = self.command.get_buffer().strip()
@@ -237,10 +151,10 @@ class Orchestrator:
 
         lines = self.exec.execute(code)
         if lines:
-            self._open_overlay(lines)
+            self.overlay.open(lines)
+            self.focus = 2
         else:
-            self.overlay_visible = False
-            self.overlay_lines = []
+            self.overlay.close()
             self.focus = 0
 
         # clear command bar after execution
@@ -261,6 +175,7 @@ class Orchestrator:
         else:
             self._set_status("Command failed", 3)
 
+    # ---------------- saving ----------------
 
     def _save_df(self, save_and_exit=False):
         handler = getattr(self.state, 'file_handler', None)
@@ -296,8 +211,10 @@ class Orchestrator:
             if ch in (3, 24):
                 break
 
-            if self.overlay_visible:
-                self._handle_overlay_key(ch)
+            if self.overlay.visible:
+                self.overlay.handle_key(ch)
+                if not self.overlay.visible:
+                    self.focus = 0
                 self.redraw()
                 continue
 
@@ -331,7 +248,8 @@ class Orchestrator:
                     self.command.activate()
                     self.focus = 1
                 elif ch == ord('?'):
-                    self._show_shortcuts()
+                    self.overlay.open(build_shortcuts_lines())
+                    self.focus = 2
                 else:
                     self.df_editor.handle_key(ch)
             elif self.focus == 1:
