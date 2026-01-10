@@ -398,20 +398,19 @@ class Orchestrator:
         except curses.error:
             pass
 
-        self.grid.draw(
-            self.layout.table_win,
-            active=(self.focus == 0 and not self.overlay_visible),
-            editing=(self.focus == 0 and self.df_mode in ('cell_insert', 'cell_normal')),
-            insert_mode=(self.focus == 0 and self.df_mode == 'cell_insert'),
-            edit_row=self.grid.curr_row,
-            edit_col=self.grid.curr_col,
-            edit_buffer=self.cell_buffer,
-            edit_cursor=self.cell_cursor,
-            edit_hscroll=self.cell_hscroll,
-        )
-
-        # when overlay is visible, avoid extra bottom refresh to reduce flicker
         if not self.overlay_visible:
+            self.grid.draw(
+                self.layout.table_win,
+                active=(self.focus == 0),
+                editing=(self.focus == 0 and self.df_mode in ('cell_insert', 'cell_normal')),
+                insert_mode=(self.focus == 0 and self.df_mode == 'cell_insert'),
+                edit_row=self.grid.curr_row,
+                edit_col=self.grid.curr_col,
+                edit_buffer=self.cell_buffer,
+                edit_cursor=self.cell_cursor,
+                edit_hscroll=self.cell_hscroll,
+            )
+
             sw = self.layout.status_win
             sw.erase()
             h, w = sw.getmaxyx()
@@ -428,9 +427,7 @@ class Orchestrator:
                     if self.leader_seq:
                         text = f" {self.leader_seq}"
                     else:
-                        if self.overlay_visible:
-                            mode = 'OVERLAY'
-                        elif self.focus == 0:
+                        if self.focus == 0:
                             if self.df_mode == 'cell_insert':
                                 mode = 'DF:CELL-INSERT'
                             elif self.df_mode == 'cell_normal':
