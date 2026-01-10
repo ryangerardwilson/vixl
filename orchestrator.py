@@ -12,6 +12,7 @@ from file_type_handler import FileTypeHandler
 from pagination import Paginator
 from history_manager import HistoryManager
 from df_editor import DfEditor
+from save_prompt import SavePrompt
 
 
 class Orchestrator:
@@ -40,11 +41,7 @@ class Orchestrator:
         self.overlay_scroll = 0
 
         # ---- save-as prompt ----
-        self.save_as_active = False
-        self.save_as_buffer = ""
-        self.save_as_cursor = 0
-        self.save_as_hscroll = 0
-        self.save_and_exit = False
+        self.save_prompt = SavePrompt(self.state, FileTypeHandler, self._set_status)
         self.exit_requested = False
 
         # ---- status ----
@@ -74,7 +71,7 @@ class Orchestrator:
         try:
             if self.overlay_visible:
                 curses.curs_set(0)
-            elif self.save_as_active:
+            elif self.save_prompt.active:
                 curses.curs_set(1)
             else:
                 curses.curs_set(1 if (self.focus == 1 and self.command.active) else 0)
@@ -100,23 +97,8 @@ class Orchestrator:
             sw.erase()
             h, w = sw.getmaxyx()
 
-            if self.save_as_active:
-                prompt = "Save as: "
-                text_w = max(1, w - len(prompt) - 1)
-                if self.save_as_cursor < self.save_as_hscroll:
-                    self.save_as_hscroll = self.save_as_cursor
-                elif self.save_as_cursor > self.save_as_hscroll + text_w:
-                    self.save_as_hscroll = self.save_as_cursor - text_w
-                start = self.save_as_hscroll
-                end = start + text_w
-                visible = self.save_as_buffer[start:end]
-                try:
-                    sw.addnstr(0, 0, prompt, len(prompt))
-                    sw.addnstr(0, len(prompt), visible, text_w)
-                    sw.move(0, len(prompt) + (self.save_as_cursor - self.save_as_hscroll))
-                except curses.error:
-                    pass
-                sw.refresh()
+            if self.save_prompt.active:
+                self.save_prompt.draw(sw)
             else:
                 cmd_active = (self.focus == 1 and self.command.active)
 
@@ -279,95 +261,12 @@ class Orchestrator:
         else:
             self._set_status("Command failed", 3)
 
-    def _start_save_as(self, save_and_exit=False):
-        self.save_as_active = True
-        self.save_as_buffer = self.state.file_path or ''
-        self.save_as_cursor = len(self.save_as_buffer)
-        self.save_as_hscroll = 0
-        self.save_and_exit = save_and_exit
-        self.exit_requested = False
-        self.overlay_visible = False
-        self.focus = 0
-
-    def _handle_save_as_key(self, ch):
-        if not self.save_as_active:
-            return
-
-        if ch in (10, 13):  # Enter
-            path = self.save_as_buffer.strip()
-            if not path:
-                self._set_status("Path required", 3)
-                return
-            if not (path.lower().endswith('.csv') or path.lower().endswith('.parquet')):
-                self._set_status("Save failed: use .csv or .parquet", 4)
-                return
-            try:
-                handler = FileTypeHandler(path)
-                if hasattr(self.state, 'ensure_non_empty'):
-                    self.state.ensure_non_empty()
-                handler.save(self.state.df)
-                self.state.file_handler = handler
-                self.state.file_path = path
-                self._set_status(f"Saved {path}", 3)
-                self.save_as_active = False
-                self.save_as_buffer = ""
-                self.save_as_cursor = 0
-                self.save_as_hscroll = 0
-                if self.save_and_exit:
-                    self.exit_requested = True
-                self.save_and_exit = False
-            except Exception as e:
-                msg = f"Save failed: {e}"[: self.layout.W - 2]
-                self._set_status(msg, 4)
-            return
-
-        if ch == 27:  # Esc
-            self.save_as_active = False
-            self.save_and_exit = False
-            self.save_as_buffer = ""
-            self.save_as_cursor = 0
-            self.save_as_hscroll = 0
-            self._set_status("Save canceled", 3)
-            return
-
-        if ch in (curses.KEY_BACKSPACE, 127, 8):
-            if self.save_as_cursor > 0:
-                self.save_as_buffer = (
-                    self.save_as_buffer[: self.save_as_cursor - 1]
-                    + self.save_as_buffer[self.save_as_cursor :]
-                )
-                self.save_as_cursor -= 1
-            return
-
-        if ch == curses.KEY_LEFT:
-            self.save_as_cursor = max(0, self.save_as_cursor - 1)
-            return
-
-        if ch == curses.KEY_RIGHT:
-            self.save_as_cursor = min(len(self.save_as_buffer), self.save_as_cursor + 1)
-            return
-
-        if ch == curses.KEY_HOME:
-            self.save_as_cursor = 0
-            return
-
-        if ch == curses.KEY_END:
-            self.save_as_cursor = len(self.save_as_buffer)
-            return
-
-        if 32 <= ch <= 126:
-            self.save_as_buffer = (
-                self.save_as_buffer[: self.save_as_cursor]
-                + chr(ch)
-                + self.save_as_buffer[self.save_as_cursor :]
-            )
-            self.save_as_cursor += 1
-            return
 
     def _save_df(self, save_and_exit=False):
         handler = getattr(self.state, 'file_handler', None)
         if handler is None:
-            self._start_save_as(save_and_exit=save_and_exit)
+            self.save_prompt.start(self.state.file_path, save_and_exit=save_and_exit)
+            self.focus = 0
             return False
 
         try:
@@ -402,10 +301,12 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            if self.save_as_active:
-                self._handle_save_as_key(ch)
-                if self.exit_requested:
-                    break
+            if self.save_prompt.active:
+                self.save_prompt.handle_key(ch)
+                if self.save_prompt.exit_requested:
+                    self.exit_requested = True
+                if not self.save_prompt.active:
+                    self.focus = 0
                 self.redraw()
                 continue
 
