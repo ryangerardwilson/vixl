@@ -8,6 +8,7 @@ from grid_pane import GridPane
 from command_pane import CommandPane
 from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
+from config_paths import HISTORY_PATH, ensure_config_dirs
 
 LEADER_COMMANDS = {
     ',ya': 'ACTIVE',
@@ -26,6 +27,8 @@ class Orchestrator:
         curses.curs_set(1)
         curses.raw()
         self.stdscr.timeout(100)
+
+        ensure_config_dirs()
 
         self.state = app_state
         self.layout = ScreenLayout(stdscr)
@@ -54,14 +57,34 @@ class Orchestrator:
 
         # ---- history ----
         import os
-        self.history_path = os.path.expanduser('~/.vixl_history')
+        self.history_path = HISTORY_PATH
         self.history = []
+
+        legacy_path = os.path.expanduser('~/.vixl_history')
         if os.path.exists(self.history_path):
             try:
                 with open(self.history_path, 'r', encoding='utf-8') as f:
                     self.history = [l.rstrip('\n') for l in f if l.strip()][-100:]
             except Exception:
                 self.history = []
+        elif os.path.exists(legacy_path):
+            try:
+                with open(legacy_path, 'r', encoding='utf-8') as f:
+                    data = [l.rstrip('\n') for l in f if l.strip()]
+                self.history = data[-100:]
+                with open(self.history_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(data) + ('\n' if data else ''))
+            except Exception:
+                self.history = []
+        else:
+            try:
+                with open(self.history_path, 'w', encoding='utf-8') as f:
+                    f.write('')
+            except Exception:
+                self.history = []
+
+        # share history with command pane
+        self.command.set_history(self.history)
 
     # ---------------- helpers ----------------
 
@@ -490,6 +513,7 @@ class Orchestrator:
         if getattr(self.exec, '_last_success', False):
             self.history.append(code)
             self.history = self.history[-100:]
+            self.command.set_history(self.history)
             try:
                 with open(self.history_path, 'a', encoding='utf-8') as f:
                     f.write(code + '\n')

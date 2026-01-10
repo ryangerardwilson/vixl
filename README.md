@@ -27,7 +27,7 @@ python main.py <csv-or-parquet-file>
 - Safe handling of empty tables
 - Content-aware, auto-sized columns
 - Right-aligned cell rendering
-- Persistent global command history (`~/.vixl_history`)
+- Persistent global command history (`~/.config/vixl/history.log`)
 - Explicit save and save-on-exit
 
 ### df Mode: Normal vs Insert

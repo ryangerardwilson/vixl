@@ -7,6 +7,8 @@ class CommandPane:
         self.cursor = 0
         self.hscroll = 0
         self.active = False
+        self.history = []
+        self.history_idx = None  # None means not navigating history
 
     # ---------- state helpers ----------
     def reset(self):
@@ -14,10 +16,12 @@ class CommandPane:
         self.cursor = 0
         self.hscroll = 0
         self.active = False
+        self.history_idx = None
 
     def activate(self):
         self.active = True
         self.cursor = len(self.buffer)
+        self.history_idx = None
 
     def get_buffer(self):
         return self.buffer
@@ -26,10 +30,52 @@ class CommandPane:
         self.buffer = text or ""
         self.cursor = len(self.buffer)
         self.hscroll = 0
+        self.history_idx = None
+
+    def set_history(self, entries):
+        self.history = list(entries or [])
+        self.history_idx = None
+
+    def _apply_history(self):
+        if self.history_idx is None:
+            return
+        if 0 <= self.history_idx < len(self.history):
+            self.buffer = self.history[self.history_idx]
+        else:
+            self.buffer = ""
+        self.cursor = len(self.buffer)
+        self.hscroll = 0
 
     # ---------- input handling ----------
     def handle_key(self, ch):
         if not self.active:
+            return None
+
+        # history navigation
+        if ch == 16:  # Ctrl+P
+            if self.history:
+                if self.history_idx is None:
+                    self.history_idx = len(self.history) - 1
+                else:
+                    self.history_idx = max(0, self.history_idx - 1)
+                self._apply_history()
+            return None
+        if ch == 14:  # Ctrl+N
+            if self.history:
+                if self.history_idx is None:
+                    # stay at blank
+                    self.buffer = ""
+                    self.cursor = 0
+                    self.hscroll = 0
+                else:
+                    self.history_idx += 1
+                    if self.history_idx >= len(self.history):
+                        self.history_idx = None
+                        self.buffer = ""
+                        self.cursor = 0
+                        self.hscroll = 0
+                    else:
+                        self._apply_history()
             return None
 
         # submit
@@ -45,6 +91,7 @@ class CommandPane:
             if self.cursor > 0:
                 self.buffer = self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
                 self.cursor -= 1
+            self.history_idx = None
             return None
 
         if ch == curses.KEY_LEFT:
@@ -66,6 +113,7 @@ class CommandPane:
         if 32 <= ch <= 126:
             self.buffer = self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
             self.cursor += 1
+            self.history_idx = None
             return None
 
         return None

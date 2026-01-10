@@ -6,7 +6,7 @@
 ## 2026-01-09
 
 ### Added
-- Persistent global command history stored at `~/.vixl_history`.
+- Persistent global command history stored at `~/.config/vixl/history.log`.
 - CSV and Parquet file support with automatic file creation.
 - Pandas (`pd`) and NumPy (`np`) preloaded in the command execution context.
 

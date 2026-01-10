@@ -145,7 +145,7 @@ Characteristics:
 
 ## 11. Command History
 
-- Command history is persisted globally at `~/.vixl_history`
+- Command history is persisted globally at `~/.config/vixl/history.log`
 - The history file is the single source of truth
 - Only successful commands are recorded
 - Non-adjacent duplicate commands are allowed
