@@ -59,12 +59,15 @@ class GridPane:
         row_w = max(3, len(str(len(self.df))) + 1)
         avail_w = max(20, w - (row_w + 1))  # prevent tiny/negative avail width
 
-        # Calculate approximate visible columns
-        widths = [self.get_col_width(i) for i in range(len(self.df.columns))]
+        # Calculate approximate visible columns using header widths only (cheap, avoids full DF scans)
+        header_widths = [
+            min(self.MAX_COL_WIDTH, len(str(col)) + 2)
+            for col in self.df.columns
+        ]
 
         visible_count = 0
         used = 0
-        for cw in widths[self.col_offset:]:
+        for cw in header_widths[self.col_offset:]:
             if used + cw + 1 > avail_w:
                 break
             used += cw + 1
