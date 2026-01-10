@@ -1,6 +1,7 @@
 import sys
 import os
 import curses
+import pandas as pd
 from file_type_handler import FileTypeHandler
 
 # Make ESC snappy
@@ -9,20 +10,27 @@ from orchestrator import Orchestrator
 from app_state import AppState
 
 
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: python main.py <csv|parquet>")
-        sys.exit(1)
+def _default_df():
+    cols = ['col_a', 'col_b', 'col_c']
+    df = pd.DataFrame({c: [] for c in cols})
+    for _ in range(3):
+        df.loc[len(df)] = [pd.NA] * len(cols)
+    return df
 
-    path = sys.argv[1]
-    handler = FileTypeHandler(path)
+
+def main():
+    has_path = len(sys.argv) == 2
+    path = sys.argv[1] if has_path else None
+    handler = FileTypeHandler(path) if path else None
 
     from loading_screen import LoadingScreen, LoadState
 
     load_state = LoadState()
 
     def load_df():
-        return handler.load_or_create()
+        if handler:
+            return handler.load_or_create()
+        return _default_df()
 
     def curses_main(stdscr):
         loader = LoadingScreen(stdscr, load_df, load_state)
