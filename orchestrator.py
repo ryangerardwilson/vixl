@@ -176,6 +176,9 @@ class Orchestrator:
                     if ch == ord('d'):
                         self.cell_leader_state = 'd'
                         return
+                    if ch == ord('n'):
+                        self.cell_leader_state = 'n'
+                        return
                     return
 
                 if state == 'c' and ch == ord('c'):
@@ -189,6 +192,20 @@ class Orchestrator:
                     self.cell_buffer = ''
                     self.cell_cursor = 0
                     self.cell_hscroll = 0
+                    return
+
+                if state == 'n' and ch == ord('r'):
+                    row = self.state.build_default_row()
+                    insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
+                    new_row = pd.DataFrame([row], columns=self.state.df.columns)
+                    self.state.df = pd.concat([
+                        self.state.df.iloc[:insert_at],
+                        new_row,
+                        self.state.df.iloc[insert_at:],
+                    ], ignore_index=True)
+                    self.grid.df = self.state.df
+                    self.grid.curr_row = insert_at
+                    self.grid.highlight_mode = 'cell'
                     return
 
             if ch == ord(','):
@@ -256,6 +273,9 @@ class Orchestrator:
                     if ch == ord('d'):
                         self.cell_leader_state = 'd'
                         return
+                    if ch == ord('n'):
+                        self.cell_leader_state = 'n'
+                        return
                     return
 
                 if state == 'c' and ch == ord('c'):
@@ -271,6 +291,20 @@ class Orchestrator:
                         self.state.df.iloc[r, c] = self._coerce_cell_value(col, '')
                     except Exception:
                         self.state.df.iloc[r, c] = ''
+                    return
+
+                if state == 'n' and ch == ord('r'):
+                    row = self.state.build_default_row()
+                    insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
+                    new_row = pd.DataFrame([row], columns=self.state.df.columns)
+                    self.state.df = pd.concat([
+                        self.state.df.iloc[:insert_at],
+                        new_row,
+                        self.state.df.iloc[insert_at:],
+                    ], ignore_index=True)
+                    self.grid.df = self.state.df
+                    self.grid.curr_row = insert_at
+                    self.grid.highlight_mode = 'cell'
                     return
 
             if ch == ord(','):
