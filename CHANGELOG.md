@@ -6,6 +6,7 @@
 - Single-line command bar; output as modal overlay; shortcuts modal (`?`); overlays auto-size to content up to 50% terminal height.
 - Command history relocated to `~/.config/vixl/history.log`; command bar history navigation via Ctrl+P/Ctrl+N.
 - Extensions: auto-load from `~/.config/vixl/extensions`; bound as df methods; explicit mutation signaling `(df, True)` or `commit_df=True`; natural commands auto-commit unless an extension was invoked. Configurable `AUTO_COMMIT` in `~/.config/vixl/config.py`.
+- DF-normal shortcut `,y` copies the entire DataFrame as TSV to clipboard via `wl-copy` for Sheets/Excel pasting.
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
 

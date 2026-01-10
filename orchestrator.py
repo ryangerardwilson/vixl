@@ -48,6 +48,7 @@ class Orchestrator:
         self.cell_hscroll = 0
         self.cell_col = None
         self.cell_leader_state = None  # None | 'leader' | 'c' | 'd'
+        self.df_leader_state = None  # None | 'leader'
 
         # ---- status ----
         self.status_msg = None
@@ -246,6 +247,21 @@ class Orchestrator:
             val = self.state.df.iloc[r, c]
             base = '' if (val is None or pd.isna(val)) else str(val)
 
+            if self.df_leader_state:
+                state = self.df_leader_state
+                self.df_leader_state = None
+                if state == 'leader' and ch == ord('y'):
+                    try:
+                        import subprocess
+                        tsv_data = self.state.df.to_csv(sep='\t', index=False)
+                        subprocess.run(['wl-copy'], input=tsv_data, text=True, check=True)
+                        self.status_msg = "DF copied"
+                        self.status_msg_until = time.time() + 3
+                    except Exception:
+                        self.status_msg = "Copy failed"
+                        self.status_msg_until = time.time() + 3
+                    return
+
             if self.cell_leader_state:
                 state = self.cell_leader_state
                 self.cell_leader_state = None
@@ -303,7 +319,8 @@ class Orchestrator:
                     return
 
             if ch == ord(','):
-                self.cell_leader_state = 'leader'
+                self.df_leader_state = 'leader'
+                self.cell_leader_state = None
                 return
 
             if ch == ord('i'):
@@ -475,6 +492,7 @@ class Orchestrator:
             "  , c c - edit cell empty",
             "  , d c - clear cell",
             "  , n r - insert row below",
+            "  , y - copy df to clipboard (TSV)",
             "  ? - shortcuts",
             "",
             "DF cell_insert",

@@ -71,7 +71,9 @@ python main.py <csv-or-parquet-file>
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
 - Clear cell: `, d c`
 - Insert row below: `, n r`
+- Copy df to clipboard (TSV): `, y` (uses `wl-copy`, paste-friendly for Sheets/Excel)
 - `?` opens shortcuts
+
 
 ### Cell edit modes
 - `cell_insert`: type to edit; Backspace deletes; Esc commits to `cell_normal`.
