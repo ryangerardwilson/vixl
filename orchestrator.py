@@ -195,6 +195,9 @@ class Orchestrator:
                     return
 
                 if state == 'n' and ch == ord('r'):
+                    # only allow row insertion while in df normal (hover) mode
+                    if self.df_mode != 'normal':
+                        return
                     row = self.state.build_default_row()
                     insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
                     new_row = pd.DataFrame([row], columns=self.state.df.columns)
@@ -250,13 +253,14 @@ class Orchestrator:
 
         # ---------- df normal (hover) ----------
         if self.df_mode == 'normal':
+            r, c = self.grid.curr_row, self.grid.curr_col
+            col = self.state.df.columns[c]
+            val = self.state.df.iloc[r, c]
+            base = '' if (val is None or pd.isna(val)) else str(val)
+
             if self.cell_leader_state:
                 state = self.cell_leader_state
                 self.cell_leader_state = None
-                r, c = self.grid.curr_row, self.grid.curr_col
-                col = self.state.df.columns[c]
-                val = self.state.df.iloc[r, c]
-                base = '' if val is None else str(val)
 
                 if state == 'leader':
                     if ch == ord('e'):
@@ -294,6 +298,9 @@ class Orchestrator:
                     return
 
                 if state == 'n' and ch == ord('r'):
+                    # only allow row insertion while in df normal (hover) mode
+                    if self.df_mode != 'normal':
+                        return
                     row = self.state.build_default_row()
                     insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
                     new_row = pd.DataFrame([row], columns=self.state.df.columns)
@@ -312,8 +319,12 @@ class Orchestrator:
                 return
 
             if ch == ord('i'):
-                self.status_msg = "Use ,e or ,cc to edit cell"
-                self.status_msg_until = time.time() + 2
+                self.cell_col = col
+                self.cell_buffer = base
+                if not self.cell_buffer.endswith(' '):
+                    self.cell_buffer += ' '
+                self.cell_cursor = len(self.cell_buffer) - 1
+                self.df_mode = 'cell_insert'
                 return
 
             if ch == ord('h'):

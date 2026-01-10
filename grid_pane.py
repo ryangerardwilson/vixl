@@ -1,5 +1,6 @@
 # ~/Apps/vixl/grid_pane.py
 import curses
+import pandas as pd
 
 
 class GridPane:
@@ -35,7 +36,10 @@ class GridPane:
         col = self.df.columns[col_idx]
         max_len = len(str(col))
         for v in self.df[col]:
-            s = '' if v is None else str(v)
+            if v is None or pd.isna(v):
+                s = ''
+            else:
+                s = str(v)
             max_len = max(max_len, len(s))
         return min(self.MAX_COL_WIDTH, max_len + 2)
 
@@ -144,7 +148,7 @@ class GridPane:
                     text = edit_buffer or ''
                 else:
                     val = self.df.iloc[r, c]
-                    text = '' if val is None else str(val)
+                    text = '' if (val is None or pd.isna(val)) else str(val)
 
                 # horizontal scroll for edited cell
                 if editing and r == edit_row and c == edit_col:
