@@ -387,44 +387,46 @@ class Orchestrator:
             edit_hscroll=self.cell_hscroll,
         )
 
-        sw = self.layout.status_win
-        sw.erase()
-        h, w = sw.getmaxyx()
+        # when overlay is visible, avoid extra bottom refresh to reduce flicker
+        if not self.overlay_visible:
+            sw = self.layout.status_win
+            sw.erase()
+            h, w = sw.getmaxyx()
 
-        cmd_active = (self.focus == 1 and self.command.active)
+            cmd_active = (self.focus == 1 and self.command.active)
 
-        if cmd_active:
-            self.command.draw(sw, active=True)
-        else:
-            now = time.time()
-            if self.status_msg and now < self.status_msg_until:
-                text = f" {self.status_msg}"
+            if cmd_active:
+                self.command.draw(sw, active=True)
             else:
-                if self.leader_seq:
-                    text = f" {self.leader_seq}"
+                now = time.time()
+                if self.status_msg and now < self.status_msg_until:
+                    text = f" {self.status_msg}"
                 else:
-                    if self.overlay_visible:
-                        mode = 'OVERLAY'
-                    elif self.focus == 0:
-                        if self.df_mode == 'cell_insert':
-                            mode = 'DF:CELL-INSERT'
-                        elif self.df_mode == 'cell_normal':
-                            mode = 'DF:CELL-NORMAL'
+                    if self.leader_seq:
+                        text = f" {self.leader_seq}"
+                    else:
+                        if self.overlay_visible:
+                            mode = 'OVERLAY'
+                        elif self.focus == 0:
+                            if self.df_mode == 'cell_insert':
+                                mode = 'DF:CELL-INSERT'
+                            elif self.df_mode == 'cell_normal':
+                                mode = 'DF:CELL-NORMAL'
+                            else:
+                                mode = 'DF'
+                        elif self.focus == 1:
+                            mode = 'CMD'
                         else:
                             mode = 'DF'
-                    elif self.focus == 1:
-                        mode = 'CMD'
-                    else:
-                        mode = 'DF'
-                    fname = self.state.file_path or ''
-                    shape = f"{self.state.df.shape}"
-                    text = f" {mode} | {fname} | {shape}"
+                        fname = self.state.file_path or ''
+                        shape = f"{self.state.df.shape}"
+                        text = f" {mode} | {fname} | {shape}"
 
-            try:
-                sw.addnstr(0, 0, text.ljust(w), w)
-            except curses.error:
-                pass
-            sw.refresh()
+                try:
+                    sw.addnstr(0, 0, text.ljust(w), w)
+                except curses.error:
+                    pass
+                sw.refresh()
 
         if self.overlay_visible:
             self._draw_overlay()
@@ -445,11 +447,7 @@ class Orchestrator:
             except curses.error:
                 pass
 
-        footer = " OUTPUT  Esc/q/Enter to close · j/k to scroll "
-        try:
-            win.addnstr(h - 2, 1, footer.ljust(w - 2), w - 2, curses.A_DIM)
-        except curses.error:
-            pass
+        # no helper footer; rely on memorized keys
         win.refresh()
 
     def _handle_overlay_key(self, ch):
