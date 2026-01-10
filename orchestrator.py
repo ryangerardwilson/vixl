@@ -25,6 +25,13 @@ class Orchestrator:
         self.state = app_state
         self.layout = ScreenLayout(stdscr)
         self.grid = GridPane(app_state.df)
+
+        # ---- pagination ----
+        self.page_size = 1000
+        self.page_index = 0
+        self.total_rows = len(self.state.df)
+        self._clamp_page()
+
         self.command = CommandPane()
         self.exec = CommandExecutor(app_state)
 
@@ -337,9 +344,28 @@ class Orchestrator:
             elif ch == ord('l'):
                 self.grid.move_right()
             elif ch == ord('j'):
-                self.grid.move_down()
+                if self.grid.curr_row + 1 >= self.page_end:
+                    if self.page_end < self.total_rows:
+                        self.page_index += 1
+                        self._clamp_page()
+                        self.grid.row_offset = 0
+                        self.grid.curr_row = self.page_start
+                    else:
+                        self.grid.curr_row = self.total_rows - 1
+                else:
+                    self.grid.move_down()
             elif ch == ord('k'):
-                self.grid.move_up()
+                if self.grid.curr_row - 1 < self.page_start:
+                    if self.page_index > 0:
+                        self.page_index -= 1
+                        self._clamp_page()
+                        self.grid.row_offset = 0
+                        self.grid.curr_row = self.page_end - 1
+                    else:
+                        self.grid.curr_row = 0
+                else:
+                    self.grid.move_up()
+
             elif ch == ord('J'):
                 self.grid.move_row_down()
             elif ch == ord('K'):
@@ -389,6 +415,8 @@ class Orchestrator:
                 edit_buffer=self.cell_buffer,
                 edit_cursor=self.cell_cursor,
                 edit_hscroll=self.cell_hscroll,
+                page_start=self.page_start,
+                page_end=self.page_end,
             )
 
             sw = self.layout.status_win
@@ -417,7 +445,9 @@ class Orchestrator:
 
                 if cmd_active:
                     self.command.draw(sw, active=True)
+                    sw.refresh()
                 else:
+                    text = ""
                     now = time.time()
                     if self.status_msg and now < self.status_msg_until:
                         text = f" {self.status_msg}"
@@ -435,13 +465,16 @@ class Orchestrator:
                             mode = 'DF'
                         fname = self.state.file_path or ''
                         shape = f"{self.state.df.shape}"
-                        text = f" {mode} | {fname} | {shape}"
+                        page_total = max(1, (self.total_rows - 1) // self.page_size + 1) if self.total_rows else 1
+                        page_info = f"Page {self.page_index + 1}/{page_total} rows {self.page_start}-{max(self.page_start, self.page_end - 1)} of {self.total_rows}"
+                        text = f" {mode} | {fname} | {shape} | {page_info}"
 
                     try:
                         sw.addnstr(0, 0, text.ljust(w), w)
                     except curses.error:
                         pass
                     sw.refresh()
+
 
         if self.overlay_visible:
             self._draw_overlay()
@@ -523,6 +556,12 @@ class Orchestrator:
         # no helper footer; rely on memorized keys
         win.refresh()
 
+    def _clamp_page(self):
+        max_page = max(0, (self.total_rows - 1) // self.page_size) if self.total_rows > 0 else 0
+        self.page_index = max(0, min(self.page_index, max_page))
+        self.page_start = self.page_index * self.page_size
+        self.page_end = min(self.total_rows, self.page_start + self.page_size)
+
     def _handle_overlay_key(self, ch):
         max_visible = max(0, self.layout.overlay_h - 2)
         max_scroll = max(0, len(self.overlay_lines) - max_visible)
@@ -559,6 +598,8 @@ class Orchestrator:
 
         # sync grid with latest df and clamp cursor within bounds
         self.grid.df = self.state.df
+        self.total_rows = len(self.state.df)
+        self._clamp_page()
         self.grid.curr_row = min(self.grid.curr_row, max(0, len(self.grid.df) - 1))
         self.grid.curr_col = min(self.grid.curr_col, max(0, len(self.grid.df.columns) - 1))
 

@@ -88,16 +88,23 @@ class GridPane:
         edit_buffer=None,
         edit_cursor=None,
         edit_hscroll=0,
+        page_start=0,
+        page_end=None,
     ):
         win.erase()
         h, w = win.getmaxyx()
 
-        # compute column widths
+        if page_end is None:
+            page_end = len(self.df)
+        total_rows = max(0, page_end - page_start)
+
+        # compute column widths using only the page slice
         widths = []
-        for col in self.df.columns:
+        df_slice = self.df.iloc[page_start:page_end]
+        for col in df_slice.columns:
             max_len = len(str(col))
-            for v in self.df[col]:
-                s = '' if v is None else str(v)
+            for v in df_slice[col]:
+                s = '' if (v is None or pd.isna(v)) else str(v)
                 max_len = max(max_len, len(s))
             widths.append(min(self.MAX_COL_WIDTH, max_len + 2))
 
@@ -114,24 +121,39 @@ class GridPane:
         max_cols = max(1, max_cols)
 
         # adjust viewport
-        if self.curr_row < self.row_offset:
-            self.row_offset = self.curr_row
-        elif self.curr_row >= self.row_offset + max_rows:
-            self.row_offset = self.curr_row - max_rows + 1
+        local_curr = self.curr_row - page_start
+        if local_curr < 0:
+            local_curr = 0
+        if local_curr >= total_rows:
+            local_curr = max(0, total_rows - 1)
+            self.curr_row = page_start + local_curr
+
+        max_row_offset = max(0, total_rows - max_rows)
+        if self.row_offset > max_row_offset:
+            self.row_offset = max_row_offset
+
+        if local_curr < self.row_offset:
+            self.row_offset = local_curr
+        elif local_curr >= self.row_offset + max_rows:
+            self.row_offset = local_curr - max_rows + 1
 
         if self.curr_col < self.col_offset:
             self.col_offset = self.curr_col
         elif self.curr_col >= self.col_offset + max_cols:
             self.col_offset = self.curr_col - max_cols + 1
 
-        visible_rows = range(self.row_offset, min(len(self.df), self.row_offset + max_rows))
-        visible_cols = range(self.col_offset, min(len(self.df.columns), self.col_offset + max_cols))
+
+        visible_rows = range(
+            page_start + self.row_offset,
+            min(page_end, page_start + self.row_offset + max_rows),
+        )
+        visible_cols = range(self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols))
 
         # header
         x = 4
         for c in visible_cols:
             cw = widths[c]
-            name = str(self.df.columns[c])[:cw].rjust(cw)
+            name = str(df_slice.columns[c])[:cw].rjust(cw)
             win.addnstr(1, x, name, cw, curses.A_BOLD)
             x += cw + 1
 
@@ -140,6 +162,7 @@ class GridPane:
         for r in visible_rows:
             win.addnstr(y, 0, str(r).rjust(3), 3)
             x = 4
+            local_r = r - page_start
             for c in visible_cols:
                 cw = widths[c]
 
