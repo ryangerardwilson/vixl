@@ -29,6 +29,16 @@ class GridPane:
         self.col_offset = 0
         self.highlight_mode = 'cell'
 
+    def get_col_width(self, col_idx):
+        if col_idx < 0 or col_idx >= len(self.df.columns):
+            return self.MAX_COL_WIDTH
+        col = self.df.columns[col_idx]
+        max_len = len(str(col))
+        for v in self.df[col]:
+            s = '' if v is None else str(v)
+            max_len = max(max_len, len(s))
+        return min(self.MAX_COL_WIDTH, max_len + 2)
+
     # ---------- navigation ----------
     def move_left(self):
         self.curr_col = max(0, self.curr_col - 1)
@@ -186,6 +196,4 @@ class GridPane:
             if y >= h - 1:
                 break
 
-        if active:
-            win.addnstr(h - 2, w - 8, ' DF ', 6)
         win.refresh()

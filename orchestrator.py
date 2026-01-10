@@ -196,7 +196,7 @@ class Orchestrator:
                 return
 
             buf_len = len(self.cell_buffer)
-            cw = self.grid.MAX_COL_WIDTH
+            cw = self.grid.get_col_width(self.grid.curr_col)
 
             moved = False
             if ch == ord('h'):
@@ -304,7 +304,7 @@ class Orchestrator:
             return
 
     def _autoscroll_insert(self):
-        cw = self.grid.MAX_COL_WIDTH
+        cw = self.grid.get_col_width(self.grid.curr_col)
         if self.cell_cursor < self.cell_hscroll:
             self.cell_hscroll = self.cell_cursor
         elif self.cell_cursor > self.cell_hscroll + cw - 1:
@@ -423,7 +423,7 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            if ch == 24:
+            if ch in (3, 24):
                 break
 
             if self.focus == 0 and ch in (19, 20):  # Ctrl+S / Ctrl+T
