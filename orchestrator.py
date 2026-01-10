@@ -6,7 +6,6 @@ import pandas as pd
 
 from grid_pane import GridPane
 from command_pane import CommandPane
-from output_pane import OutputPane
 from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
 
@@ -32,11 +31,12 @@ class Orchestrator:
         self.layout = ScreenLayout(stdscr)
         self.grid = GridPane(app_state.df)
         self.command = CommandPane()
-        self.output = OutputPane()
         self.exec = CommandExecutor(app_state)
 
-        self.focus = 0  # 0=df, 1=cmd, 2=out
-        self.io_visible = False
+        self.focus = 0  # 0=df, 1=cmd, 2=overlay
+        self.overlay_visible = False
+        self.overlay_lines = []
+        self.overlay_scroll = 0
 
         # ---- DF cell editing state ----
         self.df_mode = 'normal'  # normal | cell_normal | cell_insert
@@ -77,7 +77,13 @@ class Orchestrator:
 
     def _execute_leader(self, seq):
         if seq == ',o':
-            self.focus = 2
+            if self.overlay_lines:
+                self.overlay_visible = True
+                self.focus = 2
+                self.overlay_scroll = 0
+            else:
+                self.status_msg = "No output to show"
+                self.status_msg_until = time.time() + 3
             return
         if seq == ',df':
             self.focus = 0
@@ -90,16 +96,16 @@ class Orchestrator:
             elif self.focus == 1:
                 content = self.command.get_buffer()
             else:
-                content = '\n'.join(self.output.lines)
+                content = '\n'.join(self.overlay_lines)
         elif seq == ',yap':
             content = (
                 self.state.df.to_string() + '\n\n'
                 + self.command.get_buffer() + '\n\n'
-                + '\n'.join(self.output.lines)
+                + '\n'.join(self.overlay_lines)
             )
         elif seq == ',yio':
             last = self.history[-1] if self.history else ''
-            content = last + '\n\n' + '\n'.join(self.output.lines)
+            content = last + '\n\n' + '\n'.join(self.overlay_lines)
 
         if content:
             try:
@@ -344,7 +350,7 @@ class Orchestrator:
             elif ch == ord('L'):
                 self.grid.move_col_right()
             elif ch == ord(':'):
-                self.io_visible = True
+                self.command.activate()
                 self.focus = 1
             return
 
@@ -362,13 +368,16 @@ class Orchestrator:
 
     def redraw(self):
         try:
-            curses.curs_set(1 if self.focus == 1 else 0)
+            if self.overlay_visible:
+                curses.curs_set(0)
+            else:
+                curses.curs_set(1 if (self.focus == 1 and self.command.active) else 0)
         except curses.error:
             pass
 
         self.grid.draw(
             self.layout.table_win,
-            active=self.focus == 0,
+            active=(self.focus == 0 and not self.overlay_visible),
             editing=(self.focus == 0 and self.df_mode in ('cell_insert', 'cell_normal')),
             insert_mode=(self.focus == 0 and self.df_mode == 'cell_insert'),
             edit_row=self.grid.curr_row,
@@ -377,12 +386,6 @@ class Orchestrator:
             edit_cursor=self.cell_cursor,
             edit_hscroll=self.cell_hscroll,
         )
-
-        if self.io_visible:
-            self.output.draw(self.layout.output_win, active=False)
-        else:
-            self.layout.output_win.erase()
-            self.layout.output_win.refresh()
 
         sw = self.layout.status_win
         sw.erase()
@@ -395,7 +398,9 @@ class Orchestrator:
             if self.leader_seq:
                 text = f" {self.leader_seq}"
             else:
-                if self.focus == 0:
+                if self.overlay_visible:
+                    mode = 'OVERLAY'
+                elif self.focus == 0:
                     if self.df_mode == 'cell_insert':
                         mode = 'DF:CELL-INSERT'
                     elif self.df_mode == 'cell_normal':
@@ -403,9 +408,9 @@ class Orchestrator:
                     else:
                         mode = 'DF'
                 elif self.focus == 1:
-                    mode = f"CMD:{self.command.mode.upper()}"
+                    mode = 'CMD'
                 else:
-                    mode = 'OUT'
+                    mode = 'DF'
                 fname = self.state.file_path or ''
                 shape = f"{self.state.df.shape}"
                 text = f" {mode} | {fname} | {shape}"
@@ -416,30 +421,64 @@ class Orchestrator:
             pass
         sw.refresh()
 
-        if self.io_visible:
-            self.command.draw(self.layout.command_win, active=self.focus == 1)
-        else:
-            self.layout.command_win.erase()
-            self.layout.command_win.refresh()
+        self.command.draw(self.layout.cmd_win, active=(self.focus == 1 and self.command.active))
 
-        # ---------------- helpers ----------------
+        if self.overlay_visible:
+            self._draw_overlay()
+
+    def _draw_overlay(self):
+        win = self.layout.overlay_win
+        win.erase()
+        h, w = win.getmaxyx()
+        win.box()
+
+        max_visible = max(0, h - 2)
+        start = self.overlay_scroll
+        end = start + max_visible
+        for i, line in enumerate(self.overlay_lines[start:end]):
+            try:
+                win.addnstr(1 + i, 1, line, w - 2)
+            except curses.error:
+                pass
+
+        footer = " OUTPUT  Esc/q/Enter to close · j/k to scroll "
+        try:
+            win.addnstr(h - 2, 1, footer.ljust(w - 2), w - 2, curses.A_DIM)
+        except curses.error:
+            pass
+        win.refresh()
+
+    def _handle_overlay_key(self, ch):
+        max_visible = max(0, self.layout.overlay_h - 2)
+        max_scroll = max(0, len(self.overlay_lines) - max_visible)
+
+        if ch in (27, ord('q'), 10, 13):
+            self.overlay_visible = False
+            self.focus = 0
+            return
+        if ch == ord('j'):
+            self.overlay_scroll = min(max_scroll, self.overlay_scroll + 1)
+        elif ch == ord('k'):
+            self.overlay_scroll = max(0, self.overlay_scroll - 1)
 
     def _execute_command_buffer(self):
         code = self.command.get_buffer().strip()
-        self.io_visible = True
 
         if not code:
-            self.output.set_lines([])
+            self.command.reset()
+            self.focus = 0
             self.status_msg = "No command to execute"
             self.status_msg_until = time.time() + 3
             return
 
         lines = self.exec.execute(code)
-        self.output.set_lines(lines)
+        self.overlay_lines = lines
+        self.overlay_scroll = 0
+        self.overlay_visible = bool(lines)
+        self.focus = 2 if self.overlay_visible else 0
 
-        # keep command pane in normal mode after execution
-        self.command.mode = 'normal'
-        self.command.cursor = len(self.command.buffer)
+        # clear command bar after execution
+        self.command.reset()
 
         # sync grid with latest df and clamp cursor within bounds
         self.grid.df = self.state.df
@@ -490,10 +529,12 @@ class Orchestrator:
             ch = self.stdscr.getch()
             now = time.time()
 
-            leader_enabled = not (
-                (self.focus == 1 and self.command.mode == 'insert') or
-                (self.focus == 0)
-            )
+            if self.overlay_visible:
+                self._handle_overlay_key(ch)
+                self.redraw()
+                continue
+
+            leader_enabled = False
 
             if ch == -1:
                 if leader_enabled and self.leader_seq and now - self.leader_start >= LEADER_TIMEOUT:
@@ -532,22 +573,11 @@ class Orchestrator:
 
             if self.focus == 0:
                 self._handle_df_key(ch)
-            elif self.focus == 2:
-                if ch == 27:
-                    self.focus = 1
-                    self.io_visible = True
-                elif ch == ord('j'):
-                    self.output.scroll_down()
-                elif ch == ord('k'):
-                    self.output.scroll_up()
-            else:
-                if ch == 5:  # Ctrl+E
+            elif self.focus == 1:
+                result = self.command.handle_key(ch)
+                if result == "submit":
                     self._execute_command_buffer()
-                elif ch == 27 and self.command.mode == 'normal':
+                elif result == "cancel":
                     self.focus = 0
-                    self.io_visible = False
-                else:
-                    self.command.handle_key(ch)
-
             self.redraw()
 
