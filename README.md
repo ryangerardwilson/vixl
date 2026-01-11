@@ -96,7 +96,7 @@ python main.py <csv-or-parquet-file>
 
 ### Cell edit modes
 - `cell_insert`: type to edit; Backspace deletes; Esc commits to `cell_normal`.
-- `cell_normal`: h / l moves within buffer; `, e` / `, c c` / `, d c` / `, n r`; `i` enters insert; Esc returns to df normal.
+- `cell_normal`: h / l moves within buffer; 0 / $ jump to line edges; w / b move by word; `, e` / `, c c` / `, d c` / `, n r`; `i` enters insert; Esc returns to df normal.
 
 ### History
 - Stored at `~/.config/vixl/history.log`.

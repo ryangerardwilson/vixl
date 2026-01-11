@@ -44,6 +44,54 @@ class DfEditor:
         )
         self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
 
+    def _autoscroll_cell_normal(self):
+        cw = self.grid.get_col_width(self.grid.curr_col)
+        buf_len = len(self.cell_buffer)
+
+        if self.cell_cursor < self.cell_hscroll:
+            self.cell_hscroll = self.cell_cursor
+        elif self.cell_cursor >= self.cell_hscroll + cw:
+            self.cell_hscroll = self.cell_cursor - cw + 1
+
+        max_scroll = max(0, buf_len - cw + 1) if buf_len >= cw else 0
+        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+
+    def _is_word_char(self, ch: str) -> bool:
+        return ch.isalnum() or ch == "_"
+
+    def _cell_word_forward(self):
+        buf = self.cell_buffer
+        n = len(buf)
+        idx = self.cell_cursor
+        if idx >= n:
+            return n
+
+        def is_word(i):
+            return self._is_word_char(buf[i])
+
+        if is_word(idx):
+            while idx < n and is_word(idx):
+                idx += 1
+        while idx < n and not is_word(idx):
+            idx += 1
+        return idx
+
+    def _cell_word_backward(self):
+        buf = self.cell_buffer
+        if not buf or self.cell_cursor == 0:
+            return 0
+
+        def is_word(i):
+            return self._is_word_char(buf[i])
+
+        idx = max(0, self.cell_cursor - 1)
+        if not is_word(idx):
+            while idx > 0 and not is_word(idx):
+                idx -= 1
+        while idx > 0 and is_word(idx - 1):
+            idx -= 1
+        return idx
+
     # ---------- public API ----------
     def handle_key(self, ch):
         # ---------- cell insert ----------
@@ -154,26 +202,24 @@ class DfEditor:
                 return
 
             buf_len = len(self.cell_buffer)
-            cw = self.grid.get_col_width(self.grid.curr_col)
 
-            moved = False
+            new_cursor = self.cell_cursor
             if ch == ord("h"):
-                if self.cell_cursor > 0:
-                    self.cell_cursor -= 1
-                    moved = True
+                new_cursor = max(0, self.cell_cursor - 1)
             elif ch == ord("l"):
-                if self.cell_cursor < buf_len:
-                    self.cell_cursor += 1
-                    moved = True
+                new_cursor = min(buf_len, self.cell_cursor + 1)
+            elif ch == ord("0"):
+                new_cursor = 0
+            elif ch == ord("$"):
+                new_cursor = buf_len
+            elif ch == ord("w"):
+                new_cursor = self._cell_word_forward()
+            elif ch == ord("b"):
+                new_cursor = self._cell_word_backward()
 
-            if moved:
-                if self.cell_cursor < self.cell_hscroll:
-                    self.cell_hscroll = self.cell_cursor
-                elif self.cell_cursor >= self.cell_hscroll + cw:
-                    self.cell_hscroll = self.cell_cursor - cw + 1
-
-                max_scroll = max(0, buf_len - cw + 1) if buf_len >= cw else 0
-                self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+            if new_cursor != self.cell_cursor:
+                self.cell_cursor = new_cursor
+                self._autoscroll_cell_normal()
                 return
 
             if ch == ord("i"):

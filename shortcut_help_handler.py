@@ -47,7 +47,7 @@ class ShortcutHelpHandler:
             "  Type to edit; Backspace deletes; Esc commits to cell_normal",
             "",
             "DF cell_normal",
-            "  h / l - move cursor within buffer",
+            "  h / l - move cursor within buffer; 0 / $ - line edges; w / b - word nav",
             "  , e / , c c / , d c / , n r",
             "  i - insert; Esc - back to df normal",
         ]
