@@ -12,6 +12,7 @@ class DfEditor:
         self.paginator = paginator
         self._set_status = set_status_cb
         self.column_prompt = column_prompt
+        self._leader_ttl = 1.5
 
         # DF cell editing state
         self.mode = "normal"  # normal | cell_normal | cell_insert
@@ -92,6 +93,31 @@ class DfEditor:
         while idx > 0 and is_word(idx - 1):
             idx -= 1
         return idx
+
+    def _leader_seq(self, state: str | None) -> str:
+        if not state:
+            return ""
+        mapping = {
+            "leader": ",",
+            "i": ", i",
+            "ic": ", i c",
+            "d": ", d",
+            "r": ", r",
+            "rn": ", r n",
+            "c": ", c",
+            "n": ", n",
+        }
+        return mapping.get(state, ",")
+
+    def _show_leader_status(self, seq: str):
+        if not seq:
+            return
+        # avoid clobbering prompt usage
+        cp = getattr(self, "column_prompt", None)
+        if cp is not None:
+            if getattr(cp, "active", False):
+                return
+        self._set_status(f"Leader: {seq}", self._leader_ttl)
 
     def _start_insert_column(self, after: bool):
         if self.column_prompt is None:
@@ -377,20 +403,25 @@ class DfEditor:
 
                     if ch == ord("i"):
                         self.df_leader_state = "i"
+                        self._show_leader_status(self._leader_seq("i"))
                         return
 
                     if ch == ord("d"):
                         self.df_leader_state = "d"
+                        self._show_leader_status(self._leader_seq("d"))
                         return
 
                     if ch == ord("r"):
                         self.df_leader_state = "r"
+                        self._show_leader_status(self._leader_seq("r"))
                         return
 
                 if state == "i":
                     if ch == ord("c"):
                         self.df_leader_state = "ic"
+                        self._show_leader_status(self._leader_seq("ic"))
                         return
+                    self._show_leader_status("")
                     return
 
                 if state == "ic":
@@ -400,24 +431,29 @@ class DfEditor:
                     if ch == ord("b"):
                         self._start_insert_column(after=False)
                         return
+                    self._show_leader_status("")
                     return
 
                 if state == "d":
                     if ch == ord("c"):
                         self._delete_current_column()
                         return
+                    self._show_leader_status("")
                     return
 
                 if state == "r":
                     if ch == ord("n"):
                         self.df_leader_state = "rn"
+                        self._show_leader_status(self._leader_seq("rn"))
                         return
+                    self._show_leader_status("")
                     return
 
                 if state == "rn":
                     if ch == ord("c"):
                         self._start_rename_column()
                         return
+                    self._show_leader_status("")
                     return
 
             if self.cell_leader_state:
@@ -435,13 +471,17 @@ class DfEditor:
                         return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
+                        self._show_leader_status(self._leader_seq("c"))
                         return
                     if ch == ord("d"):
                         self.cell_leader_state = "d"
+                        self._show_leader_status(self._leader_seq("d"))
                         return
                     if ch == ord("n"):
                         self.cell_leader_state = "n"
+                        self._show_leader_status(self._leader_seq("n"))
                         return
+                    self._show_leader_status("")
                     return
 
                 if state == "c" and ch == ord("c"):
@@ -450,6 +490,7 @@ class DfEditor:
                     self.cell_cursor = 0
                     self.cell_hscroll = 0
                     self.mode = "cell_insert"
+                    self._show_leader_status("")
                     return
 
                 if state == "d" and ch == ord("c"):
@@ -457,10 +498,12 @@ class DfEditor:
                         self.state.df.iloc[r, c] = self._coerce_cell_value(col, "")
                     except Exception:
                         self.state.df.iloc[r, c] = ""
+                    self._show_leader_status("")
                     return
 
                 if state == "n" and ch == ord("r"):
                     if self.mode != "normal":
+                        self._show_leader_status("")
                         return
                     row = self.state.build_default_row()
                     insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
@@ -478,11 +521,16 @@ class DfEditor:
                     self.paginator.ensure_row_visible(insert_at)
                     self.grid.curr_row = insert_at
                     self.grid.highlight_mode = "cell"
+                    self._show_leader_status("")
                     return
+
+                self._show_leader_status("")
+                return
 
             if ch == ord(","):
                 self.df_leader_state = "leader"
                 self.cell_leader_state = None
+                self._show_leader_status(self._leader_seq("leader"))
                 return
 
             if ch == ord("i"):

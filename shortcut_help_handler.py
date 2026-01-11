@@ -31,7 +31,7 @@ class ShortcutHelpHandler:
             "  Ctrl+J / Ctrl+K - jump ~5% rows down/up",
             "  Ctrl+H / Ctrl+L - jump ~20% cols left/right",
             "  : - open command bar",
-            "  n - enter cell_normal on current cell",
+            "  n - enter cell_normal on current cell (leader sequences are shown in status)",
             "  i - edit cell (preload)",
             "  , e - edit cell (preload)",
             "  , c c - edit cell empty",
