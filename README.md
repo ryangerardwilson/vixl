@@ -87,7 +87,7 @@ python main.py <csv-or-parquet-file>
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
 - Clear cell: `x` (in df mode)
-- Insert row below: `, n r`
+- Insert rows: `, i r a` (insert above), `, i r b` (insert below)
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
 - Copy df to clipboard (TSV): `, y` (uses `wl-copy`, paste-friendly for Sheets/Excel)

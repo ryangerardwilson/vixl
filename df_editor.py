@@ -20,7 +20,7 @@ class DfEditor:
         self.cell_cursor = 0
         self.cell_hscroll = 0
         self.cell_col = None
-        self.cell_leader_state = None  # None | 'leader' | 'c' | 'd' | 'n'
+        self.cell_leader_state = None  # None | 'leader' | 'c'
         self.df_leader_state = None  # None | 'leader'
 
     # ---------- helpers ----------
@@ -101,12 +101,13 @@ class DfEditor:
             "leader": ",",
             "i": ",i",
             "ic": ",ic",
+            "ir": ",ir",
             "d": ",d",
             "r": ",r",
             "rn": ",rn",
             "c": ",c",
-            "n": ",n",
         }
+
         return mapping.get(state, ",")
 
     def _show_leader_status(self, seq: str):
@@ -130,6 +131,28 @@ class DfEditor:
             self.column_prompt.start_insert_after(self.grid.curr_col)
         else:
             self.column_prompt.start_insert_before(self.grid.curr_col)
+
+    def _insert_row(self, above: bool):
+        if len(self.state.df.columns) == 0:
+            self._set_status("No columns", 3)
+            return
+        row = self.state.build_default_row()
+        insert_at = self.grid.curr_row if above else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
+        new_row = pd.DataFrame([row], columns=self.state.df.columns)
+        self.state.df = pd.concat(
+            [
+                self.state.df.iloc[:insert_at],
+                new_row,
+                self.state.df.iloc[insert_at:],
+            ],
+            ignore_index=True,
+        )
+        self.grid.df = self.state.df
+        self.paginator.update_total_rows(len(self.state.df))
+        self.paginator.ensure_row_visible(insert_at)
+        self.grid.curr_row = insert_at
+        self.grid.highlight_mode = "cell"
+        self._set_status(f"Inserted row {'above' if above else 'below'}", 2)
 
     def _start_rename_column(self):
         if self.column_prompt is None:
@@ -221,12 +244,6 @@ class DfEditor:
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
                         return
-                    if ch == ord("d"):
-                        self.cell_leader_state = "d"
-                        return
-                    if ch == ord("n"):
-                        self.cell_leader_state = "n"
-                        return
                     return
 
                 if state == "c" and ch == ord("c"):
@@ -234,34 +251,6 @@ class DfEditor:
                     self.cell_cursor = 0
                     self.cell_hscroll = 0
                     self.mode = "cell_insert"
-                    return
-
-                if state == "d" and ch == ord("c"):
-                    self.cell_buffer = ""
-                    self.cell_cursor = 0
-                    self.cell_hscroll = 0
-                    return
-
-                if state == "n" and ch == ord("r"):
-                    # only allow row insertion while in df normal (hover) mode
-                    if self.mode != "normal":
-                        return
-                    row = self.state.build_default_row()
-                    insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
-                    new_row = pd.DataFrame([row], columns=self.state.df.columns)
-                    self.state.df = pd.concat(
-                        [
-                            self.state.df.iloc[:insert_at],
-                            new_row,
-                            self.state.df.iloc[insert_at:],
-                        ],
-                        ignore_index=True,
-                    )
-                    self.grid.df = self.state.df
-                    self.paginator.update_total_rows(len(self.state.df))
-                    self.paginator.ensure_row_visible(insert_at)
-                    self.grid.curr_row = insert_at
-                    self.grid.highlight_mode = "cell"
                     return
 
             if ch == ord(","):
@@ -421,6 +410,10 @@ class DfEditor:
                         self.df_leader_state = "ic"
                         self._show_leader_status(self._leader_seq("ic"))
                         return
+                    if ch == ord("r"):
+                        self.df_leader_state = "ir"
+                        self._show_leader_status(self._leader_seq("ir"))
+                        return
                     self._show_leader_status("")
                     return
 
@@ -432,6 +425,18 @@ class DfEditor:
                     if ch == ord("b"):
                         self._show_leader_status(",icb")
                         self._start_insert_column(after=False)
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "ir":
+                    if ch == ord("a"):
+                        self._show_leader_status(",ira")
+                        self._insert_row(above=True)
+                        return
+                    if ch == ord("b"):
+                        self._show_leader_status(",irb")
+                        self._insert_row(above=False)
                         return
                     self._show_leader_status("")
                     return
@@ -459,6 +464,72 @@ class DfEditor:
                         return
                     self._show_leader_status("")
                     return
+
+                    if ch == ord("r"):
+                        self.df_leader_state = "ir"
+                        self._show_leader_status(self._leader_seq("ir"))
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "ic":
+                    if ch == ord("a"):
+                        self._show_leader_status(",ica")
+                        self._start_insert_column(after=True)
+                        return
+                    if ch == ord("b"):
+                        self._show_leader_status(",icb")
+                        self._start_insert_column(after=False)
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "d":
+                    if ch == ord("c"):
+                        self._show_leader_status(",dc")
+                        self._delete_current_column()
+                        return
+                    self._show_leader_status("")
+                    return
+
+                    if ch == ord("b"):
+                        self._show_leader_status(",icb")
+                        self._start_insert_column(after=False)
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "ir":
+                    self._show_leader_status("")
+                    return
+
+                if state == "d":
+                    if ch == ord("c"):
+                        self._show_leader_status(",dc")
+                        self._delete_current_column()
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "r":
+                    if ch == ord("n"):
+                        self.df_leader_state = "rn"
+                        self._show_leader_status(self._leader_seq("rn"))
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "rn":
+                    if ch == ord("c"):
+                        self._show_leader_status(",rnc")
+                        self._start_rename_column()
+                        return
+                    self._show_leader_status("")
+                    return
+
+            if self.cell_leader_state:
+                state = self.cell_leader_state
+                self.cell_leader_state = None
 
             if self.cell_leader_state:
                 state = self.cell_leader_state
