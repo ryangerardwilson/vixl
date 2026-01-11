@@ -1,10 +1,10 @@
 import unittest
-import unittest
 from types import SimpleNamespace
 
 import pandas as pd
 
 from df_editor import DfEditor
+from column_prompt import ColumnPrompt
 
 
 class DummyGrid:
@@ -137,10 +137,7 @@ class DfEditorDfNormalCommandTests(unittest.TestCase):
         return DfEditor(state, grid, paginator, lambda *_: None)
 
     def test_n_enters_cell_normal_with_buffer(self):
-        df = SimpleNamespace(columns=["a"], __len__=lambda self: 1)
-        df_obj = SimpleNamespace(df=pd.DataFrame({"a": ["hi"]}))
-        # reuse actual df for values
-        df = df_obj.df
+        df = pd.DataFrame({"a": ["hi"]})
         editor = self._df_editor(df)
         editor.grid.curr_row = 0
         editor.grid.curr_col = 0
@@ -164,6 +161,32 @@ class DfEditorDfNormalCommandTests(unittest.TestCase):
 
         self.assertEqual(list(df.columns), ["b"])
         self.assertEqual(editor.grid.curr_col, 0)
+
+    def test_rename_column_with_zero_rows(self):
+        df = pd.DataFrame({"a": []})
+        state = SimpleNamespace(df=df, file_path=None, file_handler=None)
+        grid = DummyGrid()
+        paginator = DummyPaginator()
+        column_prompt = ColumnPrompt(state, grid, paginator, lambda *_: None)
+        editor = DfEditor(state, grid, paginator, lambda *_: None, column_prompt)
+        editor.grid.curr_col = 0
+        editor.mode = "normal"
+
+        editor.handle_key(ord(","))
+        self.assertEqual(editor.df_leader_state, "leader")
+        editor.handle_key(ord("r"))
+        self.assertEqual(editor.df_leader_state, "r")
+        editor.handle_key(ord("n"))
+        self.assertEqual(editor.df_leader_state, "rn")
+        editor.handle_key(ord("c"))
+
+        self.assertTrue(column_prompt.active)
+
+        for ch in "alpha":
+            column_prompt.handle_key(ord(ch))
+        column_prompt.handle_key(10)
+
+        self.assertEqual(list(df.columns), ["alpha"])
 
 
 if __name__ == "__main__":

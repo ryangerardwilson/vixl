@@ -9,7 +9,7 @@ from column_prompt import ColumnPrompt
 class DummyGrid:
     def __init__(self):
         self.curr_col = 0
-        self.df = None
+        self.df = pd.DataFrame()
 
     def adjust_col_viewport(self):
         pass
@@ -28,6 +28,7 @@ class ColumnPromptTests(unittest.TestCase):
         paginator = DummyPaginator()
         messages = []
         prompt = ColumnPrompt(SimpleNamespace(df=df), grid, paginator, lambda m, _: messages.append(m))
+        grid.df = df
         return prompt, grid, messages
 
     def _type_and_enter(self, prompt: ColumnPrompt, text: str):
