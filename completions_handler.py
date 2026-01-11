@@ -1,4 +1,5 @@
 import os
+import os
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ class CompletionHandler:
     COMPLETIONS_DIR = CONFIG_DIR / "completions"
     BASH_COMPLETION_FILE = COMPLETIONS_DIR / "vixl.bash"
     BASH_MARKER_ENV = "VIXL_BASH_COMPLETION_ACTIVE"
+    SKIP_CHECK_ENV = "VIXL_SKIP_COMPLETION_CHECK"
     BASHRC_MARKER_BEGIN = "# >>> vixl bash completion >>>"
     BASHRC_MARKER_END = "# <<< vixl bash completion <<<"
 
@@ -19,15 +21,15 @@ class CompletionHandler:
         if self._completion_file_needs_update():
             self._write_bash_completion_script()
 
-        rc_path = self._rc_path()
-        rc_has_block = self._rc_has_marker(rc_path)
+        rc_paths = self._rc_paths()
+        rc_has_block = any(self._rc_has_marker(path) for path in rc_paths)
         env_has_marker = os.environ.get(self.BASH_MARKER_ENV) == "1"
+        skip_check = os.environ.get(self.SKIP_CHECK_ENV) == "1"
 
-        if rc_has_block and env_has_marker:
+        if skip_check or rc_has_block or env_has_marker:
             return
 
-        self._print_completion_instructions(rc_path)
-        sys.exit(1)
+        self._print_completion_instructions(rc_paths)
 
     # --- internals ---
 
@@ -95,12 +97,10 @@ complete -o filenames -F _vixl_files vixl
             or "HIDE_PYCACHE" not in text
         )
 
-    def _rc_path(self) -> Path:
-        bashrc = Path.home() / ".bashrc"
-        if bashrc.exists():
-            return bashrc
-        bash_profile = Path.home() / ".bash_profile"
-        return bash_profile if bash_profile.exists() else bashrc
+    def _rc_paths(self) -> list[Path]:
+        home = Path.home()
+        candidates = [home / ".bashrc", home / ".bash_profile", home / ".profile"]
+        return [p for p in candidates if p.exists()]
 
     def _rc_has_marker(self, rc_path: Path) -> bool:
         if not rc_path.exists():
@@ -111,7 +111,7 @@ complete -o filenames -F _vixl_files vixl
             return False
         return self.BASHRC_MARKER_BEGIN in text and self.BASHRC_MARKER_END in text
 
-    def _print_completion_instructions(self, rc_path: Path) -> None:
+    def _print_completion_instructions(self, rc_paths: list[Path]) -> None:
         block = (
             f"{self.BASHRC_MARKER_BEGIN}\n"
             'if [ -f "$HOME/.config/vixl/completions/vixl.bash" ]; then\n'
@@ -119,13 +119,18 @@ complete -o filenames -F _vixl_files vixl
             "fi\n"
             f"{self.BASHRC_MARKER_END}\n"
         )
+        rc_target = rc_paths[0] if rc_paths else Path.home() / ".bashrc"
+        rc_list = ", ".join(str(p) for p in rc_paths) if rc_paths else str(rc_target)
         message = (
-            "Vixl bash completion is not active; startup is blocked.\n\n"
-            "Do this once:\n"
-            f"1) Add this block to {rc_path}:\n{block}\n"
-            f"2) Reload your shell or run: source {rc_path}\n"
+            "Vixl bash completion is not active; continuing without completion.\n\n"
+            "Optional (recommended) setup:\n"
+            f"1) Add this block to {rc_target}:\n{block}\n"
+            f"   (Checked files: {rc_list})\n"
+            f"2) Reload your shell or run: source {rc_target}\n"
             "3) Re-run: python main.py <csv-or-parquet> (or vixl <csv-or-parquet>)\n"
             "4) (Optional) Create a symlink in your PATH for 'vixl', e.g.:\n"
             '   ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"\n'
+            f"To skip this warning, set {self.SKIP_CHECK_ENV}=1 in your environment.\n"
+            f"Missing: env marker={self.BASH_MARKER_ENV}=='1', rc marker block.\n"
         )
         print(message)

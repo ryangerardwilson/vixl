@@ -1,5 +1,6 @@
 import sys
 import os
+import sys
 import curses
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
