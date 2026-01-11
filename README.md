@@ -17,6 +17,20 @@ python main.py <csv-or-parquet-file>
 - CSV and Parquet files are supported
 - If the file does not exist, a blank file is created automatically
 
+### Bash completion (auto-provisioned, startup-guarded)
+- On first run, Vixl creates `~/.config/vixl/completions/vixl.bash`.
+- Add this block to your `~/.bashrc` (or `~/.bash_profile` if you do not have a `.bashrc`):
+  ```bash
+  # >>> vixl bash completion >>>
+  if [ -f "$HOME/.config/vixl/completions/vixl.bash" ]; then
+      source "$HOME/.config/vixl/completions/vixl.bash"
+  fi
+  # <<< vixl bash completion <<<
+  ```
+- Then reload your shell (or run `source ~/.bashrc`).
+- Until the completion is active (the sourcing block is present and loaded in your current shell), Vixl will refuse to launch and will print the required steps.
+- Behavior: after activation, `python main.py <TAB>` and `vixl <TAB>` suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths.
+
 ---
 
 ## Features

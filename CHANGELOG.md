@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Added bash completion auto-provisioning at `~/.config/vixl/completions/vixl.bash` (covers `python main.py`, `python3 main.py`, and `vixl`) and guarded startup that blocks until the completion block is in your bashrc and sourced.
 - Added no-arg launch with default DataFrame (col_a/col_b/col_c, 3 empty rows) as unsaved buffer.
 - Added Save-As prompt (inline bottom strip) for unsaved buffers; Ctrl+S saves; Ctrl+T saves & exits only on success; validates .csv/.parquet.
 - Single-line command bar; output as modal overlay; shortcuts modal (`?`); overlays auto-size to content up to 50% terminal height.
