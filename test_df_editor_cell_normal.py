@@ -1,6 +1,8 @@
 import unittest
-
+import unittest
 from types import SimpleNamespace
+
+import pandas as pd
 
 from df_editor import DfEditor
 
@@ -10,16 +12,61 @@ class DummyGrid:
         self.curr_col = 0
         self.curr_row = 0
         self.col_width = col_width
+        self.df = None
+        self.row_offset = 0
+        self.col_offset = 0
+        self.highlight_mode = "cell"
 
     def get_col_width(self, _col):
         return self.col_width
 
-
-class DummyPaginator:
-    def update_total_rows(self, _):
+    def adjust_col_viewport(self):
         pass
 
+    def move_left(self):
+        self.curr_col = max(0, self.curr_col - 1)
+
+    def move_right(self):
+        self.curr_col += 1
+
+    def move_up(self):
+        self.curr_row = max(0, self.curr_row - 1)
+
+    def move_down(self):
+        self.curr_row += 1
+
+    def move_row_down(self):
+        self.curr_row += 1
+
+    def move_row_up(self):
+        self.curr_row = max(0, self.curr_row - 1)
+
+    def move_col_left(self):
+        self.curr_col = max(0, self.curr_col - 1)
+
+    def move_col_right(self):
+        self.curr_col += 1
+
+
+class DummyPaginator:
+    def __init__(self):
+        self.page_start = 0
+        self.page_end = 1
+        self.page_index = 0
+        self.page_count = 1
+        self.total_rows = 1
+
+    def update_total_rows(self, total):
+        self.total_rows = total
+        self.page_end = max(1, min(self.page_start + 1, total))
+
     def ensure_row_visible(self, _):
+        pass
+
+    def next_page(self):
+        pass
+
+    def prev_page(self):
         pass
 
 
@@ -79,6 +126,44 @@ class DfEditorCellNormalMotionTests(unittest.TestCase):
         editor.handle_key(ord("$"))
         self.assertEqual(editor.cell_cursor, 6)
         self.assertEqual(editor.cell_hscroll, 4)
+
+
+class DfEditorDfNormalCommandTests(unittest.TestCase):
+    def _df_editor(self, df):
+        state = SimpleNamespace(df=df, file_path=None, file_handler=None)
+        grid = DummyGrid()
+        grid.df = df
+        paginator = DummyPaginator()
+        return DfEditor(state, grid, paginator, lambda *_: None)
+
+    def test_n_enters_cell_normal_with_buffer(self):
+        df = SimpleNamespace(columns=["a"], __len__=lambda self: 1)
+        df_obj = SimpleNamespace(df=pd.DataFrame({"a": ["hi"]}))
+        # reuse actual df for values
+        df = df_obj.df
+        editor = self._df_editor(df)
+        editor.grid.curr_row = 0
+        editor.grid.curr_col = 0
+        editor.mode = "normal"
+
+        editor.handle_key(ord("n"))
+
+        self.assertEqual(editor.mode, "cell_normal")
+        self.assertEqual(editor.cell_buffer, "hi")
+        self.assertEqual(editor.cell_cursor, len("hi"))
+
+    def test_delete_column_via_leader(self):
+        df = pd.DataFrame({"a": [1], "b": [2]})
+        editor = self._df_editor(df)
+        editor.grid.curr_col = 0
+        editor.mode = "normal"
+
+        editor.handle_key(ord(","))
+        editor.handle_key(ord("d"))
+        editor.handle_key(ord("c"))
+
+        self.assertEqual(list(df.columns), ["b"])
+        self.assertEqual(editor.grid.curr_col, 0)
 
 
 if __name__ == "__main__":

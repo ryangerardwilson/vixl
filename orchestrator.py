@@ -13,6 +13,7 @@ from pagination import Paginator
 from history_manager import HistoryManager
 from df_editor import DfEditor
 from save_prompt import SavePrompt
+from column_prompt import ColumnPrompt
 from overlay import OverlayView
 from shortcut_help_handler import ShortcutHelpHandler
 
@@ -44,6 +45,11 @@ class Orchestrator:
 
         # ---- save-as prompt ----
         self.save_prompt = SavePrompt(self.state, FileTypeHandler, self._set_status)
+
+        # ---- column prompt ----
+        self.column_prompt = ColumnPrompt(
+            self.state, self.grid, self.paginator, self._set_status
+        )
         self.exit_requested = False
 
         # ---- status ----
@@ -62,7 +68,7 @@ class Orchestrator:
 
         # ---- DF editor ----
         self.df_editor = DfEditor(
-            self.state, self.grid, self.paginator, self._set_status
+            self.state, self.grid, self.paginator, self._set_status, self.column_prompt
         )
 
     # ---------------- helpers ----------------
@@ -77,7 +83,7 @@ class Orchestrator:
         try:
             if self.overlay.visible:
                 curses.curs_set(0)
-            elif self.save_prompt.active:
+            elif self.save_prompt.active or self.column_prompt.active:
                 curses.curs_set(1)
             else:
                 curses.curs_set(1 if (self.focus == 1 and self.command.active) else 0)
@@ -106,7 +112,9 @@ class Orchestrator:
             sw.erase()
             h, w = sw.getmaxyx()
 
-            if self.save_prompt.active:
+            if self.column_prompt.active:
+                self.column_prompt.draw(sw)
+            elif self.save_prompt.active:
                 self.save_prompt.draw(sw)
             else:
                 cmd_active = self.focus == 1 and self.command.active
@@ -228,6 +236,13 @@ class Orchestrator:
             if self.overlay.visible:
                 self.overlay.handle_key(ch)
                 if not self.overlay.visible:
+                    self.focus = 0
+                self.redraw()
+                continue
+
+            if self.column_prompt.active:
+                self.column_prompt.handle_key(ch)
+                if not self.column_prompt.active:
                     self.focus = 0
                 self.redraw()
                 continue

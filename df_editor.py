@@ -6,11 +6,12 @@ import pandas as pd
 class DfEditor:
     """Handles dataframe editing state and key interactions."""
 
-    def __init__(self, state, grid, paginator, set_status_cb):
+    def __init__(self, state, grid, paginator, set_status_cb, column_prompt=None):
         self.state = state
         self.grid = grid
         self.paginator = paginator
         self._set_status = set_status_cb
+        self.column_prompt = column_prompt
 
         # DF cell editing state
         self.mode = "normal"  # normal | cell_normal | cell_insert
@@ -91,6 +92,46 @@ class DfEditor:
         while idx > 0 and is_word(idx - 1):
             idx -= 1
         return idx
+
+    def _start_insert_column(self, after: bool):
+        if self.column_prompt is None:
+            self._set_status("Column prompt unavailable", 3)
+            return
+        if len(self.state.df.columns) == 0:
+            self._set_status("No columns", 3)
+            return
+        if after:
+            self.column_prompt.start_insert_after(self.grid.curr_col)
+        else:
+            self.column_prompt.start_insert_before(self.grid.curr_col)
+
+    def _start_rename_column(self):
+        if self.column_prompt is None:
+            self._set_status("Column prompt unavailable", 3)
+            return
+        if len(self.state.df.columns) == 0:
+            self._set_status("No columns", 3)
+            return
+        self.column_prompt.start_rename(self.grid.curr_col)
+
+    def _delete_current_column(self):
+        cols = list(self.state.df.columns)
+        if not cols:
+            self._set_status("No columns", 3)
+            return
+        col_idx = self.grid.curr_col
+        col_name = cols[col_idx]
+        self.state.df.drop(columns=[col_name], inplace=True)
+        self.grid.df = self.state.df
+        total_cols = len(self.state.df.columns)
+        self.grid.curr_col = min(col_idx, max(0, total_cols - 1))
+        self.grid.adjust_col_viewport()
+        if total_cols == 0:
+            self.cell_buffer = ""
+            self.cell_cursor = 0
+            self.cell_hscroll = 0
+            self.mode = "normal"
+        self._set_status(f"Deleted column '{col_name}'", 3)
 
     # ---------- public API ----------
     def handle_key(self, ch):
@@ -266,6 +307,15 @@ class DfEditor:
             jump_rows = max(1, round(visible_rows * 0.05))
             jump_cols = max(1, round(max(1, total_cols) * 0.20))
 
+            if ch == ord("n"):
+                self.cell_col = col
+                self.cell_buffer = base
+                self.cell_cursor = len(self.cell_buffer)
+                self.cell_hscroll = 0
+                self.mode = "cell_normal"
+                self._autoscroll_cell_normal()
+                return
+
             if self.df_leader_state:
                 state = self.df_leader_state
                 self.df_leader_state = None
@@ -316,6 +366,51 @@ class DfEditor:
                         self.grid.curr_col = total_cols - 1
                         self.grid.adjust_col_viewport()
                         return
+
+                    if ch == ord("i"):
+                        self.df_leader_state = "i"
+                        return
+
+                    if ch == ord("d"):
+                        self.df_leader_state = "d"
+                        return
+
+                    if ch == ord("r"):
+                        self.df_leader_state = "r"
+                        return
+
+                if state == "i":
+                    if ch == ord("c"):
+                        self.df_leader_state = "ic"
+                        return
+                    return
+
+                if state == "ic":
+                    if ch == ord("a"):
+                        self._start_insert_column(after=True)
+                        return
+                    if ch == ord("b"):
+                        self._start_insert_column(after=False)
+                        return
+                    return
+
+                if state == "d":
+                    if ch == ord("c"):
+                        self._delete_current_column()
+                        return
+                    return
+
+                if state == "r":
+                    if ch == ord("n"):
+                        self.df_leader_state = "rn"
+                        return
+                    return
+
+                if state == "rn":
+                    if ch == ord("c"):
+                        self._start_rename_column()
+                        return
+                    return
 
             if self.cell_leader_state:
                 state = self.cell_leader_state

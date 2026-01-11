@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - Added bash completion auto-provisioning at `~/.config/vixl/completions/vixl.bash` (covers `python main.py`, `python3 main.py`, and `vixl`); startup now warns (does not block) when completion is not detected, with `VIXL_SKIP_COMPLETION_CHECK=1` to suppress the warning; completion logic lives in `completions_handler.py`, and README documents symlink/alias guidance for `vixl`.
+- Added df-mode column workflows: `n` to enter cell_normal, `,ica`/`,icb` insert columns (prompt name+dtype), `,dc` delete column, `,rnc` rename column; column prompts share the bottom-strip UX.
 - Added no-arg launch with default DataFrame (col_a/col_b/col_c, 3 empty rows) as unsaved buffer.
 - Added Save-As prompt (inline bottom strip) for unsaved buffers; Ctrl+S saves; Ctrl+T saves & exits only on success; validates .csv/.parquet.
 - Single-line command bar; output as modal overlay; shortcuts modal (`?`); overlays auto-size to content up to 50% terminal height.
