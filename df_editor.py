@@ -124,6 +124,16 @@ class DfEditor:
                 return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
 
+    def _enter_cell_insert_at_end(self, col, base):
+        self.cell_col = col
+        self.cell_buffer = base
+        if not self.cell_buffer.endswith(" "):
+            self.cell_buffer += " "
+        self.cell_cursor = len(self.cell_buffer)
+        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+        self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
+        self.mode = "cell_insert"
+
     def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
         new_value = max(minimum, min(maximum, self.state.row_lines + delta))
         if new_value == self.state.row_lines:
@@ -406,14 +416,7 @@ class DfEditor:
 
                     if ch == ord("e"):
                         self._show_leader_status(",e")
-                        self.cell_col = col
-                        self.cell_buffer = base
-                        if not self.cell_buffer.endswith(" "):
-                            self.cell_buffer += " "
-                        self.cell_cursor = len(self.cell_buffer)
-                        self.cell_hscroll = 0
-                        self.mode = "cell_insert"
-                        self._autoscroll_insert()
+                        self._enter_cell_insert_at_end(col, base)
                         return
 
                     if ch == ord("i"):
@@ -616,14 +619,12 @@ class DfEditor:
 
                 if state == "leader":
                     if ch == ord("e"):
-                        self.cell_col = col
-                        self.cell_buffer = base
-                        if not self.cell_buffer.endswith(" "):
-                            self.cell_buffer += " "
+                        # Emulate `$` then enter insert
+                        self.df_leader_state = None
+                        self.cell_leader_state = None
                         self.cell_cursor = len(self.cell_buffer)
-                        # Force-scroll to the tail so the end is visible even when
-                        # the rendered column width is narrower than get_col_width().
-                        self.cell_hscroll = max(0, len(self.cell_buffer) - 1)
+                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
                         return
                     if ch == ord("c"):

@@ -41,6 +41,8 @@ class ShortcutHelpHandler:
             "  , i c b - insert column before (prompt name + dtype)",
             "  , d c - delete column",
             "  , r n c - rename column",
+            "  ,+rl - increase row lines",
+            "  ,-rl - decrease row lines",
             "  , h - go to first column",
             "  , l - go to last column",
             "  , j - go to last row",

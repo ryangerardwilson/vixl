@@ -38,6 +38,8 @@ class GridPane:
         self.col_offset = 0
         self.highlight_mode = "cell"
 
+        self.rendered_col_widths = {}
+
     def get_col_width(self, col_idx):
         if col_idx < 0 or col_idx >= len(self.df.columns):
             return self.MAX_COL_WIDTH
@@ -50,6 +52,9 @@ class GridPane:
                 s = str(v)
             max_len = max(max_len, len(s))
         return min(self.MAX_COL_WIDTH, max_len + 2)
+
+    def get_rendered_col_width(self, col_idx):
+        return self.rendered_col_widths.get(col_idx, self.get_col_width(col_idx))
 
     def adjust_col_viewport(self, win=None):
         """Force column viewport adjustment so curr_col is visible.
@@ -203,6 +208,8 @@ class GridPane:
             self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols)
         )
 
+        self.rendered_col_widths = {c: widths[c] for c in visible_cols}
+
         def _wrap_cell(text: str, width: int, max_lines: int):
             if width <= 0:
                 return [""] * max_lines
@@ -227,9 +234,11 @@ class GridPane:
         x = row_w + 1
         for c in visible_cols:
             cw = widths[c]
-            name = str(df_slice.columns[c])[:cw].rjust(cw)
-            win.addnstr(1, x, name, cw, curses.A_BOLD)
-            x += cw + 1
+            eff_cw = min(cw, max(1, w - x - 1))
+            self.rendered_col_widths[c] = eff_cw
+            name = str(df_slice.columns[c])[:eff_cw].rjust(eff_cw)
+            win.addnstr(1, x, name, eff_cw, curses.A_BOLD)
+            x += eff_cw + 1
 
         # rows
         base_y = 2
@@ -241,6 +250,7 @@ class GridPane:
             x = row_w + 1
             for c in visible_cols:
                 cw = widths[c]
+                eff_cw = min(self.rendered_col_widths.get(c, cw), max(1, w - x - 1))
 
                 is_edit_target = editing and r == edit_row and c == edit_col
                 if is_edit_target:
@@ -250,7 +260,7 @@ class GridPane:
                     text = "" if (val is None or pd.isna(val)) else str(val)
 
                 start = edit_hscroll if is_edit_target else 0
-                wrapped_lines = _wrap_cell(text[start:], cw, row_block_height)
+                wrapped_lines = _wrap_cell(text[start:], eff_cw, row_block_height)
 
                 attr = 0
                 if not editing:
@@ -270,16 +280,16 @@ class GridPane:
                 cursor_col = None
                 if is_edit_target and edit_cursor is not None:
                     relative_pos = max(0, edit_cursor - start)
-                    cursor_line = min(row_block_height - 1, relative_pos // cw)
-                    cursor_col = relative_pos % cw
+                    cursor_line = min(row_block_height - 1, relative_pos // eff_cw)
+                    cursor_col = relative_pos % eff_cw
 
                 for line_idx, line_text in enumerate(wrapped_lines):
                     line_y = row_y + line_idx
                     if line_y >= h - 1:
                         break
                     visible_len = len(line_text)
-                    cell = line_text.rjust(cw)
-                    win.addnstr(line_y, x, cell, cw, attr)
+                    cell = line_text.rjust(eff_cw)
+                    win.addnstr(line_y, x, cell, eff_cw, attr)
 
                     if (
                         is_edit_target
@@ -287,10 +297,10 @@ class GridPane:
                         and cursor_col is not None
                         and line_idx == cursor_line
                     ):
-                        text_start_x = x + (cw - visible_len)
+                        text_start_x = x + (eff_cw - visible_len)
                         pos = min(cursor_col, visible_len)
                         cx = text_start_x + pos
-                        cx = max(x, min(x + cw - 1, cx))
+                        cx = max(x, min(x + eff_cw - 1, cx))
                         if insert_mode:
                             win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
                         else:
@@ -299,7 +309,7 @@ class GridPane:
                                 win.addch(line_y, cx, ch, curses.A_REVERSE)
                             else:
                                 win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
-                x += cw + 1
+                x += eff_cw + 1
 
         win.refresh()
 

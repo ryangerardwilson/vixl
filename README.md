@@ -90,6 +90,7 @@ python main.py <csv-or-parquet-file>
 - Insert rows: `, i r a` (insert above), `, i r b` (insert below); Delete row: `, d r`
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
+- Adjust row lines (height): `,+rl` (increase), `,-rl` (decrease, min 1)
 - Copy df to clipboard (TSV): `, y` (uses `wl-copy`, paste-friendly for Sheets/Excel)
 - `?` opens shortcuts
 
