@@ -123,6 +123,29 @@ class DfEditor:
             idx -= 1
         return idx
 
+    def _get_word_bounds_at_or_after(self, idx: int):
+        buf = self.cell_buffer
+        n = len(buf)
+        if n == 0:
+            return None
+        i = max(0, min(idx, n - 1))
+
+        # Move to a word char at/after i
+        while i < n and not self._is_word_char(buf[i]):
+            i += 1
+        if i >= n:
+            return None
+
+        start = i
+        while start > 0 and self._is_word_char(buf[start - 1]):
+            start -= 1
+
+        end = i
+        while end < n and self._is_word_char(buf[end]):
+            end += 1
+
+        return start, end
+
     def _leader_seq(self, state: str | None) -> str:
         if not state:
             return ""
@@ -550,6 +573,17 @@ class DfEditor:
                         and buf
                         and self._is_word_char(buf[new_cursor])
                     ):
+                        # View-fixup: if the current word is clipped, scroll to reveal it.
+                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        lines = max(1, getattr(self.state, "row_lines", 1))
+                        span = max(1, cw * lines)
+                        bounds = self._get_word_bounds_at_or_after(new_cursor)
+                        if bounds:
+                            _, word_end = bounds
+                            visible_end = self.cell_hscroll + span
+                            if word_end > visible_end:
+                                max_scroll = max(0, len(self.cell_buffer) - span)
+                                self.cell_hscroll = min(max_scroll, max(0, word_end - span))
                         break
                     if next_cursor == new_cursor:
                         break
