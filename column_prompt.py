@@ -23,11 +23,12 @@ class ColumnPrompt:
         "datetime64[ns]": "datetime64[ns]",
     }
 
-    def __init__(self, state, grid, paginator, set_status_cb: Callable[[str, int], None]):
+    def __init__(self, state, grid, paginator, set_status_cb: Callable[[str, int], None], push_undo_cb: Optional[Callable[[], None]] = None):
         self.state = state
         self.grid = grid
         self.paginator = paginator
         self._set_status = set_status_cb
+        self._push_undo_cb = push_undo_cb
 
         self.active = False
         self.action: Optional[str] = None  # insert_before | insert_after | rename
@@ -114,6 +115,9 @@ class ColumnPrompt:
         win.refresh()
 
     # ---------- internals ----------
+    def set_push_undo(self, cb: Optional[Callable[[], None]]):
+        self._push_undo_cb = cb
+
     def _start(self, action: str, col_idx: int):
         self.active = True
         self.action = action
@@ -183,6 +187,12 @@ class ColumnPrompt:
             self._set_status("Missing column context", 4)
             return
 
+        if self._push_undo_cb:
+            try:
+                self._push_undo_cb()
+            except Exception:
+                pass
+
         df = self.state.df
         loc = self.target_col if self.action == "insert_before" else self.target_col + 1
         loc = min(loc, len(df.columns))
@@ -206,6 +216,11 @@ class ColumnPrompt:
             self._set_status("Column index out of range", 4)
             return
         old_name = cols[self.target_col]
+        if self._push_undo_cb:
+            try:
+                self._push_undo_cb()
+            except Exception:
+                pass
         self.state.df.rename(columns={old_name: new_name}, inplace=True)
         self.grid.df = self.state.df
         self._set_status(f"Renamed column '{old_name}' to '{new_name}'", 3)

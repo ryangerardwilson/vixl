@@ -70,6 +70,9 @@ class Orchestrator:
         self.df_editor = DfEditor(
             self.state, self.grid, self.paginator, self._set_status, self.column_prompt
         )
+        # wire undo push into column prompt
+        if hasattr(self.column_prompt, "set_push_undo"):
+            self.column_prompt.set_push_undo(self.df_editor._push_undo)
 
     # ---------------- helpers ----------------
 
@@ -173,10 +176,6 @@ class Orchestrator:
             self.focus = 0
             self._set_status("No command to execute", 3)
             return
-
-        # Snapshot for undo before executing (clears redo on mutation via _push_undo)
-        if hasattr(self, "df_editor"):
-            self.df_editor._push_undo()
 
         lines = self.exec.execute(code)
         if lines:
