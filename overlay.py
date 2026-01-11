@@ -1,4 +1,5 @@
 import curses
+import curses
 from typing import List
 
 
@@ -9,7 +10,7 @@ class OverlayView:
         self.lines: List[str] = []
         self.scroll = 0
         self.win = None
-        self.leader = False
+        self.leader_pending = False
 
     def open(self, lines: List[str]):
         max_h = min(self.layout.H // 2, self.layout.H - 2)
@@ -24,37 +25,53 @@ class OverlayView:
         self.lines = lines
         self.scroll = 0
         self.visible = True
+        self.leader_pending = False
 
     def close(self):
         self.visible = False
         self.lines = []
         self.scroll = 0
         self.win = None
-        self.leader = False
+        self.leader_pending = False
 
     def handle_key(self, ch):
         if not self.visible:
             return
+        if ch == -1:
+            return
+
         max_visible = max(0, self.layout.overlay_h - 2)
         max_scroll = max(0, len(self.lines) - max_visible)
         half_page = max(1, max_visible // 2)
 
         # leader handling (,j / ,k)
-        if self.leader:
-            self.leader = False
-            if ch == ord("j"):
-                self.scroll = max_scroll
-                return
-            if ch == ord("k"):
-                self.scroll = 0
+        if self.leader_pending:
+            if ch == ord(","):
+                self.leader_pending = False
                 return
 
+            if ch in (ord("j"), curses.KEY_DOWN):
+                self.scroll = max_scroll
+                self.leader_pending = False
+                return
+
+            if ch in (ord("k"), curses.KEY_UP):
+                self.scroll = 0
+                self.leader_pending = False
+                return
+
+            # non-matching key cancels leader
+            self.leader_pending = False
+            return
+
+        # close
         if ch in (27, ord("q"), 13, curses.KEY_ENTER):
             self.close()
             return
 
+        # start leader
         if ch == ord(","):
-            self.leader = True
+            self.leader_pending = True
             return
 
         # half-page scroll
@@ -74,6 +91,7 @@ class OverlayView:
     def draw(self):
         if not self.visible or not self.win:
             return
+
         win = self.win
         win.erase()
         h, w = win.getmaxyx()
