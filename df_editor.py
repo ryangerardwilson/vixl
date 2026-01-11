@@ -477,14 +477,6 @@ class DfEditor:
                         self.cell_leader_state = "c"
                         self._show_leader_status(self._leader_seq("c"))
                         return
-                    if ch == ord("d"):
-                        self.cell_leader_state = "d"
-                        self._show_leader_status(self._leader_seq("d"))
-                        return
-                    if ch == ord("n"):
-                        self.cell_leader_state = "n"
-                        self._show_leader_status(self._leader_seq("n"))
-                        return
                     self._show_leader_status("")
                     return
 
@@ -497,37 +489,6 @@ class DfEditor:
                     self._show_leader_status(",cc")
                     return
 
-                if state == "d" and ch == ord("c"):
-                    try:
-                        self.state.df.iloc[r, c] = self._coerce_cell_value(col, "")
-                    except Exception:
-                        self.state.df.iloc[r, c] = ""
-                    self._show_leader_status(",dc")
-                    return
-
-                if state == "n" and ch == ord("r"):
-                    if self.mode != "normal":
-                        self._show_leader_status("")
-                        return
-                    row = self.state.build_default_row()
-                    insert_at = self.grid.curr_row + 1 if len(self.state.df) > 0 else 0
-                    new_row = pd.DataFrame([row], columns=self.state.df.columns)
-                    self.state.df = pd.concat(
-                        [
-                            self.state.df.iloc[:insert_at],
-                            new_row,
-                            self.state.df.iloc[insert_at:],
-                        ],
-                        ignore_index=True,
-                    )
-                    self.grid.df = self.state.df
-                    self.paginator.update_total_rows(len(self.state.df))
-                    self.paginator.ensure_row_visible(insert_at)
-                    self.grid.curr_row = insert_at
-                    self.grid.highlight_mode = "cell"
-                    self._show_leader_status(",nr")
-                    return
-
                 self._show_leader_status("")
                 return
 
@@ -535,6 +496,18 @@ class DfEditor:
                 self.df_leader_state = "leader"
                 self.cell_leader_state = None
                 self._show_leader_status(self._leader_seq("leader"))
+                return
+
+            if ch == ord("x"):
+                if total_rows == 0 or total_cols == 0:
+                    return
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col_name = self.state.df.columns[c]
+                try:
+                    self.state.df.iloc[r, c] = self._coerce_cell_value(col_name, "")
+                except Exception:
+                    self.state.df.iloc[r, c] = ""
+                self._set_status("Cell cleared", 2)
                 return
 
             if ch == ord("i"):

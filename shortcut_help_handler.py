@@ -33,7 +33,7 @@ class ShortcutHelpHandler:
             "  i - edit cell (preload)",
             "  , e - edit cell (preload)",
             "  , c c - edit cell empty",
-            "  , d c - clear cell",
+            "  x - clear current cell",
             "  , n r - insert row below",
             "  , i c a - insert column after (prompt name + dtype)",
             "  , i c b - insert column before (prompt name + dtype)",
@@ -51,6 +51,6 @@ class ShortcutHelpHandler:
             "",
             "DF cell_normal",
             "  h / l - move cursor within buffer; 0 / $ - line edges; w / b - word nav",
-            "  , e / , c c / , d c / , n r",
+            "  , e / , c c",
             "  i - insert; Esc - back to df normal",
         ]

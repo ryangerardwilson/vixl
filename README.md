@@ -86,7 +86,7 @@ python main.py <csv-or-parquet-file>
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
-- Clear cell: `, d c`
+- Clear cell: `x` (in df mode)
 - Insert row below: `, n r`
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
