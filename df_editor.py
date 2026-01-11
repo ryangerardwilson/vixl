@@ -620,8 +620,10 @@ class DfEditor:
                         self.cell_buffer = base
                         if not self.cell_buffer.endswith(" "):
                             self.cell_buffer += " "
-                        self.cell_cursor = len(self.cell_buffer) - 1
+                        self.cell_cursor = len(self.cell_buffer)
+                        self.cell_hscroll = 0
                         self.mode = "cell_insert"
+                        self._autoscroll_insert()
                         return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
