@@ -29,6 +29,9 @@ class DfEditor:
         # Undo/redo (managed on AppState stacks)
         # undo_stack / redo_stack live on state; depth capped by state.undo_max_depth
 
+        # Repeat last action (mutations only)
+        self.last_action = None
+
     # ---------- helpers ----------
     def _coerce_cell_value(self, col, text):
         dtype = self.state.df[col].dtype
@@ -39,6 +42,20 @@ class DfEditor:
         if pd.api.types.is_bool_dtype(dtype):
             return text.lower() in ("1", "true", "yes")
         return text
+
+    def _default_series_for_dtype(self, dtype: str):
+        n = len(self.state.df)
+        if dtype == "object":
+            return pd.Series([""] * n, dtype="object")
+        if dtype == "Int64":
+            return pd.Series([pd.NA] * n, dtype="Int64")
+        if dtype == "float64":
+            return pd.Series([float("nan")] * n, dtype="float64")
+        if dtype == "boolean":
+            return pd.Series([pd.NA] * n, dtype="boolean")
+        if dtype == "datetime64[ns]":
+            return pd.Series([pd.NaT] * n, dtype="datetime64[ns]")
+        return pd.Series([pd.NA] * n)
 
     def _autoscroll_insert(self):
         cw = self.grid.get_col_width(self.grid.curr_col)
@@ -129,6 +146,111 @@ class DfEditor:
             if getattr(cp, "active", False):
                 return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
+
+    # ---------- counts ----------
+    def _reset_last_action(self):
+        self.last_action = None
+
+    def _set_last_action(self, action_type: str, **kwargs):
+        self.last_action = {"type": action_type, **kwargs}
+
+    def _repeat_last_action(self):
+        if not self.last_action:
+            self._set_status("Nothing to repeat", 2)
+            return
+        act = self.last_action
+        t = act.get("type")
+        try:
+            if t == "insert_rows":
+                count = act.get("count", 1)
+                above = act.get("above", True)
+                self._insert_rows(above=above, count=count)
+            elif t == "delete_rows":
+                count = act.get("count", 1)
+                self._delete_rows(count)
+            elif t == "adjust_row_lines":
+                delta = act.get("delta", 0)
+                self._adjust_row_lines(delta)
+            elif t == "cell_set":
+                row = self.grid.curr_row
+                col = self.grid.curr_col
+                val = act.get("value", "")
+                self._push_undo()
+                try:
+                    self.state.df.iloc[row, col] = val
+                except Exception:
+                    self._set_status("Repeat failed", 2)
+                    return
+                self.grid.df = self.state.df
+                self._set_status("Repeated cell edit", 2)
+            elif t == "cell_clear":
+                row = self.grid.curr_row
+                col = self.grid.curr_col
+                self._push_undo()
+                try:
+                    col_name = self.state.df.columns[col]
+                    self.state.df.iloc[row, col] = self._coerce_cell_value(col_name, "")
+                except Exception:
+                    self._set_status("Repeat failed", 2)
+                    return
+                self.grid.df = self.state.df
+                self._set_status("Repeated cell clear", 2)
+            elif t == "col_insert":
+                name = act.get("name")
+                dtype = act.get("dtype")
+                after = act.get("after", True)
+                if name is None or dtype is None:
+                    self._set_status("Nothing to repeat", 2)
+                    return
+                # Use column prompt logic via helper path
+                try:
+                    loc = self.grid.curr_col + (1 if after else 0)
+                    loc = min(loc, len(self.state.df.columns))
+                    self._push_undo()
+                    series = self._default_series_for_dtype(dtype)
+                    self.state.df.insert(loc, name, series)
+                    self.grid.df = self.state.df
+                    self.paginator.update_total_rows(len(self.state.df))
+                    self.grid.curr_col = loc
+                    self.grid.adjust_col_viewport()
+                    self._set_status("Repeated column insert", 2)
+                except Exception:
+                    self._set_status("Repeat failed", 2)
+            elif t == "col_rename":
+                new_name = act.get("new_name")
+                if new_name is None:
+                    self._set_status("Nothing to repeat", 2)
+                    return
+                cols = list(self.state.df.columns)
+                if not cols:
+                    self._set_status("Repeat failed", 2)
+                    return
+                col_idx = self.grid.curr_col
+                if col_idx >= len(cols):
+                    self._set_status("Repeat failed", 2)
+                    return
+                old_name = cols[col_idx]
+                try:
+                    self._push_undo()
+                    self.state.df.rename(columns={old_name: new_name}, inplace=True)
+                    self.grid.df = self.state.df
+                    self._set_status("Repeated column rename", 2)
+                except Exception:
+                    self._set_status("Repeat failed", 2)
+            elif t == "col_delete":
+                cols = list(self.state.df.columns)
+                if not cols:
+                    self._set_status("Repeat failed", 2)
+                    return
+                col_idx = self.grid.curr_col
+                if col_idx >= len(cols):
+                    self._set_status("Repeat failed", 2)
+                    return
+                self._delete_current_column()
+            else:
+                self._set_status("Nothing to repeat", 2)
+        except Exception:
+            self._set_status("Repeat failed", 2)
 
     # ---------- counts ----------
     def _reset_count(self):
@@ -232,14 +354,17 @@ class DfEditor:
         self.mode = "cell_insert"
 
     def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
-        new_value = max(minimum, min(maximum, self.state.row_lines + delta))
-        if new_value == self.state.row_lines:
+        current = self.state.row_lines
+        new_value = max(minimum, min(maximum, current + delta))
+        if new_value == current:
             bound = "minimum" if delta < 0 else "maximum"
             self._set_status(f"Row lines {bound} reached ({new_value})", 2)
             return
+        applied_delta = new_value - current
         self.state.row_lines = new_value
         self.grid.row_offset = 0
         self._set_status(f"Row lines set to {self.state.row_lines}", 2)
+        self._set_last_action("adjust_row_lines", delta=applied_delta)
 
     def _start_insert_column(self, after: bool):
         if self.column_prompt is None:
@@ -279,6 +404,7 @@ class DfEditor:
             f"Inserted {count} row{'s' if count != 1 else ''} {'above' if above else 'below'}",
             2,
         )
+        self._set_last_action("insert_rows", count=count, above=above)
 
     def _insert_row(self, above: bool):
         self._insert_rows(above=above, count=1)
@@ -309,7 +435,9 @@ class DfEditor:
         if total_rows:
             self.paginator.ensure_row_visible(self.grid.curr_row)
         self.grid.highlight_mode = "cell"
-        self._set_status(f"Deleted {end - start} row{'s' if end - start != 1 else ''}", 2)
+        deleted = end - start
+        self._set_status(f"Deleted {deleted} row{'s' if deleted != 1 else ''}", 2)
+        self._set_last_action("delete_rows", count=deleted)
 
     def _delete_current_column(self):
         cols = list(self.state.df.columns)
@@ -330,6 +458,7 @@ class DfEditor:
             self.cell_hscroll = 0
             self.mode = "normal"
         self._set_status(f"Deleted column '{col_name}'", 3)
+        self._set_last_action("col_delete", col_name=col_name)
 
     # ---------- public API ----------
     def handle_key(self, ch):
@@ -344,6 +473,7 @@ class DfEditor:
                     self._push_undo()
                     val = self._coerce_cell_value(col, self.cell_buffer)
                     self.state.df.iloc[r, c] = val
+                    self._set_last_action("cell_set", value=val)
                 except Exception:
                     self._set_status(f"Invalid value for column '{col}'", 3)
 
@@ -381,6 +511,10 @@ class DfEditor:
 
         # ---------- cell normal ----------
         if self.mode == "cell_normal":
+            if ch == ord("."):
+                self._repeat_last_action()
+                return
+
             # ----- numeric prefixes (counts) in cell_normal -----
             if ch >= ord("0") and ch <= ord("9"):
                 digit = ch - ord("0")
@@ -482,6 +616,10 @@ class DfEditor:
         if self.mode == "normal":
             total_rows = len(self.state.df)
             total_cols = len(self.state.df.columns)
+
+            if ch == ord("."):
+                self._repeat_last_action()
+                return
 
             # Handle numeric prefixes in df mode
             if ch >= ord("0") and ch <= ord("9"):
@@ -874,6 +1012,7 @@ class DfEditor:
                 except Exception:
                     self.state.df.iloc[r, c] = ""
                 self._set_status("Cell cleared", 2)
+                self._set_last_action("cell_clear")
                 return
 
             if ch == ord("i"):

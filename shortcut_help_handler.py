@@ -46,6 +46,7 @@ class ShortcutHelpHandler:
             "  ,-rl - decrease row lines",
             "  u - undo",
             "  r - redo",
+            "  . - repeat last change",
             "  , h - go to first column",
             "  , l - go to last column",
             "  , j - go to last row",
