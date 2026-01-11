@@ -114,22 +114,6 @@ class GridPane:
         self.curr_row = max(0, self.curr_row - 1)
         self.highlight_mode = "cell"
 
-    def move_row_down(self):
-        self.curr_row = min(len(self.df) - 1, self.curr_row + 1)
-        self.highlight_mode = "row"
-
-    def move_row_up(self):
-        self.curr_row = max(0, self.curr_row - 1)
-        self.highlight_mode = "row"
-
-    def move_col_left(self):
-        self.curr_col = max(0, self.curr_col - 1)
-        self.highlight_mode = "column"
-
-    def move_col_right(self):
-        self.curr_col = min(len(self.df.columns) - 1, self.curr_col + 1)
-        self.highlight_mode = "column"
-
     # ---------- rendering ----------
     def draw(
         self,

@@ -26,8 +26,6 @@ class ShortcutHelpHandler:
             "",
             "DF normal",
             "  h / j / k / l - move",
-            "  H / L - column highlight",
-            "  J / K - row highlight",
             "  Ctrl+J / Ctrl+K - jump ~5% rows down/up",
             "  Ctrl+H / Ctrl+L - jump ~20% cols left/right",
             "  : - open command bar",

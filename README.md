@@ -83,7 +83,6 @@ python main.py <csv-or-parquet-file>
 
 ### DF navigation & editing (df normal)
 - Move: h / j / k / l
-- Highlight: H / L (columns), J / K (rows)
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
