@@ -404,6 +404,18 @@ class DfEditor:
                         self.grid.adjust_col_viewport()
                         return
 
+                    if ch == ord("e"):
+                        self._show_leader_status(",e")
+                        self.cell_col = col
+                        self.cell_buffer = base
+                        if not self.cell_buffer.endswith(" "):
+                            self.cell_buffer += " "
+                        self.cell_cursor = len(self.cell_buffer)
+                        self.cell_hscroll = 0
+                        self.mode = "cell_insert"
+                        self._autoscroll_insert()
+                        return
+
                     if ch == ord("i"):
                         self.df_leader_state = "i"
                         self._show_leader_status(self._leader_seq("i"))
