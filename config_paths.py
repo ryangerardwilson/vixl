@@ -37,5 +37,6 @@ def load_config():
             pass
     return cfg
 
+
 # Example config.py the user can create:
 # AUTO_COMMIT = True

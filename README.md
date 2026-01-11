@@ -1,8 +1,10 @@
 # Vixl
 
-Vixl is a **Vim-first, terminal-native spreadsheet editor** for fast, explicit manipulation of tabular data using Pandas and NumPy.
+Vixl is a **Vim-first, terminal-native spreadsheet editor** for fast, explicit
+manipulation of tabular data using Pandas and NumPy.
 
-It is designed for users who prefer keyboard-driven workflows and want full transparency over how their data is transformed.
+It is designed for users who prefer keyboard-driven workflows and want full
+transparency over how their data is transformed.
 
 ---
 
@@ -30,6 +32,7 @@ python main.py <csv-or-parquet-file>
 - Then reload your shell (or run `source ~/.bashrc`).
 - Until the completion is active (the sourcing block is present and loaded in your current shell), Vixl will refuse to launch and will print the required steps.
 - Behavior: after activation, `python main.py <TAB>` and `vixl <TAB>` suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths.
+- For a friendly command name, create a symlink in a PATH directory (and make `main.py` executable if needed), e.g.: `ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"` (or set an alias `alias vixl='python /path/to/main.py'`). Completion covers the `vixl` command once the bashrc block is sourced.
 
 ---
 
@@ -169,7 +172,8 @@ For example, pressing `i` on a cell pre-fills a command such as:
 df.iloc[row, col] = value
 ```
 
-Users edit and execute the command explicitly in **command pane Insert mode**. The grid is a navigation and visualization surface, never a text editor.
+Users edit and execute the command explicitly in **command pane Insert mode**.
+The grid is a navigation and visualization surface, never a text editor.
 
 ---
 
@@ -186,7 +190,8 @@ All Python files live in the project root:
 - `command_executor.py` – command execution sandbox
 - `grid_pane.py`, `command_pane.py`, `output_pane.py` – UI panes
 
-Each file represents a clear product responsibility, with one primary class per file.
+Each file represents a clear product responsibility, with one primary class per
+file.
 
 ---
 

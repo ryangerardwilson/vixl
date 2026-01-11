@@ -89,7 +89,9 @@ class CommandPane:
 
         if ch in (curses.KEY_BACKSPACE, 127, 8):
             if self.cursor > 0:
-                self.buffer = self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                self.buffer = (
+                    self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                )
                 self.cursor -= 1
             self.history_idx = None
             return None
@@ -111,7 +113,9 @@ class CommandPane:
             return None
 
         if 32 <= ch <= 126:
-            self.buffer = self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            self.buffer = (
+                self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            )
             self.cursor += 1
             self.history_idx = None
             return None

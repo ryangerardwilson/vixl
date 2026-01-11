@@ -9,7 +9,7 @@ class FileTypeHandler:
         _, ext = os.path.splitext(path)
         self.ext = ext.lower()
 
-        if self.ext not in {'.csv', '.parquet'}:
+        if self.ext not in {".csv", ".parquet"}:
             print("Unsupported file type (use .csv or .parquet)")
             sys.exit(1)
 
@@ -19,9 +19,9 @@ class FileTypeHandler:
             self._write(df)
             return df
 
-        if self.ext == '.csv':
+        if self.ext == ".csv":
             return pd.read_csv(self.path)
-        elif self.ext == '.parquet':
+        elif self.ext == ".parquet":
             # Parquet files must be non-empty to be valid
             if os.path.getsize(self.path) == 0:
                 df = pd.DataFrame()
@@ -36,9 +36,9 @@ class FileTypeHandler:
         self._write(df)
 
     def _write(self, df: pd.DataFrame) -> None:
-        if self.ext == '.csv':
+        if self.ext == ".csv":
             df.to_csv(self.path, index=False)
-        elif self.ext == '.parquet':
+        elif self.ext == ".parquet":
             df.to_parquet(self.path)
         else:
             print("Unsupported file type (use .csv or .parquet)")

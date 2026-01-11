@@ -3,7 +3,9 @@ from typing import Optional, Callable
 
 
 class SavePrompt:
-    def __init__(self, state, file_type_handler_cls, set_status_cb: Callable[[str, int], None]):
+    def __init__(
+        self, state, file_type_handler_cls, set_status_cb: Callable[[str, int], None]
+    ):
         self.state = state
         self.FileTypeHandler = file_type_handler_cls
         self._set_status = set_status_cb
@@ -17,7 +19,7 @@ class SavePrompt:
 
     def start(self, current_path: Optional[str], save_and_exit: bool = False):
         self.active = True
-        self.buffer = current_path or ''
+        self.buffer = current_path or ""
         self.cursor = len(self.buffer)
         self.hscroll = 0
         self.save_and_exit = save_and_exit
@@ -32,12 +34,12 @@ class SavePrompt:
             if not path:
                 self._set_status("Path required", 3)
                 return
-            if not (path.lower().endswith('.csv') or path.lower().endswith('.parquet')):
+            if not (path.lower().endswith(".csv") or path.lower().endswith(".parquet")):
                 self._set_status("Save failed: use .csv or .parquet", 4)
                 return
             try:
                 handler = self.FileTypeHandler(path)
-                if hasattr(self.state, 'ensure_non_empty'):
+                if hasattr(self.state, "ensure_non_empty"):
                     self.state.ensure_non_empty()
                 handler.save(self.state.df)
                 self.state.file_handler = handler
@@ -66,7 +68,9 @@ class SavePrompt:
 
         if ch in (curses.KEY_BACKSPACE, 127, 8):
             if self.cursor > 0:
-                self.buffer = self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                self.buffer = (
+                    self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                )
                 self.cursor -= 1
             return
 
@@ -87,7 +91,9 @@ class SavePrompt:
             return
 
         if 32 <= ch <= 126:
-            self.buffer = self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            self.buffer = (
+                self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            )
             self.cursor += 1
             return
 

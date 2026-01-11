@@ -19,7 +19,9 @@ def _visible_count(grid: GridPane, win: DummyWin, offset: int | None = None) -> 
     row_w = max(3, len(str(len(grid.df))) + 1)
     avail_w = max(20, w - (row_w + 1))
 
-    header_widths = [min(grid.MAX_COL_WIDTH, len(str(col)) + 2) for col in grid.df.columns]
+    header_widths = [
+        min(grid.MAX_COL_WIDTH, len(str(col)) + 2) for col in grid.df.columns
+    ]
 
     visible_count = 0
     used = 0
@@ -40,7 +42,9 @@ class GridPaneAdjustViewportTests(unittest.TestCase):
         win = DummyWin(24, 120)
 
         def fail_on_width(col_idx):
-            raise AssertionError("get_col_width should not be called during adjust_col_viewport")
+            raise AssertionError(
+                "get_col_width should not be called during adjust_col_viewport"
+            )
 
         grid.get_col_width = fail_on_width
         grid.curr_col = len(df.columns) - 1

@@ -38,7 +38,7 @@ class LoadingScreen:
     PHASE_FREEZE = 3
     PHASE_HOLD = 4
 
-    GLYPHS = ['0', '1', 'A', 'F', '░', '▒']
+    GLYPHS = ["0", "1", "A", "F", "░", "▒"]
 
     def __init__(self, stdscr, loader_fn, load_state: LoadState):
         self.stdscr = stdscr
@@ -56,7 +56,7 @@ class LoadingScreen:
         self.streams = [_Stream(x, h, self.rng) for x in range(w)]
 
         # logo mask
-        art = AsciiArt.ART.strip('\n').splitlines()
+        art = AsciiArt.ART.strip("\n").splitlines()
         art_h = len(art)
         art_w = max(len(l) for l in art) if art else 0
         top = max(0, (h // 2 - art_h) // 2)
@@ -64,7 +64,7 @@ class LoadingScreen:
         self.logo_mask = {}
         for iy, line in enumerate(art):
             for ix, ch in enumerate(line):
-                if ch != ' ':
+                if ch != " ":
                     self.logo_mask[(top + iy, left + ix)] = ch
         self.logo_cols = sorted({x for (_, x) in self.logo_mask})
         self.takeover_idx = 0
@@ -105,22 +105,30 @@ class LoadingScreen:
         # Phase transitions
         elapsed = now - self.phase_start
 
-        if self.phase == self.PHASE_RAIN and elapsed > 0.3:         # Reduced by ~30% from 0.8s → 0.56s
+        if (
+            self.phase == self.PHASE_RAIN and elapsed > 0.3
+        ):  # Reduced by ~30% from 0.8s → 0.56s
             self.phase = self.PHASE_INTERFERE
             self.phase_start = now
 
-        elif self.phase == self.PHASE_INTERFERE and elapsed > 0.2:   # Still 0.4s subtle interference
+        elif (
+            self.phase == self.PHASE_INTERFERE and elapsed > 0.2
+        ):  # Still 0.4s subtle interference
             self.phase = self.PHASE_TAKEOVER
             self.phase_start = now
             self.takeover_idx = 0
 
         elif self.phase == self.PHASE_TAKEOVER:
             # Fast takeover: multiple columns per frame
-            cols_per_frame = 10  # Keeps takeover very quick (~0.2–0.4s even for wide logos)
+            cols_per_frame = (
+                10  # Keeps takeover very quick (~0.2–0.4s even for wide logos)
+            )
 
             target_idx = self.takeover_idx + cols_per_frame
-            while (self.takeover_idx < len(self.logo_cols) and
-                   self.takeover_idx < target_idx):
+            while (
+                self.takeover_idx < len(self.logo_cols)
+                and self.takeover_idx < target_idx
+            ):
                 col = self.logo_cols[self.takeover_idx]
                 for (y, x), ch in self.logo_mask.items():
                     if x == col:
@@ -134,7 +142,7 @@ class LoadingScreen:
                 self.phase = self.PHASE_FREEZE
                 self.phase_start = now
 
-        elif self.phase == self.PHASE_FREEZE and elapsed > 0.2:      # Quick freeze
+        elif self.phase == self.PHASE_FREEZE and elapsed > 0.2:  # Quick freeze
             self.phase = self.PHASE_HOLD
             self.logo_fully_revealed_time = now
             self.phase_start = now

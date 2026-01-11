@@ -17,10 +17,18 @@ class GridPane:
             curses.start_color()
             curses.use_default_colors()
             curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
-            curses.init_pair(self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE)
-            curses.init_pair(self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, curses.COLOR_BLACK)
-            curses.init_pair(self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, curses.COLOR_BLACK)
-            curses.init_pair(self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE)
+            curses.init_pair(
+                self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE
+            )
+            curses.init_pair(
+                self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, curses.COLOR_BLACK
+            )
+            curses.init_pair(
+                self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, curses.COLOR_BLACK
+            )
+            curses.init_pair(
+                self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE
+            )
         except curses.error:
             pass
 
@@ -28,7 +36,7 @@ class GridPane:
         self.curr_col = 0
         self.row_offset = 0
         self.col_offset = 0
-        self.highlight_mode = 'cell'
+        self.highlight_mode = "cell"
 
     def get_col_width(self, col_idx):
         if col_idx < 0 or col_idx >= len(self.df.columns):
@@ -37,7 +45,7 @@ class GridPane:
         max_len = len(str(col))
         for v in self.df[col]:
             if v is None or pd.isna(v):
-                s = ''
+                s = ""
             else:
                 s = str(v)
             max_len = max(max_len, len(s))
@@ -61,13 +69,12 @@ class GridPane:
 
         # Calculate approximate visible columns using header widths only (cheap, avoids full DF scans)
         header_widths = [
-            min(self.MAX_COL_WIDTH, len(str(col)) + 2)
-            for col in self.df.columns
+            min(self.MAX_COL_WIDTH, len(str(col)) + 2) for col in self.df.columns
         ]
 
         visible_count = 0
         used = 0
-        for cw in header_widths[self.col_offset:]:
+        for cw in header_widths[self.col_offset :]:
             if used + cw + 1 > avail_w:
                 break
             used += cw + 1
@@ -93,35 +100,35 @@ class GridPane:
     # ---------- navigation ----------
     def move_left(self):
         self.curr_col = max(0, self.curr_col - 1)
-        self.highlight_mode = 'cell'
+        self.highlight_mode = "cell"
 
     def move_right(self):
         self.curr_col = min(len(self.df.columns) - 1, self.curr_col + 1)
-        self.highlight_mode = 'cell'
+        self.highlight_mode = "cell"
 
     def move_down(self):
         self.curr_row = min(len(self.df) - 1, self.curr_row + 1)
-        self.highlight_mode = 'cell'
+        self.highlight_mode = "cell"
 
     def move_up(self):
         self.curr_row = max(0, self.curr_row - 1)
-        self.highlight_mode = 'cell'
+        self.highlight_mode = "cell"
 
     def move_row_down(self):
         self.curr_row = min(len(self.df) - 1, self.curr_row + 1)
-        self.highlight_mode = 'row'
+        self.highlight_mode = "row"
 
     def move_row_up(self):
         self.curr_row = max(0, self.curr_row - 1)
-        self.highlight_mode = 'row'
+        self.highlight_mode = "row"
 
     def move_col_left(self):
         self.curr_col = max(0, self.curr_col - 1)
-        self.highlight_mode = 'column'
+        self.highlight_mode = "column"
 
     def move_col_right(self):
         self.curr_col = min(len(self.df.columns) - 1, self.curr_col + 1)
-        self.highlight_mode = 'column'
+        self.highlight_mode = "column"
 
     # ---------- rendering ----------
     def draw(
@@ -151,7 +158,7 @@ class GridPane:
         for col in df_slice.columns:
             max_len = len(str(col))
             for v in df_slice[col]:
-                s = '' if (v is None or pd.isna(v)) else str(v)
+                s = "" if (v is None or pd.isna(v)) else str(v)
                 max_len = max(max_len, len(s))
             widths.append(min(self.MAX_COL_WIDTH, max_len + 2))
 
@@ -162,7 +169,7 @@ class GridPane:
 
         max_cols = 0
         used = 0
-        for cw in widths[self.col_offset:]:
+        for cw in widths[self.col_offset :]:
             if used + cw + 1 > avail_w:
                 break
             used += cw + 1
@@ -206,7 +213,9 @@ class GridPane:
             page_start + self.row_offset,
             min(page_end, page_start + self.row_offset + max_rows),
         )
-        visible_cols = range(self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols))
+        visible_cols = range(
+            self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols)
+        )
 
         # header
         x = row_w + 1
@@ -225,13 +234,13 @@ class GridPane:
                 cw = widths[c]
 
                 if editing and r == edit_row and c == edit_col:
-                    text = edit_buffer or ''
+                    text = edit_buffer or ""
                 else:
                     val = self.df.iloc[r, c]
-                    text = '' if (val is None or pd.isna(val)) else str(val)
+                    text = "" if (val is None or pd.isna(val)) else str(val)
 
                 if editing and r == edit_row and c == edit_col:
-                    visible = text[edit_hscroll: edit_hscroll + cw]
+                    visible = text[edit_hscroll : edit_hscroll + cw]
                 else:
                     visible = text[:cw]
 
@@ -240,9 +249,13 @@ class GridPane:
                 attr = 0
                 if not editing:
                     active_cell = (
-                        (self.highlight_mode == 'row' and r == self.curr_row)
-                        or (self.highlight_mode == 'column' and c == self.curr_col)
-                        or (self.highlight_mode == 'cell' and r == self.curr_row and c == self.curr_col)
+                        (self.highlight_mode == "row" and r == self.curr_row)
+                        or (self.highlight_mode == "column" and c == self.curr_col)
+                        or (
+                            self.highlight_mode == "cell"
+                            and r == self.curr_row
+                            and c == self.curr_col
+                        )
                     )
                     if active_cell:
                         attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
@@ -250,7 +263,12 @@ class GridPane:
                 win.addnstr(y, x, cell, cw, attr)
 
                 # Cursor rendering
-                if editing and r == edit_row and c == edit_col and edit_cursor is not None:
+                if (
+                    editing
+                    and r == edit_row
+                    and c == edit_col
+                    and edit_cursor is not None
+                ):
                     visible_len = len(visible)
                     text_start_x = x + (cw - visible_len)
 
@@ -260,13 +278,13 @@ class GridPane:
                     cx = max(x, min(x + cw - 1, cx))
 
                     if insert_mode:
-                        win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
+                        win.addnstr(y, cx, " ", 1, curses.A_REVERSE)
                     else:
                         if pos < visible_len:
                             ch = visible[pos]
                             win.addch(y, cx, ch, curses.A_REVERSE)
                         else:
-                            win.addnstr(y, cx, ' ', 1, curses.A_REVERSE)
+                            win.addnstr(y, cx, " ", 1, curses.A_REVERSE)
 
                 x += cw + 1
             y += 1

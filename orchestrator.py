@@ -51,15 +51,19 @@ class Orchestrator:
         self.status_msg_until = 0
 
         # ---- history ----
-        legacy_path = os.path.expanduser('~/.vixl_history')
-        self.history_mgr = HistoryManager(HISTORY_PATH, legacy_path=legacy_path, max_items=100)
+        legacy_path = os.path.expanduser("~/.vixl_history")
+        self.history_mgr = HistoryManager(
+            HISTORY_PATH, legacy_path=legacy_path, max_items=100
+        )
         self.history = self.history_mgr.load()
 
         # share history with command pane
         self.command.set_history(self.history)
 
         # ---- DF editor ----
-        self.df_editor = DfEditor(self.state, self.grid, self.paginator, self._set_status)
+        self.df_editor = DfEditor(
+            self.state, self.grid, self.paginator, self._set_status
+        )
 
     # ---------------- helpers ----------------
 
@@ -84,8 +88,11 @@ class Orchestrator:
             self.grid.draw(
                 self.layout.table_win,
                 active=(self.focus == 0),
-                editing=(self.focus == 0 and self.df_editor.mode in ('cell_insert', 'cell_normal')),
-                insert_mode=(self.focus == 0 and self.df_editor.mode == 'cell_insert'),
+                editing=(
+                    self.focus == 0
+                    and self.df_editor.mode in ("cell_insert", "cell_normal")
+                ),
+                insert_mode=(self.focus == 0 and self.df_editor.mode == "cell_insert"),
                 edit_row=self.grid.curr_row,
                 edit_col=self.grid.curr_col,
                 edit_buffer=self.df_editor.cell_buffer,
@@ -102,7 +109,7 @@ class Orchestrator:
             if self.save_prompt.active:
                 self.save_prompt.draw(sw)
             else:
-                cmd_active = (self.focus == 1 and self.command.active)
+                cmd_active = self.focus == 1 and self.command.active
 
                 if cmd_active:
                     self.command.draw(sw, active=True)
@@ -114,17 +121,21 @@ class Orchestrator:
                         text = f" {self.status_msg}"
                     else:
                         if self.focus == 0:
-                            if self.df_editor.mode == 'cell_insert':
-                                mode = 'DF:CELL-INSERT'
-                            elif self.df_editor.mode == 'cell_normal':
-                                mode = 'DF:CELL-NORMAL'
+                            if self.df_editor.mode == "cell_insert":
+                                mode = "DF:CELL-INSERT"
+                            elif self.df_editor.mode == "cell_normal":
+                                mode = "DF:CELL-NORMAL"
                             else:
-                                mode = 'DF'
+                                mode = "DF"
                         elif self.focus == 1:
-                            mode = 'CMD'
+                            mode = "CMD"
                         else:
-                            mode = 'DF'
-                        fname = os.path.basename(self.state.file_path) if self.state.file_path else ''
+                            mode = "DF"
+                        fname = (
+                            os.path.basename(self.state.file_path)
+                            if self.state.file_path
+                            else ""
+                        )
                         shape = f"{self.state.df.shape}"
                         page_total = self.paginator.page_count
                         page_info = f"Page {self.paginator.page_index + 1}/{page_total} rows {self.paginator.page_start}-{max(self.paginator.page_start, self.paginator.page_end - 1)} of {self.paginator.total_rows}"
@@ -165,10 +176,12 @@ class Orchestrator:
         self.grid.df = self.state.df
         self.paginator.update_total_rows(len(self.state.df))
         self.grid.curr_row = min(self.grid.curr_row, max(0, len(self.grid.df) - 1))
-        self.grid.curr_col = min(self.grid.curr_col, max(0, len(self.grid.df.columns) - 1))
+        self.grid.curr_col = min(
+            self.grid.curr_col, max(0, len(self.grid.df.columns) - 1)
+        )
         self.paginator.ensure_row_visible(self.grid.curr_row)
 
-        if getattr(self.exec, '_last_success', False):
+        if getattr(self.exec, "_last_success", False):
             self.history_mgr.append(code)
             self.command.set_history(self.history_mgr.items)
             self.history_mgr.persist(code)
@@ -179,17 +192,17 @@ class Orchestrator:
     # ---------------- saving ----------------
 
     def _save_df(self, save_and_exit=False):
-        handler = getattr(self.state, 'file_handler', None)
+        handler = getattr(self.state, "file_handler", None)
         if handler is None:
             self.save_prompt.start(self.state.file_path, save_and_exit=save_and_exit)
             self.focus = 0
             return False
 
         try:
-            if hasattr(self.state, 'ensure_non_empty'):
+            if hasattr(self.state, "ensure_non_empty"):
                 self.state.ensure_non_empty()
             handler.save(self.state.df)
-            fname = self.state.file_path or ''
+            fname = self.state.file_path or ""
             self._set_status(f"Saved {fname}" if fname else "Saved", 3)
             if save_and_exit:
                 self.exit_requested = True
@@ -245,10 +258,10 @@ class Orchestrator:
                 continue
 
             if self.focus == 0:
-                if ch == ord(':'):
+                if ch == ord(":"):
                     self.command.activate()
                     self.focus = 1
-                elif ch == ord('?'):
+                elif ch == ord("?"):
                     self.overlay.open(ShortcutHelpHandler.get_lines())
                     self.focus = 2
                 else:

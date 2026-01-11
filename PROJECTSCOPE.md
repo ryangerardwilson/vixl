@@ -2,9 +2,13 @@
 
 ## 1. Project Overview
 
-Vixl is a **Vim-first, terminal-native spreadsheet editor** for fast, explicit manipulation of tabular data inside the terminal.
+Vixl is a **Vim-first, terminal-native spreadsheet editor** for fast, explicit
+manipulation of tabular data inside the terminal.
 
-The project prioritizes speed, density, scriptability, and transparency, with tight integration into the Python data ecosystem. Vixl is not an Excel UI clone; it is a power-user tool optimized for keyboard-driven workflows and inspectable data transformations.
+The project prioritizes speed, density, scriptability, and transparency, with
+tight integration into the Python data ecosystem. Vixl is not an Excel UI
+clone; it is a power-user tool optimized for keyboard-driven workflows and
+inspectable data transformations.
 
 ---
 
@@ -43,7 +47,8 @@ Responsibilities:
 - Initialize file handling and application state
 - Hand control to the orchestrator
 
-`main.py` contains no rendering, key handling, or business logic and is expected to remain thin.
+`main.py` contains no rendering, key handling, or business logic and is
+expected to remain thin.
 
 ### orchestrator.py
 
@@ -114,7 +119,9 @@ Behavior of df Insert mode:
 - The prefilled command opens in the command pane
 - Users edit and execute explicitly in **command pane Insert mode**
 
-The grid is a navigation and visualization surface, never a text editor. All text entry occurs in the command pane, and all data mutation flows through explicit Python commands.
+The grid is a navigation and visualization surface, never a text editor. All
+text entry occurs in the command pane, and all data mutation flows through
+explicit Python commands.
 
 Selection mirrors Vim visual mode semantics.
 
@@ -197,7 +204,8 @@ Vixl is designed for:
 - Analysts
 - Vim users
 
-Users are expected to be comfortable with the keyboard and basic Python concepts.
+Users are expected to be comfortable with the keyboard and basic Python
+concepts.
 
 ---
 

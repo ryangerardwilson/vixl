@@ -36,12 +36,12 @@ class OverlayView:
         max_visible = max(0, self.layout.overlay_h - 2)
         max_scroll = max(0, len(self.lines) - max_visible)
 
-        if ch in (27, ord('q'), 10, 13):
+        if ch in (27, ord("q"), 10, 13):
             self.close()
             return
-        if ch == ord('j'):
+        if ch == ord("j"):
             self.scroll = min(max_scroll, self.scroll + 1)
-        elif ch == ord('k'):
+        elif ch == ord("k"):
             self.scroll = max(0, self.scroll - 1)
 
     def draw(self):
