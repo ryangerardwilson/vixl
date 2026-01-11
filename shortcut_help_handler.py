@@ -16,6 +16,8 @@ class ShortcutHelpHandler:
             "Overlay (output)",
             "  Esc / q / Enter - close",
             "  j / k - scroll",
+            "  Ctrl+J / Ctrl+K - half-page down/up",
+            "  ,j / ,k - bottom/top",
             "",
             "Command bar",
             "  : (from df) - enter",

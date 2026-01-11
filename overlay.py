@@ -9,6 +9,7 @@ class OverlayView:
         self.lines: List[str] = []
         self.scroll = 0
         self.win = None
+        self.leader = False
 
     def open(self, lines: List[str]):
         max_h = min(self.layout.H // 2, self.layout.H - 2)
@@ -29,16 +30,42 @@ class OverlayView:
         self.lines = []
         self.scroll = 0
         self.win = None
+        self.leader = False
 
     def handle_key(self, ch):
         if not self.visible:
             return
         max_visible = max(0, self.layout.overlay_h - 2)
         max_scroll = max(0, len(self.lines) - max_visible)
+        half_page = max(1, max_visible // 2)
 
-        if ch in (27, ord("q"), 10, 13):
+        # leader handling (,j / ,k)
+        if self.leader:
+            self.leader = False
+            if ch == ord("j"):
+                self.scroll = max_scroll
+                return
+            if ch == ord("k"):
+                self.scroll = 0
+                return
+
+        if ch in (27, ord("q"), 13, curses.KEY_ENTER):
             self.close()
             return
+
+        if ch == ord(","):
+            self.leader = True
+            return
+
+        # half-page scroll
+        if ch == 10:  # Ctrl+J
+            self.scroll = min(max_scroll, self.scroll + half_page)
+            return
+        if ch == 11:  # Ctrl+K
+            self.scroll = max(0, self.scroll - half_page)
+            return
+
+        # line scroll
         if ch == ord("j"):
             self.scroll = min(max_scroll, self.scroll + 1)
         elif ch == ord("k"):
