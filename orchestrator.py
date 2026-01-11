@@ -70,11 +70,9 @@ class Orchestrator:
         self.df_editor = DfEditor(
             self.state, self.grid, self.paginator, self._set_status, self.column_prompt
         )
-        # wire undo and last_action into column prompt
+        # wire undo into column prompt
         if hasattr(self.column_prompt, "set_push_undo"):
             self.column_prompt.set_push_undo(self.df_editor._push_undo)
-        if hasattr(self.column_prompt, "set_last_action_cb"):
-            self.column_prompt.set_last_action_cb(self.df_editor._set_last_action)
 
     # ---------------- helpers ----------------
 

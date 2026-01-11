@@ -23,13 +23,12 @@ class ColumnPrompt:
         "datetime64[ns]": "datetime64[ns]",
     }
 
-    def __init__(self, state, grid, paginator, set_status_cb: Callable[[str, int], None], push_undo_cb: Optional[Callable[[], None]] = None, set_last_action_cb: Optional[Callable[..., None]] = None):
+    def __init__(self, state, grid, paginator, set_status_cb: Callable[[str, int], None], push_undo_cb: Optional[Callable[[], None]] = None):
         self.state = state
         self.grid = grid
         self.paginator = paginator
         self._set_status = set_status_cb
         self._push_undo_cb = push_undo_cb
-        self._set_last_action_cb = set_last_action_cb
 
         self.active = False
         self.action: Optional[str] = None  # insert_before | insert_after | rename
@@ -119,10 +118,8 @@ class ColumnPrompt:
     def set_push_undo(self, cb: Optional[Callable[[], None]]):
         self._push_undo_cb = cb
 
-    def set_last_action_cb(self, cb: Optional[Callable[..., None]]):
-        self._set_last_action_cb = cb
-
     def _start(self, action: str, col_idx: int):
+
         self.active = True
         self.action = action
         self.target_col = col_idx
@@ -206,17 +203,8 @@ class ColumnPrompt:
         self.paginator.update_total_rows(len(df))
         self.grid.curr_col = loc
         self.grid.adjust_col_viewport()
-        if self._set_last_action_cb:
-            try:
-                self._set_last_action_cb(
-                    "col_insert",
-                    name=self.pending_name,
-                    dtype=dtype,
-                    after=(self.action == "insert_after"),
-                )
-            except Exception:
-                pass
         self._set_status(f"Inserted column '{self.pending_name}'", 3)
+
 
     def _apply_rename(self, new_name: str):
         if self.target_col is None:
@@ -237,11 +225,6 @@ class ColumnPrompt:
                 pass
         self.state.df.rename(columns={old_name: new_name}, inplace=True)
         self.grid.df = self.state.df
-        if self._set_last_action_cb:
-            try:
-                self._set_last_action_cb("col_rename", new_name=new_name)
-            except Exception:
-                pass
         self._set_status(f"Renamed column '{old_name}' to '{new_name}'", 3)
 
     def _reset(self):

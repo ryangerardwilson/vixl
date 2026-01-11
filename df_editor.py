@@ -195,58 +195,6 @@ class DfEditor:
                     return
                 self.grid.df = self.state.df
                 self._set_status("Repeated cell clear", 2)
-            elif t == "col_insert":
-                name = act.get("name")
-                dtype = act.get("dtype")
-                after = act.get("after", True)
-                if name is None or dtype is None:
-                    self._set_status("Nothing to repeat", 2)
-                    return
-                # Use column prompt logic via helper path
-                try:
-                    loc = self.grid.curr_col + (1 if after else 0)
-                    loc = min(loc, len(self.state.df.columns))
-                    self._push_undo()
-                    series = self._default_series_for_dtype(dtype)
-                    self.state.df.insert(loc, name, series)
-                    self.grid.df = self.state.df
-                    self.paginator.update_total_rows(len(self.state.df))
-                    self.grid.curr_col = loc
-                    self.grid.adjust_col_viewport()
-                    self._set_status("Repeated column insert", 2)
-                except Exception:
-                    self._set_status("Repeat failed", 2)
-            elif t == "col_rename":
-                new_name = act.get("new_name")
-                if new_name is None:
-                    self._set_status("Nothing to repeat", 2)
-                    return
-                cols = list(self.state.df.columns)
-                if not cols:
-                    self._set_status("Repeat failed", 2)
-                    return
-                col_idx = self.grid.curr_col
-                if col_idx >= len(cols):
-                    self._set_status("Repeat failed", 2)
-                    return
-                old_name = cols[col_idx]
-                try:
-                    self._push_undo()
-                    self.state.df.rename(columns={old_name: new_name}, inplace=True)
-                    self.grid.df = self.state.df
-                    self._set_status("Repeated column rename", 2)
-                except Exception:
-                    self._set_status("Repeat failed", 2)
-            elif t == "col_delete":
-                cols = list(self.state.df.columns)
-                if not cols:
-                    self._set_status("Repeat failed", 2)
-                    return
-                col_idx = self.grid.curr_col
-                if col_idx >= len(cols):
-                    self._set_status("Repeat failed", 2)
-                    return
-                self._delete_current_column()
             else:
                 self._set_status("Nothing to repeat", 2)
         except Exception:

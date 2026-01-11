@@ -83,7 +83,7 @@ python main.py <csv-or-parquet-file>
 
 ### DF navigation & editing (df normal)
 - Numeric prefixes (counts) supported for: h/j/k/l, Ctrl+J/K/H/L, ,ira / ,irb, ,dr, ,+rl / ,-rl; in cell_normal: h/l and w/b
-- Repeat last change: `.` (mutations only)
+- Repeat last change: `.` (mutations only; excludes column insert/rename/delete and command bar commands)
 - Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
