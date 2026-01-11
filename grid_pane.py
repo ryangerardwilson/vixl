@@ -9,6 +9,7 @@ class GridPane:
     PAIR_CURSOR_NORMAL_BG = 3
     PAIR_CURSOR_NORMAL_CHAR = 4
     PAIR_CELL_ACTIVE_TEXT = 5
+    PAIR_CELL_TEXT = 6
     MAX_COL_WIDTH = 40
 
     def __init__(self, df):
@@ -17,6 +18,7 @@ class GridPane:
             curses.start_color()
             curses.use_default_colors()
             curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
+            curses.init_pair(self.PAIR_CELL_TEXT, curses.COLOR_WHITE, curses.COLOR_BLACK)
             curses.init_pair(
                 self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE
             )
@@ -136,6 +138,10 @@ class GridPane:
         row_lines=1,
     ):
         win.erase()
+        try:
+            win.bkgd(" ", curses.color_pair(self.PAIR_CELL_TEXT))
+        except curses.error:
+            pass
         h, w = win.getmaxyx()
         row_block_height = max(1, row_lines)
 
@@ -252,64 +258,63 @@ class GridPane:
                 cw = widths[c]
                 eff_cw = min(self.rendered_col_widths.get(c, cw), max(1, w - x - 1))
 
-                is_edit_target = editing and r == edit_row and c == edit_col
-                if is_edit_target:
+                use_hscroll = editing and (r == edit_row and c == edit_col)
+
+                if use_hscroll:
                     text = edit_buffer or ""
                 else:
                     val = self.df.iloc[r, c]
                     text = "" if (val is None or pd.isna(val)) else str(val)
 
-                start = edit_hscroll if is_edit_target else 0
+                start = edit_hscroll if use_hscroll else 0
                 wrapped_lines = _wrap_cell(text[start:], eff_cw, row_block_height)
 
-                attr = 0
-                if not editing:
-                    active_cell = (
-                        (self.highlight_mode == "row" and r == self.curr_row)
-                        or (self.highlight_mode == "column" and c == self.curr_col)
-                        or (
-                            self.highlight_mode == "cell"
-                            and r == self.curr_row
-                            and c == self.curr_col
-                        )
+                base_attr = curses.color_pair(self.PAIR_CELL_TEXT)
+                attr = base_attr
+                active_cell = (
+                    (self.highlight_mode == "row" and r == self.curr_row)
+                    or (self.highlight_mode == "column" and c == self.curr_col)
+                    or (
+                        self.highlight_mode == "cell"
+                        and r == self.curr_row
+                        and c == self.curr_col
                     )
-                    if active_cell:
-                        attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
+                )
+                if (not editing) and active_cell:
+                    attr = base_attr | curses.A_REVERSE
 
-                cursor_line = None
-                cursor_col = None
-                if is_edit_target and edit_cursor is not None:
-                    relative_pos = max(0, edit_cursor - start)
+                is_cursor_target = use_hscroll and edit_cursor is not None
+                cursor_line = -1
+                cursor_col = -1
+                if is_cursor_target:
+                    cursor_val = int(edit_cursor or 0)
+                    relative_pos = max(0, cursor_val - start)
                     cursor_line = min(row_block_height - 1, relative_pos // eff_cw)
                     cursor_col = relative_pos % eff_cw
 
+                eff_cw_int = int(eff_cw)
                 for line_idx, line_text in enumerate(wrapped_lines):
                     line_y = row_y + line_idx
                     if line_y >= h - 1:
                         break
                     visible_len = len(line_text)
-                    cell = line_text.rjust(eff_cw)
-                    win.addnstr(line_y, x, cell, eff_cw, attr)
+                    cell = line_text.rjust(eff_cw_int)
+                    win.addnstr(line_y, x, cell, eff_cw_int, attr)
 
-                    if (
-                        is_edit_target
-                        and cursor_line is not None
-                        and cursor_col is not None
-                        and line_idx == cursor_line
-                    ):
-                        text_start_x = x + (eff_cw - visible_len)
+                    if is_cursor_target and cursor_line >= 0 and cursor_col >= 0 and line_idx == cursor_line:
+                        text_start_x = x + (eff_cw_int - visible_len)
                         pos = min(cursor_col, visible_len)
                         cx = text_start_x + pos
-                        cx = max(x, min(x + eff_cw - 1, cx))
+                        cx = max(x, min(x + eff_cw_int - 1, cx))
+                        caret_attr = base_attr | curses.A_REVERSE
                         if insert_mode:
-                            win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
+                            win.addnstr(line_y, cx, " ", 1, caret_attr)
                         else:
-                            if pos < visible_len and visible_len > 0:
-                                ch = line_text[pos]
-                                win.addch(line_y, cx, ch, curses.A_REVERSE)
-                            else:
-                                win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
-                x += eff_cw + 1
+                            ch = line_text[pos] if pos < visible_len else " "
+                            win.addnstr(line_y, cx, ch, 1, caret_attr)
+                x += eff_cw_int + 1
+
+
 
         win.refresh()
 
