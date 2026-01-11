@@ -148,7 +148,11 @@ class Orchestrator:
                         shape = f"{self.state.df.shape}"
                         page_total = self.paginator.page_count
                         page_info = f"Page {self.paginator.page_index + 1}/{page_total} rows {self.paginator.page_start}-{max(self.paginator.page_start, self.paginator.page_end - 1)} of {self.paginator.total_rows}"
-                        text = f" {mode} | {fname} | {shape} | {page_info}"
+                        count_text = ""
+                        if self.focus == 0 and getattr(self.df_editor, "pending_count", None):
+                            count_val = self.df_editor.pending_count
+                            count_text = f" | Count: {count_val}"
+                        text = f" {mode} | {fname} | {shape} | {page_info}{count_text}"
 
                     try:
                         sw.addnstr(0, 0, text.ljust(w), w)
