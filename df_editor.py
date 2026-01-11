@@ -442,6 +442,24 @@ class DfEditor:
                     return
 
                 if state == "d":
+                    if ch == ord("r"):
+                        if total_rows == 0:
+                            self._set_status("No rows", 3)
+                            return
+                        row_idx = self.grid.curr_row
+                        self.state.df = (
+                            self.state.df.drop(self.state.df.index[row_idx]).reset_index(drop=True)
+                        )
+                        self.grid.df = self.state.df
+                        total_rows = len(self.state.df)
+                        self.grid.curr_row = min(row_idx, max(0, total_rows - 1))
+                        self.paginator.update_total_rows(total_rows)
+                        if total_rows:
+                            self.paginator.ensure_row_visible(self.grid.curr_row)
+                        self.grid.highlight_mode = "cell"
+                        self._show_leader_status(",dr")
+                        self._set_status("Deleted row", 2)
+                        return
                     if ch == ord("c"):
                         self._show_leader_status(",dc")
                         self._delete_current_column()

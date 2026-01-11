@@ -36,6 +36,7 @@ class ShortcutHelpHandler:
             "  x - clear current cell",
             "  , i r a - insert row above",
             "  , i r b - insert row below",
+            "  , d r - delete row",
             "  , i c a - insert column after (prompt name + dtype)",
             "  , i c b - insert column before (prompt name + dtype)",
             "  , d c - delete column",
