@@ -36,7 +36,7 @@ class CompletionHandler:
         self.COMPLETIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     def _write_bash_completion_script(self) -> None:
-        script = """# Vixl bash completion
+        script = """# Vixl bash completion (HIDE_DOTFILES HIDE_PYCACHE)
 if [[ -z "${VIXL_BASH_COMPLETION_ACTIVE:-}" ]]; then
     export VIXL_BASH_COMPLETION_ACTIVE=1
 fi
@@ -44,6 +44,8 @@ fi
 _vixl_files() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local cmd="${COMP_WORDS[0]##*/}"
+    local hide_dotfiles=1
+    [[ "$cur" == .* ]] && hide_dotfiles=0
 
     if [[ "$cmd" == "python" || "$cmd" == "python3" ]]; then
         [[ ${#COMP_WORDS[@]} -ge 2 && "${COMP_WORDS[1]}" == "main.py" ]] || return 0
@@ -56,12 +58,19 @@ _vixl_files() {
 
     COMPREPLY=()
     while IFS= read -r f; do
-        COMPREPLY+=("$f")
-    done < <(compgen -f -- "$cur" | while read -r f; do
-        if [[ -d "$f" || "$f" == *.csv || "$f" == *.parquet ]]; then
-            printf '%s\n' "$f"
+        local f_base="${f##*/}"
+        # Skip dotfiles/dirs unless the user typed a leading '.'
+        if (( hide_dotfiles )) && [[ "$f_base" == .* ]]; then
+            continue
         fi
-    done)
+        # Skip __pycache__ unless explicitly typed
+        if [[ "$f_base" == "__pycache__" && "$cur" != __pycache__* ]]; then
+            continue
+        fi
+        if [[ -d "$f" || "$f" == *.csv || "$f" == *.parquet ]]; then
+            COMPREPLY+=("$f")
+        fi
+    done < <(compgen -f -- "$cur")
     return 0
 }
 
@@ -80,7 +89,11 @@ complete -o filenames -F _vixl_files vixl
             text = self.BASH_COMPLETION_FILE.read_text()
         except OSError:
             return True
-        return "complete -o filenames -F _vixl_files vixl" not in text
+        return (
+            "complete -o filenames -F _vixl_files vixl" not in text
+            or "HIDE_DOTFILES" not in text
+            or "HIDE_PYCACHE" not in text
+        )
 
     def _rc_path(self) -> Path:
         bashrc = Path.home() / ".bashrc"

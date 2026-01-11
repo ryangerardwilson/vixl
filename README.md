@@ -31,7 +31,7 @@ python main.py <csv-or-parquet-file>
   ```
 - Then reload your shell (or run `source ~/.bashrc`).
 - Until the completion is active (the sourcing block is present and loaded in your current shell), Vixl will refuse to launch and will print the required steps.
-- Behavior: after activation, `python main.py <TAB>` and `vixl <TAB>` suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths.
+- Behavior: after activation, `python main.py <TAB>` and `vixl <TAB>` suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths. Dotfiles and dot-directories are hidden unless you start the path with a leading `.`; `__pycache__/` is also hidden unless you explicitly type that prefix.
 - For a friendly command name, create a symlink in a PATH directory (and make `main.py` executable if needed), e.g.: `ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"` (or set an alias `alias vixl='python /path/to/main.py'`). Completion covers the `vixl` command once the bashrc block is sourced.
 
 ---
