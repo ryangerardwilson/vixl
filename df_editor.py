@@ -23,6 +23,9 @@ class DfEditor:
         self.cell_leader_state = None  # None | 'leader' | 'c'
         self.df_leader_state = None  # None | 'leader'
 
+        # Numeric prefix (Vim-style counts)
+        self.pending_count: int | None = None
+
     # ---------- helpers ----------
     def _coerce_cell_value(self, col, text):
         dtype = self.state.df[col].dtype
@@ -124,6 +127,23 @@ class DfEditor:
                 return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
 
+    # ---------- counts ----------
+    def _reset_count(self):
+        self.pending_count = None
+
+    def _push_count_digit(self, digit: int):
+        if digit < 0 or digit > 9:
+            return
+        if self.pending_count is None:
+            self.pending_count = digit
+        else:
+            self.pending_count = min(9999, self.pending_count * 10 + digit)
+
+    def _consume_count(self, default: int = 1) -> int:
+        count = self.pending_count if self.pending_count is not None else default
+        self.pending_count = None
+        return max(1, count)
+
     def _enter_cell_insert_at_end(self, col, base):
         self.cell_col = col
         self.cell_buffer = base
@@ -156,17 +176,18 @@ class DfEditor:
         else:
             self.column_prompt.start_insert_before(self.grid.curr_col)
 
-    def _insert_row(self, above: bool):
+    def _insert_rows(self, above: bool, count: int = 1):
         if len(self.state.df.columns) == 0:
             self._set_status("No columns", 3)
             return
-        row = self.state.build_default_row()
+        count = max(1, count)
         insert_at = self.grid.curr_row if above else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
-        new_row = pd.DataFrame([row], columns=self.state.df.columns)
+        row = self.state.build_default_row()
+        new_rows = pd.DataFrame([row] * count, columns=self.state.df.columns)
         self.state.df = pd.concat(
             [
                 self.state.df.iloc[:insert_at],
-                new_row,
+                new_rows,
                 self.state.df.iloc[insert_at:],
             ],
             ignore_index=True,
@@ -176,7 +197,13 @@ class DfEditor:
         self.paginator.ensure_row_visible(insert_at)
         self.grid.curr_row = insert_at
         self.grid.highlight_mode = "cell"
-        self._set_status(f"Inserted row {'above' if above else 'below'}", 2)
+        self._set_status(
+            f"Inserted {count} row{'s' if count != 1 else ''} {'above' if above else 'below'}",
+            2,
+        )
+
+    def _insert_row(self, above: bool):
+        self._insert_rows(above=above, count=1)
 
     def _start_rename_column(self):
         if self.column_prompt is None:
@@ -186,6 +213,24 @@ class DfEditor:
             self._set_status("No columns", 3)
             return
         self.column_prompt.start_rename(self.grid.curr_col)
+
+    def _delete_rows(self, count: int = 1):
+        total_rows = len(self.state.df)
+        if total_rows == 0:
+            self._set_status("No rows", 3)
+            return
+        count = max(1, count)
+        start = self.grid.curr_row
+        end = min(total_rows, start + count)
+        self.state.df = self.state.df.drop(self.state.df.index[start:end]).reset_index(drop=True)
+        self.grid.df = self.state.df
+        total_rows = len(self.state.df)
+        self.grid.curr_row = min(start, max(0, total_rows - 1))
+        self.paginator.update_total_rows(total_rows)
+        if total_rows:
+            self.paginator.ensure_row_visible(self.grid.curr_row)
+        self.grid.highlight_mode = "cell"
+        self._set_status(f"Deleted {end - start} row{'s' if end - start != 1 else ''}", 2)
 
     def _delete_current_column(self):
         cols = list(self.state.df.columns)
@@ -225,6 +270,7 @@ class DfEditor:
                 self.cell_cursor = 0
                 self.cell_hscroll = 0
                 self.mode = "cell_normal"
+                self._reset_count()
 
                 return
 
@@ -254,17 +300,40 @@ class DfEditor:
 
         # ---------- cell normal ----------
         if self.mode == "cell_normal":
+            # ----- numeric prefixes (counts) in cell_normal -----
+            if ch >= ord("0") and ch <= ord("9"):
+                digit = ch - ord("0")
+                # Leading 0 with no pending count is treated as motion to start-of-line
+                if digit == 0 and self.pending_count is None:
+                    self.cell_cursor = 0
+                    self._autoscroll_cell_normal()
+                    return
+                self._push_count_digit(digit)
+                return
+
             if self.cell_leader_state:
                 state = self.cell_leader_state
                 self.cell_leader_state = None
 
                 if state == "leader":
                     if ch == ord("e"):
-                        if not self.cell_buffer.endswith(" "):
-                            self.cell_buffer += " "
-                        self.cell_cursor = len(self.cell_buffer) - 1
+                        # Emulate `$` then enter insert
+                        self.df_leader_state = None
+                        self.cell_leader_state = None
+                        self.cell_cursor = len(self.cell_buffer)
+                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
+                        self._reset_count()
                         return
+                    if ch == ord("c"):
+                        self.cell_leader_state = "c"
+                        self._show_leader_status(self._leader_seq("c"))
+                        return
+                    self._show_leader_status("")
+                    self._reset_count()
+                    return
+
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
                         return
@@ -283,24 +352,38 @@ class DfEditor:
 
             buf_len = len(self.cell_buffer)
 
+            # Apply counts to motions
+            count = self._consume_count() if self.pending_count is not None else 1
+
             new_cursor = self.cell_cursor
             if ch == ord("h"):
-                new_cursor = max(0, self.cell_cursor - 1)
+                new_cursor = max(0, self.cell_cursor - count)
             elif ch == ord("l"):
-                new_cursor = min(buf_len, self.cell_cursor + 1)
+                new_cursor = min(buf_len, self.cell_cursor + count)
             elif ch == ord("0"):
                 new_cursor = 0
             elif ch == ord("$"):
                 new_cursor = buf_len
             elif ch == ord("w"):
-                new_cursor = self._cell_word_forward()
+                for _ in range(count):
+                    new_cursor = self._cell_word_forward()
+                    self.cell_cursor = new_cursor
+                # _cell_word_forward already advances from current cursor; reset after loop
+                new_cursor = self.cell_cursor
             elif ch == ord("b"):
-                new_cursor = self._cell_word_backward()
+                for _ in range(count):
+                    new_cursor = self._cell_word_backward()
+                    self.cell_cursor = new_cursor
+                new_cursor = self.cell_cursor
 
             if new_cursor != self.cell_cursor:
                 self.cell_cursor = new_cursor
                 self._autoscroll_cell_normal()
+                self._reset_count()
                 return
+
+            # If command executed without movement, reset any pending count
+            self._reset_count()
 
             if ch == ord("i"):
                 self.mode = "cell_insert"
@@ -319,12 +402,18 @@ class DfEditor:
             total_rows = len(self.state.df)
             total_cols = len(self.state.df.columns)
 
+            # Handle numeric prefixes in df mode
+            if ch >= ord("0") and ch <= ord("9"):
+                self._push_count_digit(ch - ord("0"))
+                return
+
             # Allow leader commands even when rows are zero as long as columns exist.
             if total_cols == 0:
                 self.grid.curr_row = 0
                 self.grid.curr_col = 0
                 self.grid.row_offset = 0
                 self.grid.col_offset = 0
+                self._reset_count()
                 return
 
             if total_rows == 0:
@@ -361,6 +450,7 @@ class DfEditor:
                 self.cell_hscroll = 0
                 self.mode = "cell_normal"
                 self._autoscroll_cell_normal()
+                self._reset_count()
                 return
 
             if self.df_leader_state:
@@ -379,39 +469,48 @@ class DfEditor:
                             self._set_status("DF copied", 3)
                         except Exception:
                             self._set_status("Copy failed", 3)
+                        self._reset_count()
                         return
 
                     if ch == ord("j"):
                         if total_rows == 0:
+                            self._reset_count()
                             return
                         target = total_rows - 1
                         self.paginator.ensure_row_visible(target)
                         self.grid.row_offset = 0
                         self.grid.curr_row = target
                         self.grid.highlight_mode = "cell"
+                        self._reset_count()
                         return
 
                     if ch == ord("k"):
                         if total_rows == 0:
+                            self._reset_count()
                             return
                         self.paginator.ensure_row_visible(0)
                         self.grid.row_offset = 0
                         self.grid.curr_row = 0
                         self.grid.highlight_mode = "cell"
+                        self._reset_count()
                         return
 
                     if ch == ord("h"):
                         if total_cols == 0:
+                            self._reset_count()
                             return
                         self.grid.curr_col = 0
                         self.grid.adjust_col_viewport()
+                        self._reset_count()
                         return
 
                     if ch == ord("l"):
                         if total_cols == 0:
+                            self._reset_count()
                             return
                         self.grid.curr_col = total_cols - 1
                         self.grid.adjust_col_viewport()
+                        self._reset_count()
                         return
 
                     if ch == ord("e"):
@@ -470,40 +569,37 @@ class DfEditor:
 
                 if state == "ir":
                     if ch == ord("a"):
+                        count = self._consume_count()
                         self._show_leader_status(",ira")
-                        self._insert_row(above=True)
+                        self._insert_rows(above=True, count=count)
                         return
                     if ch == ord("b"):
+                        count = self._consume_count()
                         self._show_leader_status(",irb")
-                        self._insert_row(above=False)
+                        self._insert_rows(above=False, count=count)
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "d":
                     if ch == ord("r"):
                         if total_rows == 0:
                             self._set_status("No rows", 3)
+                            self._reset_count()
                             return
                         row_idx = self.grid.curr_row
-                        self.state.df = (
-                            self.state.df.drop(self.state.df.index[row_idx]).reset_index(drop=True)
-                        )
-                        self.grid.df = self.state.df
-                        total_rows = len(self.state.df)
-                        self.grid.curr_row = min(row_idx, max(0, total_rows - 1))
-                        self.paginator.update_total_rows(total_rows)
-                        if total_rows:
-                            self.paginator.ensure_row_visible(self.grid.curr_row)
-                        self.grid.highlight_mode = "cell"
+                        count = self._consume_count()
+                        self._delete_rows(count)
                         self._show_leader_status(",dr")
-                        self._set_status("Deleted row", 2)
                         return
                     if ch == ord("c"):
                         self._show_leader_status(",dc")
                         self._delete_current_column()
+                        self._reset_count()
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "r":
@@ -532,10 +628,12 @@ class DfEditor:
 
                 if state == "plus_r":
                     if ch == ord("l"):
+                        count = self._consume_count()
                         self._show_leader_status(",+rl")
-                        self._adjust_row_lines(1)
+                        self._adjust_row_lines(count)
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "minus":
@@ -544,34 +642,42 @@ class DfEditor:
                         self._show_leader_status(self._leader_seq("minus_r"))
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "minus_r":
                     if ch == ord("l"):
+                        count = self._consume_count()
                         self._show_leader_status(",-rl")
-                        self._adjust_row_lines(-1)
+                        self._adjust_row_lines(-count)
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "ic":
                     if ch == ord("a"):
                         self._show_leader_status(",ica")
                         self._start_insert_column(after=True)
+                        self._reset_count()
                         return
                     if ch == ord("b"):
                         self._show_leader_status(",icb")
                         self._start_insert_column(after=False)
+                        self._reset_count()
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                 if state == "d":
                     if ch == ord("c"):
                         self._show_leader_status(",dc")
                         self._delete_current_column()
+                        self._reset_count()
                         return
                     self._show_leader_status("")
+                    self._reset_count()
                     return
 
                     if ch == ord("b"):
@@ -649,6 +755,7 @@ class DfEditor:
             if ch == ord(","):
                 self.df_leader_state = "leader"
                 self.cell_leader_state = None
+                # preserve pending_count for leader chains
                 self._show_leader_status(self._leader_seq("leader"))
                 return
 
@@ -671,12 +778,16 @@ class DfEditor:
                     self.cell_buffer += " "
                 self.cell_cursor = len(self.cell_buffer) - 1
                 self.mode = "cell_insert"
+                self._reset_count()
                 return
+
+            count = self._consume_count() if self.pending_count is not None else 1
 
             # Big jumps
             if ch == 10:  # Ctrl+J - down
                 if total_rows > 0:
-                    target = min(total_rows - 1, self.grid.curr_row + jump_rows)
+                    step = max(1, jump_rows * count)
+                    target = min(total_rows - 1, self.grid.curr_row + step)
                     self.paginator.ensure_row_visible(target)
                     self.grid.row_offset = 0
                     self.grid.curr_row = target
@@ -684,7 +795,8 @@ class DfEditor:
 
             if ch == 11:  # Ctrl+K - up
                 if total_rows > 0:
-                    target = max(0, self.grid.curr_row - jump_rows)
+                    step = max(1, jump_rows * count)
+                    target = max(0, self.grid.curr_row - step)
                     self.paginator.ensure_row_visible(target)
                     self.grid.row_offset = 0
                     self.grid.curr_row = target
@@ -692,44 +804,40 @@ class DfEditor:
 
             if ch == 8:  # Ctrl+H - left jump
                 if total_cols > 0:
-                    target = max(0, self.grid.curr_col - jump_cols)
+                    step = max(1, jump_cols * count)
+                    target = max(0, self.grid.curr_col - step)
                     self.grid.curr_col = target
                     self.grid.adjust_col_viewport()
                 return
 
             if ch == 12:  # Ctrl+L - right jump
                 if total_cols > 0:
-                    target = min(total_cols - 1, self.grid.curr_col + jump_cols)
+                    step = max(1, jump_cols * count)
+                    target = min(total_cols - 1, self.grid.curr_col + step)
                     self.grid.curr_col = target
                     self.grid.adjust_col_viewport()
                 return
 
             # Normal vim movement
             if ch == ord("h"):
-                self.grid.move_left()
+                target = max(0, self.grid.curr_col - count)
+                self.grid.curr_col = target
+                self.grid.adjust_col_viewport()
             elif ch == ord("l"):
-                self.grid.move_right()
+                target = min(total_cols - 1, self.grid.curr_col + count)
+                self.grid.curr_col = target
+                self.grid.adjust_col_viewport()
             elif ch == ord("j"):
-                if self.grid.curr_row + 1 >= self.paginator.page_end:
-                    if self.paginator.page_end < self.paginator.total_rows:
-                        self.paginator.next_page()
-                        self.grid.row_offset = 0
-                        self.grid.curr_row = self.paginator.page_start
-                    else:
-                        self.grid.curr_row = max(0, self.paginator.total_rows - 1)
-                else:
-                    self.grid.move_down()
+                if total_rows > 0:
+                    target = min(total_rows - 1, self.grid.curr_row + count)
+                    self.paginator.ensure_row_visible(target)
+                    self.grid.row_offset = 0
+                    self.grid.curr_row = target
             elif ch == ord("k"):
-                if self.grid.curr_row - 1 < self.paginator.page_start:
-                    if self.paginator.page_index > 0:
-                        self.paginator.prev_page()
-                        self.grid.row_offset = 0
-                        self.grid.curr_row = max(
-                            self.paginator.page_start, self.paginator.page_end - 1
-                        )
-                    else:
-                        self.grid.curr_row = 0
-                else:
-                    self.grid.move_up()
+                if total_rows > 0:
+                    target = max(0, self.grid.curr_row - count)
+                    self.paginator.ensure_row_visible(target)
+                    self.grid.row_offset = 0
+                    self.grid.curr_row = target
 
             return
