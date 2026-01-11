@@ -26,6 +26,9 @@ class DfEditor:
         # Numeric prefix (Vim-style counts)
         self.pending_count: int | None = None
 
+        # Undo/redo (managed on AppState stacks)
+        # undo_stack / redo_stack live on state; depth capped by state.undo_max_depth
+
     # ---------- helpers ----------
     def _coerce_cell_value(self, col, text):
         dtype = self.state.df[col].dtype
@@ -144,6 +147,80 @@ class DfEditor:
         self.pending_count = None
         return max(1, count)
 
+    # ---------- undo/redo ----------
+    def _snapshot_state(self):
+        return {
+            "df": self.state.df.copy(deep=True),
+            "curr_row": self.grid.curr_row,
+            "curr_col": self.grid.curr_col,
+            "row_offset": self.grid.row_offset,
+            "col_offset": self.grid.col_offset,
+            "highlight_mode": self.grid.highlight_mode,
+        }
+
+    def _restore_state(self, snap):
+        self.state.df = snap["df"]
+        self.grid.df = self.state.df
+        self.grid.highlight_mode = snap.get("highlight_mode", "cell")
+        self.paginator.update_total_rows(len(self.state.df))
+        self.grid.curr_row = min(max(0, snap.get("curr_row", 0)), max(0, len(self.state.df) - 1))
+        self.grid.curr_col = min(
+            max(0, snap.get("curr_col", 0)),
+            max(0, len(self.state.df.columns) - 1),
+        )
+        self.grid.row_offset = max(0, snap.get("row_offset", 0))
+        self.grid.col_offset = max(0, snap.get("col_offset", 0))
+        self.paginator.ensure_row_visible(self.grid.curr_row)
+        self.grid.highlight_mode = "cell"
+        self.mode = "normal"
+        self.cell_buffer = ""
+        self.cell_cursor = 0
+        self.cell_hscroll = 0
+        self.pending_count = None
+
+    def _push_undo(self):
+        if not hasattr(self.state, "undo_stack"):
+            return
+        snap = self._snapshot_state()
+        self.state.undo_stack.append(snap)
+        if len(self.state.undo_stack) > getattr(self.state, "undo_max_depth", 50):
+            self.state.undo_stack.pop(0)
+        if hasattr(self.state, "redo_stack"):
+            self.state.redo_stack.clear()
+
+    def _push_redo(self):
+        if hasattr(self.state, "redo_stack"):
+            self.state.redo_stack.append(self._snapshot_state())
+
+    def undo(self):
+        if not getattr(self.state, "undo_stack", None):
+            self._set_status("Nothing to undo", 2)
+            self._reset_count()
+            return
+        current = self._snapshot_state()
+        self._push_redo()
+        snap = self.state.undo_stack.pop()
+        self._restore_state(snap)
+        remaining = len(self.state.undo_stack)
+        self._set_status(f"Undone ({remaining} more)" if remaining else "Undone", 2)
+        self.pending_count = None
+
+    def redo(self):
+        if not getattr(self.state, "redo_stack", None):
+            self._set_status("Nothing to redo", 2)
+            self._reset_count()
+            return
+        current = self._snapshot_state()
+        if hasattr(self.state, "undo_stack"):
+            self.state.undo_stack.append(current)
+            if len(self.state.undo_stack) > getattr(self.state, "undo_max_depth", 50):
+                self.state.undo_stack.pop(0)
+        snap = self.state.redo_stack.pop()
+        self._restore_state(snap)
+        remaining = len(self.state.redo_stack)
+        self._set_status(f"Redone ({remaining} more)" if remaining else "Redone", 2)
+        self.pending_count = None
+
     def _enter_cell_insert_at_end(self, col, base):
         self.cell_col = col
         self.cell_buffer = base
@@ -181,6 +258,7 @@ class DfEditor:
             self._set_status("No columns", 3)
             return
         count = max(1, count)
+        self._push_undo()
         insert_at = self.grid.curr_row if above else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
         row = self.state.build_default_row()
         new_rows = pd.DataFrame([row] * count, columns=self.state.df.columns)
@@ -220,6 +298,7 @@ class DfEditor:
             self._set_status("No rows", 3)
             return
         count = max(1, count)
+        self._push_undo()
         start = self.grid.curr_row
         end = min(total_rows, start + count)
         self.state.df = self.state.df.drop(self.state.df.index[start:end]).reset_index(drop=True)
@@ -237,6 +316,7 @@ class DfEditor:
         if not cols:
             self._set_status("No columns", 3)
             return
+        self._push_undo()
         col_idx = self.grid.curr_col
         col_name = cols[col_idx]
         self.state.df.drop(columns=[col_name], inplace=True)
@@ -261,6 +341,7 @@ class DfEditor:
                 r, c = self.grid.curr_row, self.grid.curr_col
                 col = self.cell_col
                 try:
+                    self._push_undo()
                     val = self._coerce_cell_value(col, self.cell_buffer)
                     self.state.df.iloc[r, c] = val
                 except Exception:
@@ -456,6 +537,7 @@ class DfEditor:
             if self.df_leader_state:
                 state = self.df_leader_state
                 self.df_leader_state = None
+                # leader chains should not clear count until a command executes
 
                 if state == "leader":
                     if ch == ord("y"):
@@ -732,6 +814,7 @@ class DfEditor:
                         cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
                         self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
+                        self._reset_count()
                         return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
@@ -762,6 +845,28 @@ class DfEditor:
             if ch == ord("x"):
                 if total_rows == 0 or total_cols == 0:
                     return
+                self._push_undo()
+                r, c = self.grid.curr_row, self.grid.curr_col
+                col_name = self.state.df.columns[c]
+                try:
+                    self.state.df.iloc[r, c] = self._coerce_cell_value(col_name, "")
+                except Exception:
+                    self.state.df.iloc[r, c] = ""
+                self._set_status("Cell cleared", 2)
+                self._reset_count()
+                return
+
+            if ch == ord("i"):
+                self.cell_col = col
+                self.cell_buffer = base
+                if not self.cell_buffer.endswith(" "):
+                    self.cell_buffer += " "
+                self.cell_cursor = len(self.cell_buffer) - 1
+                self.mode = "cell_insert"
+                self._reset_count()
+                return
+
+                self._push_undo()
                 r, c = self.grid.curr_row, self.grid.curr_col
                 col_name = self.state.df.columns[c]
                 try:
@@ -782,6 +887,14 @@ class DfEditor:
                 return
 
             count = self._consume_count() if self.pending_count is not None else 1
+
+            # Undo / Redo (ignore counts)
+            if ch == ord("u"):
+                self.undo()
+                return
+            if ch == ord("r"):
+                self.redo()
+                return
 
             # Big jumps
             if ch == 10:  # Ctrl+J - down

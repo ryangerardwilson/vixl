@@ -83,6 +83,7 @@ python main.py <csv-or-parquet-file>
 
 ### DF navigation & editing (df normal)
 - Numeric prefixes (counts) supported for: h/j/k/l, Ctrl+J/K/H/L, ,ira / ,irb, ,dr, ,+rl / ,-rl; in cell_normal: h/l and w/b
+- Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)

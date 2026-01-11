@@ -44,6 +44,8 @@ class ShortcutHelpHandler:
             "  , r n c - rename column",
             "  ,+rl - increase row lines",
             "  ,-rl - decrease row lines",
+            "  u - undo",
+            "  r - redo",
             "  , h - go to first column",
             "  , l - go to last column",
             "  , j - go to last row",

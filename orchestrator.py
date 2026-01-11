@@ -174,6 +174,10 @@ class Orchestrator:
             self._set_status("No command to execute", 3)
             return
 
+        # Snapshot for undo before executing (clears redo on mutation via _push_undo)
+        if hasattr(self, "df_editor"):
+            self.df_editor._push_undo()
+
         lines = self.exec.execute(code)
         if lines:
             self.overlay.open(lines)
