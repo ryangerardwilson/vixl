@@ -69,17 +69,23 @@ class DfEditor:
         )
         self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
 
-    def _autoscroll_cell_normal(self):
-        cw = self.grid.get_col_width(self.grid.curr_col)
+    def _autoscroll_cell_normal(self, prefer_left: bool = False, margin: int = 2):
+        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+        lines = max(1, getattr(self.state, "row_lines", 1))
+        span = max(1, cw * lines)
         buf_len = len(self.cell_buffer)
+
+        max_scroll = max(0, buf_len - span)
 
         if self.cell_cursor < self.cell_hscroll:
             self.cell_hscroll = self.cell_cursor
-        elif self.cell_cursor >= self.cell_hscroll + cw:
-            self.cell_hscroll = self.cell_cursor - cw + 1
+        elif self.cell_cursor >= self.cell_hscroll + span:
+            if prefer_left:
+                self.cell_hscroll = max(0, self.cell_cursor - max(0, margin))
+            else:
+                self.cell_hscroll = self.cell_cursor - span + 1
 
-        max_scroll = max(0, buf_len - cw + 1) if buf_len >= cw else 0
-        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+        self.cell_hscroll = min(max(self.cell_hscroll, 0), max_scroll)
 
     def _is_word_char(self, ch: str) -> bool:
         return ch.isalnum() or ch == "_"
@@ -518,30 +524,45 @@ class DfEditor:
             # Apply counts to motions
             count = self._consume_count() if self.pending_count is not None else 1
 
-            new_cursor = self.cell_cursor
+            old_cursor = self.cell_cursor
+            new_cursor = old_cursor
+
             if ch == ord("h"):
-                new_cursor = max(0, self.cell_cursor - count)
+                new_cursor = max(0, old_cursor - count)
             elif ch == ord("l"):
-                new_cursor = min(buf_len, self.cell_cursor + count)
+                new_cursor = min(buf_len, old_cursor + count)
             elif ch == ord("0"):
                 new_cursor = 0
             elif ch == ord("$"):
                 new_cursor = buf_len
             elif ch == ord("w"):
+                new_cursor = old_cursor
+                buf = self.cell_buffer
                 for _ in range(count):
-                    new_cursor = self._cell_word_forward()
+                    if new_cursor >= buf_len:
+                        break
                     self.cell_cursor = new_cursor
-                # _cell_word_forward already advances from current cursor; reset after loop
-                new_cursor = self.cell_cursor
+                    next_cursor = self._cell_word_forward()
+                    # If we're inside the last word, don't jump to end-of-buffer.
+                    if (
+                        next_cursor >= buf_len
+                        and new_cursor < buf_len
+                        and buf
+                        and self._is_word_char(buf[new_cursor])
+                    ):
+                        break
+                    if next_cursor == new_cursor:
+                        break
+                    new_cursor = next_cursor
             elif ch == ord("b"):
+                new_cursor = old_cursor
                 for _ in range(count):
-                    new_cursor = self._cell_word_backward()
                     self.cell_cursor = new_cursor
-                new_cursor = self.cell_cursor
+                    new_cursor = self._cell_word_backward()
 
-            if new_cursor != self.cell_cursor:
+            if new_cursor != old_cursor:
                 self.cell_cursor = new_cursor
-                self._autoscroll_cell_normal()
+                self._autoscroll_cell_normal(prefer_left=(ch in (ord("w"), ord("b"))))
                 self._reset_count()
                 return
 
