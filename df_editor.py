@@ -347,7 +347,7 @@ class DfEditor:
             if ch == ord("n") and not self.df_leader_state:
                 self.cell_col = col
                 self.cell_buffer = base
-                self.cell_cursor = len(self.cell_buffer)
+                self.cell_cursor = 0
                 self.cell_hscroll = 0
                 self.mode = "cell_normal"
                 self._autoscroll_cell_normal()
@@ -621,9 +621,10 @@ class DfEditor:
                         if not self.cell_buffer.endswith(" "):
                             self.cell_buffer += " "
                         self.cell_cursor = len(self.cell_buffer)
-                        self.cell_hscroll = 0
+                        # Force-scroll to the tail so the end is visible even when
+                        # the rendered column width is narrower than get_col_width().
+                        self.cell_hscroll = max(0, len(self.cell_buffer) - 1)
                         self.mode = "cell_insert"
-                        self._autoscroll_insert()
                         return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
