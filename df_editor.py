@@ -106,6 +106,10 @@ class DfEditor:
             "r": ",r",
             "rn": ",rn",
             "c": ",c",
+            "plus": ",+",
+            "plus_r": ",+r",
+            "minus": ",-",
+            "minus_r": ",-r",
         }
 
         return mapping.get(state, ",")
@@ -119,6 +123,16 @@ class DfEditor:
             if getattr(cp, "active", False):
                 return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
+
+    def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
+        new_value = max(minimum, min(maximum, self.state.row_lines + delta))
+        if new_value == self.state.row_lines:
+            bound = "minimum" if delta < 0 else "maximum"
+            self._set_status(f"Row lines {bound} reached ({new_value})", 2)
+            return
+        self.state.row_lines = new_value
+        self.grid.row_offset = 0
+        self._set_status(f"Row lines set to {self.state.row_lines}", 2)
 
     def _start_insert_column(self, after: bool):
         if self.column_prompt is None:
@@ -405,6 +419,16 @@ class DfEditor:
                         self._show_leader_status(self._leader_seq("r"))
                         return
 
+                    if ch == ord("+"):
+                        self.df_leader_state = "plus"
+                        self._show_leader_status(self._leader_seq("plus"))
+                        return
+
+                    if ch == ord("-"):
+                        self.df_leader_state = "minus"
+                        self._show_leader_status(self._leader_seq("minus"))
+                        return
+
                 if state == "i":
                     if ch == ord("c"):
                         self.df_leader_state = "ic"
@@ -483,9 +507,34 @@ class DfEditor:
                     self._show_leader_status("")
                     return
 
+                if state == "plus":
                     if ch == ord("r"):
-                        self.df_leader_state = "ir"
-                        self._show_leader_status(self._leader_seq("ir"))
+                        self.df_leader_state = "plus_r"
+                        self._show_leader_status(self._leader_seq("plus_r"))
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "plus_r":
+                    if ch == ord("l"):
+                        self._show_leader_status(",+rl")
+                        self._adjust_row_lines(1)
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "minus":
+                    if ch == ord("r"):
+                        self.df_leader_state = "minus_r"
+                        self._show_leader_status(self._leader_seq("minus_r"))
+                        return
+                    self._show_leader_status("")
+                    return
+
+                if state == "minus_r":
+                    if ch == ord("l"):
+                        self._show_leader_status(",-rl")
+                        self._adjust_row_lines(-1)
                         return
                     self._show_leader_status("")
                     return

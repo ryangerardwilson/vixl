@@ -128,9 +128,11 @@ class GridPane:
         edit_hscroll=0,
         page_start=0,
         page_end=None,
+        row_lines=1,
     ):
         win.erase()
         h, w = win.getmaxyx()
+        row_block_height = max(1, row_lines)
 
         if page_end is None:
             page_end = len(self.df)
@@ -148,7 +150,7 @@ class GridPane:
 
         row_w = max(3, len(str(max(page_end - 1, 0))) + 1)
 
-        max_rows = h - 3
+        max_rows = max(1, (h - 3) // row_block_height)
         avail_w = w - (row_w + 1)
 
         max_cols = 0
@@ -160,10 +162,10 @@ class GridPane:
             max_cols += 1
         max_cols = max(1, max_cols)
 
-        # ────────────────────────────────────────────────────────────────
+        # -----------------------------------------------------------------------
         # Safety net - prevent negative or invalid offset on every draw
         # This protects against all kinds of jumps (Ctrl+H/L, ,h, ,l)
-        # ────────────────────────────────────────────────────────────────
+        # -----------------------------------------------------------------------
         self.col_offset = max(0, self.col_offset)
         self.col_offset = min(self.col_offset, len(self.df.columns) - max_cols)
 
@@ -201,6 +203,26 @@ class GridPane:
             self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols)
         )
 
+        def _wrap_cell(text: str, width: int, max_lines: int):
+            if width <= 0:
+                return [""] * max_lines
+            lines: list[str] = []
+            parts = text.split("\n") if text else [""]
+            for part in parts:
+                if part == "":
+                    lines.append("")
+                else:
+                    for i in range(0, len(part), width):
+                        lines.append(part[i : i + width])
+                if len(lines) >= max_lines:
+                    break
+            if not lines:
+                lines.append("")
+            lines = lines[:max_lines]
+            while len(lines) < max_lines:
+                lines.append("")
+            return lines
+
         # header
         x = row_w + 1
         for c in visible_cols:
@@ -210,25 +232,25 @@ class GridPane:
             x += cw + 1
 
         # rows
-        y = 2
-        for r in visible_rows:
-            win.addnstr(y, 0, str(r).rjust(row_w), row_w)
+        base_y = 2
+        for idx, r in enumerate(visible_rows):
+            row_y = base_y + idx * row_block_height
+            if row_y >= h - 1:
+                break
+            win.addnstr(row_y, 0, str(r).rjust(row_w), row_w)
             x = row_w + 1
             for c in visible_cols:
                 cw = widths[c]
 
-                if editing and r == edit_row and c == edit_col:
+                is_edit_target = editing and r == edit_row and c == edit_col
+                if is_edit_target:
                     text = edit_buffer or ""
                 else:
                     val = self.df.iloc[r, c]
                     text = "" if (val is None or pd.isna(val)) else str(val)
 
-                if editing and r == edit_row and c == edit_col:
-                    visible = text[edit_hscroll : edit_hscroll + cw]
-                else:
-                    visible = text[:cw]
-
-                cell = visible.rjust(cw)
+                start = edit_hscroll if is_edit_target else 0
+                wrapped_lines = _wrap_cell(text[start:], cw, row_block_height)
 
                 attr = 0
                 if not editing:
@@ -244,35 +266,40 @@ class GridPane:
                     if active_cell:
                         attr = curses.color_pair(self.PAIR_CELL_ACTIVE_TEXT)
 
-                win.addnstr(y, x, cell, cw, attr)
+                cursor_line = None
+                cursor_col = None
+                if is_edit_target and edit_cursor is not None:
+                    relative_pos = max(0, edit_cursor - start)
+                    cursor_line = min(row_block_height - 1, relative_pos // cw)
+                    cursor_col = relative_pos % cw
 
-                # Cursor rendering
-                if (
-                    editing
-                    and r == edit_row
-                    and c == edit_col
-                    and edit_cursor is not None
-                ):
-                    visible_len = len(visible)
-                    text_start_x = x + (cw - visible_len)
+                for line_idx, line_text in enumerate(wrapped_lines):
+                    line_y = row_y + line_idx
+                    if line_y >= h - 1:
+                        break
+                    visible_len = len(line_text)
+                    cell = line_text.rjust(cw)
+                    win.addnstr(line_y, x, cell, cw, attr)
 
-                    relative_pos = edit_cursor - edit_hscroll
-                    pos = max(0, min(relative_pos, visible_len))
-                    cx = text_start_x + pos
-                    cx = max(x, min(x + cw - 1, cx))
-
-                    if insert_mode:
-                        win.addnstr(y, cx, " ", 1, curses.A_REVERSE)
-                    else:
-                        if pos < visible_len:
-                            ch = visible[pos]
-                            win.addch(y, cx, ch, curses.A_REVERSE)
+                    if (
+                        is_edit_target
+                        and cursor_line is not None
+                        and cursor_col is not None
+                        and line_idx == cursor_line
+                    ):
+                        text_start_x = x + (cw - visible_len)
+                        pos = min(cursor_col, visible_len)
+                        cx = text_start_x + pos
+                        cx = max(x, min(x + cw - 1, cx))
+                        if insert_mode:
+                            win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
                         else:
-                            win.addnstr(y, cx, " ", 1, curses.A_REVERSE)
-
+                            if pos < visible_len and visible_len > 0:
+                                ch = line_text[pos]
+                                win.addch(line_y, cx, ch, curses.A_REVERSE)
+                            else:
+                                win.addnstr(line_y, cx, " ", 1, curses.A_REVERSE)
                 x += cw + 1
-            y += 1
-            if y >= h - 1:
-                break
 
         win.refresh()
+
