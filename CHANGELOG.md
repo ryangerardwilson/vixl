@@ -1,16 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+- Added external editor workflow on `,v` from both df normal and cell_normal; shows "Receiving new data from editor" while syncing and returns the cursor to the start of the cell on completion.
 - Added bash completion auto-provisioning at `~/.config/vixl/completions/vixl.bash` (covers `python main.py`, `python3 main.py`, and `vixl`); startup now warns (does not block) when completion is not detected, with `VIXL_SKIP_COMPLETION_CHECK=1` to suppress the warning; completion logic lives in `completions_handler.py`, and README documents symlink/alias guidance for `vixl`.
 - Added df-mode column workflows: `n` to enter cell_normal, `,ica`/`,icb` insert columns (prompt name+dtype), `,dc` delete column, `,rnc` rename column; column prompts share the bottom-strip UX.
 - Added no-arg launch with default DataFrame (col_a/col_b/col_c, 3 empty rows) as unsaved buffer.
 - Added Save-As prompt (inline bottom strip) for unsaved buffers; Ctrl+S saves; Ctrl+T saves & exits only on success; validates .csv/.parquet.
-- Single-line command bar; output as modal overlay; shortcuts modal (`?`); overlays auto-size to content up to 50% terminal height.
+- Single-line command bar; output as modal overlay; shortcuts modal (`?`); overlays auto-size to content up to 50% of terminal height.
 - Command history relocated to `~/.config/vixl/history.log`; command bar history navigation via Ctrl+P/Ctrl+N.
 - Extensions: auto-load from `~/.config/vixl/extensions`; bound as df methods; explicit mutation signaling `(df, True)` or `commit_df=True`; natural commands auto-commit unless an extension was invoked. Configurable `AUTO_COMMIT` in `~/.config/vixl/config.py`.
 - DF-normal shortcut `,y` copies the entire DataFrame as TSV to clipboard via `wl-copy` for Sheets/Excel pasting.
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
+
 
 ## 2026-01-09
 

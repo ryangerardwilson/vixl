@@ -89,6 +89,7 @@ python main.py <csv-or-parquet-file>
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
+- External edit current cell: `, v` launches your `$VISUAL`/`$EDITOR` (via Alacritty if available); status shows "Receiving new data from editor" while syncing; returns to cell_normal at the cell start.
 - Clear cell: `x` (in df mode)
 - Insert rows: `, i r a` (insert above), `, i r b` (insert below); Delete row: `, d r`
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
@@ -100,7 +101,7 @@ python main.py <csv-or-parquet-file>
 
 ### Cell edit modes
 - `cell_insert`: type to edit; Backspace deletes; Esc commits to `cell_normal`.
-- `cell_normal`: h / l moves within buffer; 0 / $ jump to line edges; w / b move by word; `, e` / `, c c` / `, d c` / `, n r`; `i` enters insert; Esc returns to df normal.
+- `cell_normal`: h / l moves within buffer; 0 / $ jump to line edges; w / b move by word; `, e` / `, c c` / `, d c` / `, n r`; `, v` opens the external editor for the current cell and returns with the cursor at the start; `i` enters insert; Esc returns to df normal.
 
 ### History
 - Stored at `~/.config/vixl/history.log`.

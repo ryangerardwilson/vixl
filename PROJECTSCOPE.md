@@ -164,7 +164,7 @@ Characteristics:
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
 - Single-line command bar; Enter/Ctrl+E executes; Esc cancels; Ctrl+P/Ctrl+N history.
 - Output modal appears only when there is output; shortcuts modal via `?`; both close with Esc/q/Enter; j/k scroll.
-- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`, `, y` (copy df to clipboard as TSV via wl-copy).
+- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`, `, v` (external edit via `$VISUAL`/`$EDITOR`, syncs back with status), `, y` (copy df to clipboard as TSV via wl-copy).
 - Save-As flow: inline prompt on Ctrl+S/Ctrl+T when unsaved; validates .csv/.parquet; Ctrl+T exits only after successful save.
 - Overlays auto-size to content up to 50% of terminal height, centered.
 
@@ -172,9 +172,9 @@ Characteristics:
 - Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
 - Command bar: : enter; Enter/Ctrl+E execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
 - Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
-- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; , h first col; , l last col; , k first row; , j last row; , y copy df to clipboard (TSV via wl-copy); ? shortcuts.
+- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; , v external edit (opens `$VISUAL`/`$EDITOR`, status shows while syncing); , h first col; , l last col; , k first row; , j last row; , y copy df to clipboard (TSV via wl-copy); ? shortcuts.
 - Cell insert: type; Backspace; Esc commits to cell_normal.
-- Cell normal: h/l move within buffer; , e / , c c / , d c / , n r; i insert; Esc back to df normal.
+- Cell normal: h/l move within buffer; , e / , c c / , d c / , n r; , v external edit (returns cursor to start after sync); i insert; Esc back to df normal.
 
 ### File locations
 - History: `~/.config/vixl/history.log`
