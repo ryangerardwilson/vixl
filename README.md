@@ -47,7 +47,7 @@ python main.py <csv-or-parquet-file>
 ### Vixl – interactive DataFrame editor (curses)
 - Single-line command bar at the bottom.
 - Modal overlays for output and shortcuts (content-sized, up to 50% of terminal height).
-- Extensions loaded from `~/.config/vixl/extensions`, bound as methods on `df`.
+- Extensions loaded from `~/.config/vixl/extensions`, namespaced under `df.vixl` to avoid pandas collisions.
 - Persistent history at `~/.config/vixl/history.log`.
 
 ### Quick start
@@ -110,14 +110,27 @@ python main.py <csv-or-parquet-file>
 
 ### Extensions
 - Location: `~/.config/vixl/extensions/*.py`
-- Loaded at startup; functions are bound as methods on `df`.
+- Loaded at startup; functions are exposed under `df.vixl.<name>` to avoid pandas attribute collisions.
 - Mutation contract:
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`. Without this, changes from extension calls are discarded.
   - Natural commands (no extension calls) auto-commit the sandboxed `df`.
 - Config: `~/.config/vixl/config.py` supports `AUTO_COMMIT = True/False` (default False).
+- Config (optional, JSON): `~/.config/vixl/config.json` supports `cmd_mode.tab_fuzzy_expansions_register` for cmd-mode Tab insertions. Example:
+  ```json
+  {
+    "cmd_mode": {
+      "tab_fuzzy_expansions_register": [
+        "df.vixl.distribution_ascii_bar(bins=10)",
+        "df.pivot()",
+        "df.info()"
+      ]
+    }
+  }
+  ```
 - Examples (save under `~/.config/vixl/extensions/`):
-  1) multiply_cols (explicit commit)
-     ```python
+   1) multiply_cols (explicit commit)
+      ```python
+
      def multiply_cols(df, col_a, col_b, out_col="product"):
          df[out_col] = df[col_a] * df[col_b]
          return df, True
@@ -145,7 +158,7 @@ python main.py <csv-or-parquet-file>
              lines.append("|" + "█" * bar_len)
          return "\n".join(lines)
      ```
-     Usage: `df.ascii_bar("col_a")` → shows a simple bar chart in the output modal.
+     Usage: `df.vixl.ascii_bar("col_a")` → shows a simple bar chart in the output modal.
   5) normalize_cols (explicit commit)
      ```python
      def normalize_cols(df, cols, prefix="norm_"):
@@ -156,9 +169,9 @@ python main.py <csv-or-parquet-file>
          return df, True
      ```
 - Usage examples in cmd:
-  - `df.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
-  - `df.top_n("col_a", 3)` (read-only; output modal)
-  - `df.ascii_bar("col_a")` (bar graph in modal)
+  - `df.vixl.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
+  - `df.vixl.top_n("col_a", 3)` (read-only; output modal)
+  - `df.vixl.ascii_bar("col_a")` (bar graph in modal)
 
 ### Removed / changed features
 - Leader commands (`,ya`, `,yap`, `,yio`, `,o`, `,df`) removed.

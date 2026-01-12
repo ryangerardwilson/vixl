@@ -5,9 +5,11 @@ CONFIG_DIR = os.path.join(HOME, ".config", "vixl")
 HISTORY_PATH = os.path.join(CONFIG_DIR, "history.log")
 EXTENSIONS_DIR = os.path.join(CONFIG_DIR, "extensions")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.py")
+CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings
 AUTO_COMMIT_DEFAULT = False
+TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT = []
 
 
 def ensure_config_dirs():
@@ -24,6 +26,7 @@ def ensure_config_dirs():
 def load_config():
     cfg = {
         "AUTO_COMMIT": AUTO_COMMIT_DEFAULT,
+        "TAB_FUZZY_EXPANSIONS_REGISTER": list(TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT),
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -35,6 +38,26 @@ def load_config():
                 cfg["AUTO_COMMIT"] = bool(ns["AUTO_COMMIT"])
         except Exception:
             pass
+
+    if os.path.exists(CONFIG_JSON):
+        try:
+            import json
+
+            with open(CONFIG_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            cmd_mode = data.get("cmd_mode") if isinstance(data, dict) else None
+            reg = (
+                cmd_mode.get("tab_fuzzy_expansions_register")
+                if isinstance(cmd_mode, dict)
+                else None
+            )
+            if isinstance(reg, list):
+                cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] = [
+                    str(item) for item in reg if isinstance(item, str)
+                ]
+        except Exception:
+            pass
+
     return cfg
 
 

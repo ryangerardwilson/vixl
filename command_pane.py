@@ -11,6 +11,7 @@ class CommandPane:
         self.history = []
         self.history_idx = None  # None means not navigating history
         self.extension_names = []
+        self.custom_expansions = []
         self.ghost_attr = curses.A_DIM
         try:
             curses.start_color()
@@ -53,6 +54,10 @@ class CommandPane:
         self.extension_names = sorted(names or [])
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
+    def set_custom_expansions(self, expansions):
+        self.custom_expansions = [str(item) for item in (expansions or [])]
+        self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
+
     def _apply_history(self):
         if self.history_idx is None:
             return
@@ -70,20 +75,59 @@ class CommandPane:
         if after and (after[0].isalnum() or after[0] == "_"):
             return None
 
-        idx = prefix.rfind("df.")
-        if idx == -1:
+        markers = ["df.vixl.", "df."]
+        chosen = None
+        for marker in markers:
+            idx = prefix.rfind(marker)
+            if idx != -1:
+                if chosen is None or idx > chosen[0] or (
+                    idx == chosen[0] and len(marker) > len(chosen[1])
+                ):
+                    chosen = (idx, marker)
+        if not chosen:
             return None
 
-        token = prefix[idx + 3 :]
+        idx, marker = chosen
+        token = prefix[idx + len(marker) :]
         if len(token) == 0:
             return None
         if not all(ch.isalnum() or ch == "_" for ch in token):
             return None
 
-        return (idx + 3, self.cursor, token)
+        return (idx + len(marker), self.cursor, token, marker)
 
-    def _choose_suggestion(self, token):
-        if not token or not self.extension_names:
+    def _choose_custom_suggestion(self, token, marker):
+        if not token or not self.custom_expansions:
+            return None
+
+        candidates = []
+        for item in self.custom_expansions:
+            if not isinstance(item, str):
+                continue
+            if not item.startswith(marker):
+                continue
+            tail = item[len(marker) :]
+            candidates.append(tail)
+
+        prefix_matches = [c for c in candidates if c.startswith(token)]
+        if prefix_matches:
+            prefix_matches.sort(key=lambda x: (len(x), x))
+            chosen = prefix_matches[0]
+            display = chosen[len(token) :]
+            return chosen, display
+
+        close = difflib.get_close_matches(token, candidates, n=1, cutoff=0.6)
+        if close:
+            chosen = close[0]
+            if chosen.startswith(token):
+                display = chosen[len(token) :]
+            else:
+                display = f" -> {marker}{chosen}"
+            return chosen, display
+        return None
+
+    def _choose_extension_suggestion(self, token, marker):
+        if marker != "df.vixl." or not token or not self.extension_names:
             return None
 
         prefix_matches = [name for name in self.extension_names if name.startswith(token)]
@@ -99,7 +143,7 @@ class CommandPane:
             if chosen.startswith(token):
                 display = chosen[len(token) :]
             else:
-                display = f" -> df.{chosen}"
+                display = f" -> df.vixl.{chosen}"
             return chosen, display
         return None
 
@@ -107,24 +151,35 @@ class CommandPane:
         token_info = self._extract_df_token()
         if not token_info:
             return None
-        start, end, token = token_info
-        suggestion = self._choose_suggestion(token)
+        start, end, token, marker = token_info
+
+        suggestion = self._choose_custom_suggestion(token, marker)
+        if not suggestion:
+            suggestion = self._choose_extension_suggestion(token, marker)
         if not suggestion:
             return None
+
         chosen, display = suggestion
         return {
-            "token": chosen,
+            "replacement": chosen,
             "display": display,
             "start": start,
             "end": end,
+            "marker": marker,
         }
 
     def _apply_suggestion(self, suggestion):
         token_start = suggestion["start"]
         token_end = suggestion["end"]
-        token = suggestion["token"]
-        self.buffer = self.buffer[:token_start] + token + self.buffer[token_end:]
-        self.cursor = token_start + len(token)
+        replacement = suggestion["replacement"]
+        self.buffer = self.buffer[:token_start] + replacement + self.buffer[token_end:]
+
+        paren_idx = replacement.find("(")
+        if paren_idx != -1:
+            self.cursor = token_start + paren_idx + 1
+        else:
+            self.cursor = token_start + len(replacement)
+
         self.hscroll = min(self.hscroll, max(0, self.cursor))
         self.history_idx = None
 

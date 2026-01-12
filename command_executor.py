@@ -9,6 +9,33 @@ import pandas as pd
 from config_paths import EXTENSIONS_DIR, ensure_config_dirs, load_config
 
 
+class VixlExtensions:
+    def __init__(self, df, extensions, ext_flag=None):
+        self._df = df
+        self._extensions = extensions
+        self._ext_flag = ext_flag
+        self._cache = {}
+
+    def __getattr__(self, name):
+        if name not in self._extensions:
+            raise AttributeError(f"No extension named '{name}'")
+        if name in self._cache:
+            return self._cache[name]
+
+        fn = self._extensions[name]
+
+        def _wrapped(*args, **kwargs):
+            if self._ext_flag is not None:
+                self._ext_flag[0] = True
+            return fn(self._df, *args, **kwargs)
+
+        self._cache[name] = _wrapped
+        return _wrapped
+
+    def __dir__(self):
+        return sorted(self._extensions.keys())
+
+
 class CommandExecutor:
     def __init__(self, app_state):
         self.state = app_state
@@ -47,24 +74,10 @@ class CommandExecutor:
         return sorted(self._extensions.keys())
 
     def _bind_extensions(self, df, ext_flag=None):
-        for name, fn in self._extensions.items():
-            try:
-                if ext_flag is not None:
-
-                    def _make_wrapped(func):
-                        def _wrapped(*args, **kwargs):
-                            ext_flag[0] = True
-                            return func(*args, **kwargs)
-
-                        return _wrapped
-
-                    wrapped = _make_wrapped(fn)
-                    bound = types.MethodType(wrapped, df)
-                else:
-                    bound = types.MethodType(fn, df)
-                setattr(df, name, bound)
-            except Exception:
-                pass
+        try:
+            setattr(df, "vixl", VixlExtensions(df, self._extensions, ext_flag))
+        except Exception:
+            pass
 
     # ---------- execution ----------
     def execute(self, code):
