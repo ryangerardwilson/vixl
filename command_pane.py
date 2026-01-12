@@ -258,7 +258,7 @@ class CommandPane:
             return None
 
         # submit
-        if ch in (10, 13, 5):  # Enter or Ctrl+E
+        if ch in (10, 13):  # Enter
             return "submit"
 
         # cancel / meta prefix
@@ -306,11 +306,11 @@ class CommandPane:
             self.cursor = min(len(self.buffer), self.cursor + 1)
             return None
 
-        if ch == curses.KEY_HOME:
+        if ch in (curses.KEY_HOME, 1):  # Home or Ctrl+A
             self.cursor = 0
             return None
 
-        if ch == curses.KEY_END:
+        if ch in (curses.KEY_END, 5):  # End or Ctrl+E
             self.cursor = len(self.buffer)
             return None
 
