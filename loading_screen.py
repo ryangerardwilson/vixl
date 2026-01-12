@@ -49,6 +49,13 @@ class LoadingScreen:
         self.logo_fully_revealed_time = None
         self.min_logo_duration = 1.0
 
+        try:
+            curses.start_color()
+            curses.use_default_colors()
+            self.stdscr.bkgd(" ", curses.color_pair(0))
+        except curses.error:
+            pass
+
         self.rng = random.Random(1337)
         h, w = self.stdscr.getmaxyx()
         self.h = h

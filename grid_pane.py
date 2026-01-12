@@ -19,16 +19,16 @@ class GridPane:
             curses.use_default_colors()
             curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
             curses.init_pair(
-                self.PAIR_CELL_TEXT, curses.COLOR_WHITE, curses.COLOR_BLACK
+                self.PAIR_CELL_TEXT, curses.COLOR_WHITE, -1
             )
             curses.init_pair(
                 self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE
             )
             curses.init_pair(
-                self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, curses.COLOR_BLACK
+                self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, -1
             )
             curses.init_pair(
-                self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, curses.COLOR_BLACK
+                self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, -1
             )
             curses.init_pair(
                 self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE
