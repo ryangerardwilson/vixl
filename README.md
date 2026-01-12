@@ -99,6 +99,7 @@ python main.py <csv-or-parquet-file>
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
 - Adjust row lines (height): `,+rl` (increase), `,-rl` (decrease, min 1)
 - Copy to clipboard (via `wl-copy`): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value.
+- Preview JSON (read-only): `, p j` opens the current cell value as pretty-formatted JSON in Vim (Alacritty), view-only.
 - `?` opens shortcuts
 
 

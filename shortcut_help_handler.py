@@ -57,6 +57,7 @@ class ShortcutHelpHandler:
              "  , k - go to first row",
              "  , y a - copy df to clipboard (TSV)",
              "  , y c - copy current cell to clipboard",
+             "  , p j - preview current cell as pretty JSON (read-only Vim)",
              "  ? - shortcuts",
 
             "",

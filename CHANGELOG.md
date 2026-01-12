@@ -14,6 +14,7 @@
 - Command bar: Enter executes (Ctrl+E now moves to line end); Emacs-style navigation added (Alt+F/B word nav, Ctrl+W delete word, Ctrl+U kill to start, Ctrl+H/D move left/right, Ctrl+A/E line start/end).
 - Bash completion now binds only to the `vixl` command (no python/main.py hooks).
 - DF-normal clipboard: `,ya` copies the entire DataFrame as TSV (wl-copy); `,yc` copies the current cell value.
+- DF-normal JSON preview: `,pj` opens the current cell as pretty JSON in Vim (read-only via Alacritty).
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
 

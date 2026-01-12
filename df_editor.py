@@ -45,120 +45,7 @@ class DfEditor:
         self.external_meta = None
         self.external_receiving = False
 
-    # ---------- helpers ----------
-    def _coerce_cell_value(self, col, text):
-        dtype = self.state.df[col].dtype
-        if pd.api.types.is_integer_dtype(dtype):
-            return int(text) if text != "" else None
-        if pd.api.types.is_float_dtype(dtype):
-            return float(text) if text != "" else None
-        if pd.api.types.is_bool_dtype(dtype):
-            return text.lower() in ("1", "true", "yes")
-        return text
-
-    def _default_series_for_dtype(self, dtype: str):
-        n = len(self.state.df)
-        if dtype == "object":
-            return pd.Series([""] * n, dtype="object")
-        if dtype == "Int64":
-            return pd.Series([pd.NA] * n, dtype="Int64")
-        if dtype == "float64":
-            return pd.Series([float("nan")] * n, dtype="float64")
-        if dtype == "boolean":
-            return pd.Series([pd.NA] * n, dtype="boolean")
-        if dtype == "datetime64[ns]":
-            return pd.Series([pd.NaT] * n, dtype="datetime64[ns]")
-        return pd.Series([pd.NA] * n)
-
-    def _autoscroll_insert(self):
-        cw = self.grid.get_col_width(self.grid.curr_col)
-        if self.cell_cursor < self.cell_hscroll:
-            self.cell_hscroll = self.cell_cursor
-        elif self.cell_cursor > self.cell_hscroll + cw - 1:
-            self.cell_hscroll = self.cell_cursor - (cw - 1)
-
-        max_scroll = (
-            max(0, len(self.cell_buffer) - cw + 1) if len(self.cell_buffer) >= cw else 0
-        )
-        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
-
-    def _autoscroll_cell_normal(self, prefer_left: bool = False, margin: int = 2):
-        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
-        lines = max(1, getattr(self.state, "row_lines", 1))
-        span = max(1, cw * lines)
-        buf_len = len(self.cell_buffer)
-
-        max_scroll = max(0, buf_len - span)
-
-        if self.cell_cursor < self.cell_hscroll:
-            self.cell_hscroll = self.cell_cursor
-        elif self.cell_cursor >= self.cell_hscroll + span:
-            if prefer_left:
-                self.cell_hscroll = max(0, self.cell_cursor - max(0, margin))
-            else:
-                self.cell_hscroll = self.cell_cursor - span + 1
-
-        self.cell_hscroll = min(max(self.cell_hscroll, 0), max_scroll)
-
-    def _is_word_char(self, ch: str) -> bool:
-        return ch.isalnum() or ch == "_"
-
-    def _cell_word_forward(self):
-        buf = self.cell_buffer
-        n = len(buf)
-        idx = self.cell_cursor
-        if idx >= n:
-            return n
-
-        def is_word(i):
-            return self._is_word_char(buf[i])
-
-        if is_word(idx):
-            while idx < n and is_word(idx):
-                idx += 1
-        while idx < n and not is_word(idx):
-            idx += 1
-        return idx
-
-    def _cell_word_backward(self):
-        buf = self.cell_buffer
-        if not buf or self.cell_cursor == 0:
-            return 0
-
-        def is_word(i):
-            return self._is_word_char(buf[i])
-
-        idx = max(0, self.cell_cursor - 1)
-        if not is_word(idx):
-            while idx > 0 and not is_word(idx):
-                idx -= 1
-        while idx > 0 and is_word(idx - 1):
-            idx -= 1
-        return idx
-
-    def _get_word_bounds_at_or_after(self, idx: int):
-        buf = self.cell_buffer
-        n = len(buf)
-        if n == 0:
-            return None
-        i = max(0, min(idx, n - 1))
-
-        # Move to a word char at/after i
-        while i < n and not self._is_word_char(buf[i]):
-            i += 1
-        if i >= n:
-            return None
-
-        start = i
-        while start > 0 and self._is_word_char(buf[start - 1]):
-            start -= 1
-
-        end = i
-        while end < n and self._is_word_char(buf[end]):
-            end += 1
-
-        return start, end
-
+    # ---------- leader helpers ----------
     def _leader_seq(self, state: str | None) -> str:
         if not state:
             return ""
@@ -177,22 +64,28 @@ class DfEditor:
             "minus_r": ",-r",
             "x": ",x",
             "xa": ",xa",
+            "y": ",y",
+            "p": ",p",
         }
-
         return mapping.get(state, ",")
 
     def _show_leader_status(self, seq: str):
         if not seq:
             return
-        # avoid clobbering prompt usage
         cp = getattr(self, "column_prompt", None)
-        if cp is not None:
-            if getattr(cp, "active", False):
-                return
+        if cp is not None and getattr(cp, "active", False):
+            return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
 
-    def _build_editor_command(self, tmp_path: str) -> str:
+    def _build_editor_command(self, tmp_path: str, read_only: bool = False) -> str:
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
+        if read_only:
+            ro_opts = (
+                "-n -R -M "
+                "+setlocal\ nobuflisted\ noswapfile\ buftype=nofile\ bufhidden=wipe\ "
+                "nowrap\ readonly\ nomodifiable\ nonumber\ norelativenumber\ shortmess+=I"
+            )
+            return f"{editor} {ro_opts} {shlex.quote(tmp_path)}"
         return f"{editor} {shlex.quote(tmp_path)}"
 
     def _launch_in_alacritty(self, editor_cmd: str):
@@ -206,7 +99,55 @@ class DfEditor:
         except Exception:
             return None
 
+    def _open_cell_json_preview(self, row: int, col: int):
+        total_rows = len(self.state.df)
+        total_cols = len(self.state.df.columns)
+        if total_rows == 0 or total_cols == 0:
+            self._set_status("No cell to preview", 3)
+            return
+
+        r = min(max(0, row), max(0, total_rows - 1))
+        c = min(max(0, col), max(0, total_cols - 1))
+        val = self.state.df.iloc[r, c]
+
+        try:
+            import json
+        except ImportError:
+            self._set_status("JSON preview unavailable", 3)
+            return
+
+        if val is None or (hasattr(pd, "isna") and pd.isna(val)):
+            text = "null"
+        else:
+            try:
+                parsed = json.loads(val) if isinstance(val, str) else val
+                text = json.dumps(parsed, indent=2, ensure_ascii=False, default=str)
+            except Exception:
+                text = json.dumps(val, indent=2, ensure_ascii=False, default=str)
+
+        tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8")
+        tmp_path = tmp.name
+        try:
+            tmp.write(text)
+            tmp.flush()
+        finally:
+            tmp.close()
+
+        editor_cmd = self._build_editor_command(tmp_path, read_only=True)
+        proc = self._launch_in_alacritty(editor_cmd)
+        if proc is None:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            self._set_status("JSON preview failed", 3)
+            return
+
+        self._set_status("Opened JSON preview (read-only)", 3)
+
     def queue_external_edit(self, preserve_cell_mode: bool):
+
+
         if self.external_proc is not None:
             self._set_status("Already editing externally", 3)
             self._reset_count()
@@ -936,6 +877,11 @@ class DfEditor:
                         self._show_leader_status(",y")
                         return
 
+                    if ch == ord("p"):
+                        self.df_leader_state = "p"
+                        self._show_leader_status(",p")
+                        return
+
                     if ch == ord("j"):
                         if total_rows == 0:
                             self._reset_count()
@@ -1046,6 +992,14 @@ class DfEditor:
                             self._set_status("Cell copied", 3)
                         except Exception:
                             self._set_status("Copy failed", 3)
+                        self._reset_count()
+                        return
+                    self._reset_count()
+                    return
+
+                elif state == "p":
+                    if ch == ord("j"):
+                        self._open_cell_json_preview(r, c)
                         self._reset_count()
                         return
                     self._reset_count()
