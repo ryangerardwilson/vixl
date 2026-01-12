@@ -110,6 +110,8 @@ class Orchestrator:
                 page_start=self.paginator.page_start,
                 page_end=self.paginator.page_end,
                 row_lines=self.state.row_lines,
+                expanded_rows=self.state.expanded_rows,
+                expand_all_rows=self.state.expand_all_rows,
             )
 
             sw = self.layout.status_win

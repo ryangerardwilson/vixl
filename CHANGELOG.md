@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Added row expansion: `,er` toggles expansion of the current row; `,ear` toggles expansion of all rows; `,ec` collapses all expansions. Expanded rows wrap vertically to show full content without widening columns; collapsed default remains single-line. Ctrl+L remains the 20% right jump.
 - Added external editor workflow on `,v` from both df normal and cell_normal; shows "Receiving new data from editor" while syncing and returns the cursor to the start of the cell on completion.
 - Added bash completion auto-provisioning at `~/.config/vixl/completions/vixl.bash` (covers `python main.py`, `python3 main.py`, and `vixl`); startup now warns (does not block) when completion is not detected, with `VIXL_SKIP_COMPLETION_CHECK=1` to suppress the warning; completion logic lives in `completions_handler.py`, and README documents symlink/alias guidance for `vixl`.
 - Added df-mode column workflows: `n` to enter cell_normal, `,ica`/`,icb` insert columns (prompt name+dtype), `,dc` delete column, `,rnc` rename column; column prompts share the bottom-strip UX.

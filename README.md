@@ -87,6 +87,7 @@ python main.py <csv-or-parquet-file>
 - Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
+- Row expansion (leader): `,er` expands/collapses the current row; `,ear` expands/collapses all rows; `,ec` collapses all expansions. Expanded rows wrap vertically to show full cell content within existing column widths.
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
 - Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer)
 - External edit current cell: `, v` launches your `$VISUAL`/`$EDITOR` (via Alacritty if available); status shows "Receiving new data from editor" while syncing; returns to cell_normal at the cell start.

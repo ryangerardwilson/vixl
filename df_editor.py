@@ -175,6 +175,8 @@ class DfEditor:
             "plus_r": ",+r",
             "minus": ",-",
             "minus_r": ",-r",
+            "e": ",e",
+            "ea": ",ea",
         }
 
         return mapping.get(state, ",")
@@ -545,6 +547,36 @@ class DfEditor:
         self._set_status(f"Row lines set to {self.state.row_lines}", 2)
         self._set_last_action("adjust_row_lines", delta=applied_delta)
 
+    def _toggle_row_expanded(self):
+        if len(self.state.df) == 0:
+            self._set_status("No rows to expand", 2)
+            return
+        row = max(0, min(self.grid.curr_row, len(self.state.df) - 1))
+        expanded = getattr(self.state, "expanded_rows", set())
+        if row in expanded:
+            expanded.remove(row)
+            self._set_status("Row collapsed", 2)
+        else:
+            expanded.add(row)
+            self._set_status("Row expanded", 2)
+        self.state.expand_all_rows = False if not expanded else self.state.expand_all_rows
+        self.grid.row_offset = 0
+        self._reset_count()
+
+    def _toggle_all_rows_expanded(self):
+        self.state.expand_all_rows = not getattr(self.state, "expand_all_rows", False)
+        state = "expanded" if self.state.expand_all_rows else "collapsed"
+        self._set_status(f"All rows {state}", 2)
+        self.grid.row_offset = 0
+        self._reset_count()
+
+    def _collapse_all_rows(self):
+        self.state.expand_all_rows = False
+        self.state.expanded_rows = set()
+        self.grid.row_offset = 0
+        self._set_status("All rows collapsed", 2)
+        self._reset_count()
+
     def _start_insert_column(self, after: bool):
         if self.column_prompt is None:
             self._set_status("Column prompt unavailable", 3)
@@ -913,6 +945,11 @@ class DfEditor:
                         self._reset_count()
                         return
 
+                    if ch == ord("e"):
+                        self.df_leader_state = "e"
+                        self._show_leader_status(self._leader_seq("e"))
+                        return
+
                     if ch == ord("j"):
                         if total_rows == 0:
                             self._reset_count()
@@ -1064,6 +1101,32 @@ class DfEditor:
                     self._show_leader_status("")
                     return
 
+                if state == "e":
+                    if ch == ord("r"):
+                        self._show_leader_status(",er")
+                        self._toggle_row_expanded()
+                        return
+                    if ch == ord("a"):
+                        self.df_leader_state = "ea"
+                        self._show_leader_status(self._leader_seq("ea"))
+                        return
+                    if ch == ord("c"):
+                        self._show_leader_status(",ec")
+                        self._collapse_all_rows()
+                        return
+                    self._show_leader_status("")
+                    self._reset_count()
+                    return
+
+                if state == "ea":
+                    if ch == ord("r"):
+                        self._show_leader_status(",ear")
+                        self._toggle_all_rows_expanded()
+                        return
+                    self._show_leader_status("")
+                    self._reset_count()
+                    return
+
                 if state == "plus":
                     if ch == ord("r"):
                         self.df_leader_state = "plus_r"
@@ -1190,6 +1253,10 @@ class DfEditor:
                         self.cell_leader_state = "c"
                         self._show_leader_status(self._leader_seq("c"))
                         return
+                    if ch == ord("e"):
+                        self.cell_leader_state = "ce"
+                        self._show_leader_status(",ce")
+                        return
                     self._show_leader_status("")
                     return
 
@@ -1200,6 +1267,11 @@ class DfEditor:
                     self.cell_hscroll = 0
                     self.mode = "cell_insert"
                     self._show_leader_status(",cc")
+                    return
+
+                if state == "ce":
+                    # future cell-level expansions could live here; no-op for now
+                    self._show_leader_status("")
                     return
 
                 self._show_leader_status("")
@@ -1257,7 +1329,8 @@ class DfEditor:
                 self._reset_count()
                 return
 
-            count = self._consume_count() if self.pending_count is not None else 1
+            had_count = self.pending_count is not None
+            count = self._consume_count() if had_count else 1
 
             # Undo / Redo (ignore counts)
             if ch == ord("u"):

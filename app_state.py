@@ -8,6 +8,8 @@ class AppState:
         self.file_handler = file_handler
         self.df = self._ensure_non_empty(df)
         self.row_lines = 1
+        self.expanded_rows: set[int] = set()
+        self.expand_all_rows: bool = False
         self.undo_stack = []
         self.redo_stack = []
         self.undo_max_depth = 50

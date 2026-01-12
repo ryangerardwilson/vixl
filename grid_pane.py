@@ -138,6 +138,8 @@ class GridPane:
         page_start=0,
         page_end=None,
         row_lines=1,
+        expanded_rows=None,
+        expand_all_rows=False,
     ):
         win.erase()
         try:
@@ -145,7 +147,6 @@ class GridPane:
         except curses.error:
             pass
         h, w = win.getmaxyx()
-        row_block_height = max(1, row_lines)
 
         if page_end is None:
             page_end = len(self.df)
@@ -163,7 +164,6 @@ class GridPane:
 
         row_w = max(3, len(str(max(page_end - 1, 0))) + 1)
 
-        max_rows = max(1, (h - 3) // row_block_height)
         avail_w = w - (row_w + 1)
 
         max_cols = 0
@@ -190,15 +190,6 @@ class GridPane:
             local_curr = max(0, total_rows - 1)
             self.curr_row = page_start + local_curr
 
-        max_row_offset = max(0, total_rows - max_rows)
-        if self.row_offset > max_row_offset:
-            self.row_offset = max_row_offset
-
-        if local_curr < self.row_offset:
-            self.row_offset = local_curr
-        elif local_curr >= self.row_offset + max_rows:
-            self.row_offset = local_curr - max_rows + 1
-
         # Column adjustment (runs every draw)
         if self.curr_col < self.col_offset:
             self.col_offset = self.curr_col
@@ -208,10 +199,6 @@ class GridPane:
         # Final safety after all adjustments
         self.col_offset = max(0, self.col_offset)
 
-        visible_rows = range(
-            page_start + self.row_offset,
-            min(page_end, page_start + self.row_offset + max_rows),
-        )
         visible_cols = range(
             self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols)
         )
@@ -238,6 +225,18 @@ class GridPane:
                 lines.append("")
             return lines
 
+        def _wrap_cell_line_count(text: str, width: int) -> int:
+            if width <= 0:
+                return 1
+            parts = text.split("\n") if text else [""]
+            lines = 0
+            for part in parts:
+                if part == "":
+                    lines += 1
+                else:
+                    lines += max(1, (len(part) + width - 1) // width)
+            return max(1, lines)
+
         # header
         x = row_w + 1
         for c in visible_cols:
@@ -248,13 +247,76 @@ class GridPane:
             win.addnstr(1, x, name, eff_cw, curses.A_BOLD)
             x += eff_cw + 1
 
-        # rows
+        # Compute per-row heights (supports expansion)
+        expanded_rows = expanded_rows or set()
+        page_rows = list(range(page_start, page_end))
+        row_heights: list[int] = []
+        for abs_r in page_rows:
+            base_height = max(1, row_lines)
+            is_expanded = expand_all_rows or (abs_r in expanded_rows)
+            if not is_expanded:
+                row_heights.append(base_height)
+                continue
+
+            max_lines = base_height
+            for c in visible_cols:
+                eff_cw = self.rendered_col_widths.get(c, widths[c])
+                if editing and abs_r == edit_row and c == edit_col:
+                    text = edit_buffer or ""
+                else:
+                    val = self.df.iloc[abs_r, c]
+                    text = "" if (val is None or pd.isna(val)) else str(val)
+                max_lines = max(max_lines, _wrap_cell_line_count(text, eff_cw))
+            row_heights.append(max_lines)
+
         base_y = 2
-        for idx, r in enumerate(visible_rows):
-            row_y = base_y + idx * row_block_height
-            if row_y >= h - 1:
+        max_height_budget = max(0, h - base_y - 1)
+
+        if total_rows == 0:
+            visible_rows = []
+        else:
+            curr_idx = min(max(self.curr_row - page_start, 0), len(page_rows) - 1)
+            self.row_offset = min(max(self.row_offset, 0), len(page_rows) - 1)
+
+            prefix = [0]
+            for rh in row_heights:
+                prefix.append(prefix[-1] + rh)
+
+            offset = self.row_offset
+            # ensure current row fits in view; slide offset forward if needed
+            while prefix[curr_idx + 1] - prefix[offset] > max_height_budget and offset < curr_idx:
+                offset += 1
+
+            def _rows_from(start_idx: int):
+                rows: list[int] = []
+                used = 0
+                for i in range(start_idx, len(page_rows)):
+                    rh = row_heights[i]
+                    if used + rh > max_height_budget and used > 0:
+                        break
+                    rows.append(page_rows[i])
+                    used += rh
+                    if used >= max_height_budget:
+                        break
+                if not rows and page_rows:
+                    rows.append(page_rows[start_idx])
+                return rows
+
+            visible_rows = _rows_from(offset)
+            if self.curr_row not in visible_rows:
+                # try to back up to include current row
+                offset = max(0, curr_idx)
+                visible_rows = _rows_from(offset)
+            self.row_offset = offset
+
+        # rows
+        y_cursor = base_y
+        for r in visible_rows:
+            idx_in_page = r - page_start
+            row_h = row_heights[idx_in_page] if idx_in_page < len(row_heights) else max(1, row_lines)
+            if y_cursor >= h - 1:
                 break
-            win.addnstr(row_y, 0, str(r).rjust(row_w), row_w)
+            win.addnstr(y_cursor, 0, str(r).rjust(row_w), row_w)
             x = row_w + 1
             for c in visible_cols:
                 cw = widths[c]
@@ -269,7 +331,7 @@ class GridPane:
                     text = "" if (val is None or pd.isna(val)) else str(val)
 
                 start = edit_hscroll if use_hscroll else 0
-                wrapped_lines = _wrap_cell(text[start:], eff_cw, row_block_height)
+                wrapped_lines = _wrap_cell(text[start:], eff_cw, row_h)
 
                 base_attr = curses.color_pair(self.PAIR_CELL_TEXT)
                 attr = base_attr
@@ -291,12 +353,12 @@ class GridPane:
                 if is_cursor_target:
                     cursor_val = int(edit_cursor or 0)
                     relative_pos = max(0, cursor_val - start)
-                    cursor_line = min(row_block_height - 1, relative_pos // eff_cw)
+                    cursor_line = min(row_h - 1, relative_pos // eff_cw)
                     cursor_col = relative_pos % eff_cw
 
                 eff_cw_int = int(eff_cw)
                 for line_idx, line_text in enumerate(wrapped_lines):
-                    line_y = row_y + line_idx
+                    line_y = y_cursor + line_idx
                     if line_y >= h - 1:
                         break
                     visible_len = len(line_text)
@@ -319,6 +381,18 @@ class GridPane:
                         else:
                             ch = line_text[pos] if pos < visible_len else " "
                             win.addnstr(line_y, cx, ch, 1, caret_attr)
-                x += eff_cw_int + 1
+
+                x += eff_cw + 1
+
+            y_cursor += row_h
+            if y_cursor >= h - 1:
+                break
+
+        # footer line
+        try:
+            win.hline(h - 1, 0, " ", w)
+        except curses.error:
+            pass
 
         win.refresh()
+
