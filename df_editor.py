@@ -932,19 +932,9 @@ class DfEditor:
 
                 if state == "leader":
                     if ch == ord("y"):
-                        try:
-                            import subprocess
-
-                            tsv_data = self.state.df.to_csv(sep="\t", index=False)
-                            subprocess.run(
-                                ["wl-copy"], input=tsv_data, text=True, check=True
-                            )
-                            self._set_status("DF copied", 3)
-                        except Exception:
-                            self._set_status("Copy failed", 3)
-                        self._reset_count()
+                        self.df_leader_state = "y"
+                        self._show_leader_status(",y")
                         return
-
 
                     if ch == ord("j"):
                         if total_rows == 0:
@@ -1032,6 +1022,34 @@ class DfEditor:
                         self.df_leader_state = "minus"
                         self._show_leader_status(self._leader_seq("minus"))
                         return
+
+                elif state == "y":
+                    if ch == ord("a"):
+                        try:
+                            import subprocess
+
+                            tsv_data = self.state.df.to_csv(sep="\t", index=False)
+                            subprocess.run(
+                                ["wl-copy"], input=tsv_data, text=True, check=True
+                            )
+                            self._set_status("DF copied", 3)
+                        except Exception:
+                            self._set_status("Copy failed", 3)
+                        self._reset_count()
+                        return
+                    if ch == ord("c"):
+                        try:
+                            import subprocess
+
+                            value = "" if (val is None or pd.isna(val)) else str(val)
+                            subprocess.run(["wl-copy"], input=value, text=True, check=True)
+                            self._set_status("Cell copied", 3)
+                        except Exception:
+                            self._set_status("Copy failed", 3)
+                        self._reset_count()
+                        return
+                    self._reset_count()
+                    return
 
                 if state == "i":
                     if ch == ord("c"):

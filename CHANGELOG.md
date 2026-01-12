@@ -13,7 +13,7 @@
 - Optional config.json at `~/.config/vixl/config.json` to predefine cmd-mode Tab insertions via `cmd_mode.tab_fuzzy_expansions_register`.
 - Command bar: Enter executes (Ctrl+E now moves to line end); Emacs-style navigation added (Alt+F/B word nav, Ctrl+W delete word, Ctrl+U kill to start, Ctrl+H/D move left/right, Ctrl+A/E line start/end).
 - Bash completion now binds only to the `vixl` command (no python/main.py hooks).
-- DF-normal shortcut `,y` copies the entire DataFrame as TSV to clipboard via `wl-copy` for Sheets/Excel pasting.
+- DF-normal clipboard: `,ya` copies the entire DataFrame as TSV (wl-copy); `,yc` copies the current cell value.
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
 
