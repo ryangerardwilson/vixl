@@ -240,6 +240,10 @@ class Orchestrator:
         while True:
             ch = self.stdscr.getch()
 
+            if getattr(self, "df_editor", None) is not None:
+                self.df_editor._complete_external_edit_if_done()
+                self.df_editor.run_pending_external_edit()
+
             if ch in (3, 24):
                 break
 
@@ -298,11 +302,10 @@ class Orchestrator:
                 elif result == "cancel":
                     self.focus = 0
 
-            self.redraw()
-
             if getattr(self, "df_editor", None) is not None:
                 self.df_editor.run_pending_external_edit()
-                self.df_editor._complete_external_edit_if_done()
+
+            self.redraw()
 
             if self.exit_requested:
                 break
