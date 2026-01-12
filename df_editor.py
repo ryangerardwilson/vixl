@@ -727,6 +727,10 @@ class DfEditor:
                         self.mode = "cell_insert"
                         self._reset_count()
                         return
+                    if ch == ord("v"):
+                        self._show_leader_status(",v")
+                        self.queue_external_edit(preserve_cell_mode=True)
+                        return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
                         self._show_leader_status(self._leader_seq("c"))
