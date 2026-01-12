@@ -4,17 +4,16 @@ import numpy as np
 
 class AppState:
     def __init__(self, df, file_path, file_handler):
-         self.file_path = file_path
-         self.file_handler = file_handler
-         self.df = self._ensure_non_empty(df)
-         self.row_lines = 1
-         self.undo_stack = []
-         self.redo_stack = []
-         self.undo_max_depth = 50
-         self.undo_stack = []
-         self.redo_stack = []
-         self.undo_max_depth = 50
-
+        self.file_path = file_path
+        self.file_handler = file_handler
+        self.df = self._ensure_non_empty(df)
+        self.row_lines = 1
+        self.undo_stack = []
+        self.redo_stack = []
+        self.undo_max_depth = 50
+        self.undo_stack = []
+        self.redo_stack = []
+        self.undo_max_depth = 50
 
     def ensure_non_empty(self):
         self.df = self._ensure_non_empty(self.df)

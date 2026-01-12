@@ -18,7 +18,9 @@ class GridPane:
             curses.start_color()
             curses.use_default_colors()
             curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
-            curses.init_pair(self.PAIR_CELL_TEXT, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            curses.init_pair(
+                self.PAIR_CELL_TEXT, curses.COLOR_WHITE, curses.COLOR_BLACK
+            )
             curses.init_pair(
                 self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE
             )
@@ -301,7 +303,12 @@ class GridPane:
                     cell = line_text.rjust(eff_cw_int)
                     win.addnstr(line_y, x, cell, eff_cw_int, attr)
 
-                    if is_cursor_target and cursor_line >= 0 and cursor_col >= 0 and line_idx == cursor_line:
+                    if (
+                        is_cursor_target
+                        and cursor_line >= 0
+                        and cursor_col >= 0
+                        and line_idx == cursor_line
+                    ):
                         text_start_x = x + (eff_cw_int - visible_len)
                         pos = min(cursor_col, visible_len)
                         cx = text_start_x + pos
@@ -314,7 +321,4 @@ class GridPane:
                             win.addnstr(line_y, cx, ch, 1, caret_attr)
                 x += eff_cw_int + 1
 
-
-
         win.refresh()
-

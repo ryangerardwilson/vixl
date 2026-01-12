@@ -262,7 +262,9 @@ class DfEditor:
         self.grid.df = self.state.df
         self.grid.highlight_mode = snap.get("highlight_mode", "cell")
         self.paginator.update_total_rows(len(self.state.df))
-        self.grid.curr_row = min(max(0, snap.get("curr_row", 0)), max(0, len(self.state.df) - 1))
+        self.grid.curr_row = min(
+            max(0, snap.get("curr_row", 0)), max(0, len(self.state.df) - 1)
+        )
         self.grid.curr_col = min(
             max(0, snap.get("curr_col", 0)),
             max(0, len(self.state.df.columns) - 1),
@@ -361,7 +363,11 @@ class DfEditor:
             return
         count = max(1, count)
         self._push_undo()
-        insert_at = self.grid.curr_row if above else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
+        insert_at = (
+            self.grid.curr_row
+            if above
+            else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
+        )
         row = self.state.build_default_row()
         new_rows = pd.DataFrame([row] * count, columns=self.state.df.columns)
         self.state.df = pd.concat(
@@ -404,7 +410,9 @@ class DfEditor:
         self._push_undo()
         start = self.grid.curr_row
         end = min(total_rows, start + count)
-        self.state.df = self.state.df.drop(self.state.df.index[start:end]).reset_index(drop=True)
+        self.state.df = self.state.df.drop(self.state.df.index[start:end]).reset_index(
+            drop=True
+        )
         self.grid.df = self.state.df
         total_rows = len(self.state.df)
         self.grid.curr_row = min(start, max(0, total_rows - 1))
@@ -513,7 +521,9 @@ class DfEditor:
                         self.df_leader_state = None
                         self.cell_leader_state = None
                         self.cell_cursor = len(self.cell_buffer)
-                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        cw = max(
+                            1, self.grid.get_rendered_col_width(self.grid.curr_col)
+                        )
                         self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
                         self._reset_count()
@@ -574,7 +584,9 @@ class DfEditor:
                         and self._is_word_char(buf[new_cursor])
                     ):
                         # View-fixup: if the current word is clipped, scroll to reveal it.
-                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        cw = max(
+                            1, self.grid.get_rendered_col_width(self.grid.curr_col)
+                        )
                         lines = max(1, getattr(self.state, "row_lines", 1))
                         span = max(1, cw * lines)
                         bounds = self._get_word_bounds_at_or_after(new_cursor)
@@ -583,7 +595,9 @@ class DfEditor:
                             visible_end = self.cell_hscroll + span
                             if word_end > visible_end:
                                 max_scroll = max(0, len(self.cell_buffer) - span)
-                                self.cell_hscroll = min(max_scroll, max(0, word_end - span))
+                                self.cell_hscroll = min(
+                                    max_scroll, max(0, word_end - span)
+                                )
                         break
                     if next_cursor == new_cursor:
                         break
@@ -952,7 +966,9 @@ class DfEditor:
                         self.df_leader_state = None
                         self.cell_leader_state = None
                         self.cell_cursor = len(self.cell_buffer)
-                        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+                        cw = max(
+                            1, self.grid.get_rendered_col_width(self.grid.curr_col)
+                        )
                         self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
                         self._reset_count()

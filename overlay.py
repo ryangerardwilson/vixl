@@ -1,5 +1,4 @@
 import curses
-import curses
 from typing import List
 
 

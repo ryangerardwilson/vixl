@@ -23,7 +23,14 @@ class ColumnPrompt:
         "datetime64[ns]": "datetime64[ns]",
     }
 
-    def __init__(self, state, grid, paginator, set_status_cb: Callable[[str, int], None], push_undo_cb: Optional[Callable[[], None]] = None):
+    def __init__(
+        self,
+        state,
+        grid,
+        paginator,
+        set_status_cb: Callable[[str, int], None],
+        push_undo_cb: Optional[Callable[[], None]] = None,
+    ):
         self.state = state
         self.grid = grid
         self.paginator = paginator
@@ -64,7 +71,9 @@ class ColumnPrompt:
 
         if ch in (curses.KEY_BACKSPACE, 127, 8):
             if self.cursor > 0:
-                self.buffer = self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                self.buffer = (
+                    self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
+                )
                 self.cursor -= 1
             return
 
@@ -85,7 +94,9 @@ class ColumnPrompt:
             return
 
         if 32 <= ch <= 126:
-            self.buffer = self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            self.buffer = (
+                self.buffer[: self.cursor] + chr(ch) + self.buffer[self.cursor :]
+            )
             self.cursor += 1
             return
 
@@ -119,7 +130,6 @@ class ColumnPrompt:
         self._push_undo_cb = cb
 
     def _start(self, action: str, col_idx: int):
-
         self.active = True
         self.action = action
         self.target_col = col_idx
@@ -158,9 +168,7 @@ class ColumnPrompt:
         elif self.step == "dtype":
             dtype = self._normalize_dtype(text)
             if not dtype:
-                self._set_status(
-                    "Use one of: " + "/".join(self.DTYPE_CHOICES), 4
-                )
+                self._set_status("Use one of: " + "/".join(self.DTYPE_CHOICES), 4)
                 return
             self._apply_insert(dtype)
             self._reset()
@@ -205,7 +213,6 @@ class ColumnPrompt:
         self.grid.adjust_col_viewport()
         self._set_status(f"Inserted column '{self.pending_name}'", 3)
 
-
     def _apply_rename(self, new_name: str):
         if self.target_col is None:
             self._set_status("Missing column context", 4)
@@ -241,9 +248,7 @@ class ColumnPrompt:
         if self.action in ("insert_before", "insert_after"):
             direction = "before" if self.action == "insert_before" else "after"
             if self.step == "dtype":
-                return (
-                    f"Insert {direction} dtype ({'/'.join(self.DTYPE_CHOICES)}): "
-                )
+                return f"Insert {direction} dtype ({'/'.join(self.DTYPE_CHOICES)}): "
             return f"Insert {direction} col name: "
 
         if self.action == "rename":

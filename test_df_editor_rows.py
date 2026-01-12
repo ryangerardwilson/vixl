@@ -59,7 +59,12 @@ class DummyPaginator:
 
 class RowInsertLeaderTests(unittest.TestCase):
     def _editor(self, df, row=0):
-        state = SimpleNamespace(df=df, file_path=None, file_handler=None, build_default_row=lambda: {"a": None})
+        state = SimpleNamespace(
+            df=df,
+            file_path=None,
+            file_handler=None,
+            build_default_row=lambda: {"a": None},
+        )
         grid = DummyGrid()
         grid.df = df
         grid.curr_row = row

@@ -27,7 +27,9 @@ class ColumnPromptTests(unittest.TestCase):
         grid.curr_col = curr_col
         paginator = DummyPaginator()
         messages = []
-        prompt = ColumnPrompt(SimpleNamespace(df=df), grid, paginator, lambda m, _: messages.append(m))
+        prompt = ColumnPrompt(
+            SimpleNamespace(df=df), grid, paginator, lambda m, _: messages.append(m)
+        )
         grid.df = df
         return prompt, grid, messages
 
