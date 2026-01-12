@@ -12,6 +12,7 @@ class CommandPane:
         self.history_idx = None  # None means not navigating history
         self.extension_names = []
         self.custom_expansions = []
+        self.meta_pending = False
         self.ghost_attr = curses.A_DIM
         try:
             curses.start_color()
@@ -183,10 +184,49 @@ class CommandPane:
         self.hscroll = min(self.hscroll, max(0, self.cursor))
         self.history_idx = None
 
+    # ---------- word helpers ----------
+    @staticmethod
+    def _is_word_char(ch):
+        return ch.isalnum() or ch == "_"
+
+    def _word_boundary_left(self):
+        i = self.cursor
+        # skip separators immediately left
+        while i > 0 and not self._is_word_char(self.buffer[i - 1]):
+            i -= 1
+        # skip the word
+        while i > 0 and self._is_word_char(self.buffer[i - 1]):
+            i -= 1
+        return i
+
+    def _word_boundary_right(self):
+        i = self.cursor
+        n = len(self.buffer)
+        # skip separators immediately right
+        while i < n and not self._is_word_char(self.buffer[i]):
+            i += 1
+        # skip the word
+        while i < n and self._is_word_char(self.buffer[i]):
+            i += 1
+        return i
+
     # ---------- input handling ----------
     def handle_key(self, ch):
         if not self.active:
             return None
+
+        # handle pending meta (Alt) sequences
+        if self.meta_pending:
+            self.meta_pending = False
+            if ch in (ord("f"), ord("F")):
+                self.cursor = self._word_boundary_right()
+                return None
+            if ch in (ord("b"), ord("B")):
+                self.cursor = self._word_boundary_left()
+                return None
+            # treat as plain Esc cancel if unknown sequence
+            self.reset()
+            return "cancel"
 
         # history navigation
         if ch == 16:  # Ctrl+P
@@ -225,10 +265,25 @@ class CommandPane:
         if ch in (10, 13, 5):  # Enter or Ctrl+E
             return "submit"
 
-        # cancel
+        # cancel / meta prefix
         if ch == 27:  # Esc
-            self.reset()
-            return "cancel"
+            self.meta_pending = True
+            return None
+
+        if ch == 23:  # Ctrl+W, delete word backward
+            start = self._word_boundary_left()
+            if start < self.cursor:
+                self.buffer = self.buffer[:start] + self.buffer[self.cursor :]
+                self.cursor = start
+                self.history_idx = None
+            return None
+
+        if ch == 21:  # Ctrl+U, kill to line start
+            if self.cursor > 0:
+                self.buffer = self.buffer[self.cursor :]
+                self.cursor = 0
+                self.history_idx = None
+            return None
 
         if ch in (curses.KEY_BACKSPACE, 127, 8):
             if self.cursor > 0:

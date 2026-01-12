@@ -71,7 +71,7 @@ python main.py <csv-or-parquet-file>
 - Execute: Enter / Ctrl+E
 - Cancel: Esc
 - History: Ctrl+P / Ctrl+N (Ctrl+N past newest clears)
-- Edit keys: Left/Right/Home/End, Backspace
+- Edit keys: Left/Right/Home/End, Backspace; Emacs-style: Alt+F / Alt+B (word fwd/back), Ctrl+W (delete word backward), Ctrl+U (kill to line start)
 
 ### Output modal
 - Appears only when there is output from a command.
