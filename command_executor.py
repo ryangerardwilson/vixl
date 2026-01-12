@@ -43,6 +43,9 @@ class CommandExecutor:
                     funcs[name] = attr
         return funcs
 
+    def get_extension_names(self):
+        return sorted(self._extensions.keys())
+
     def _bind_extensions(self, df, ext_flag=None):
         for name, fn in self._extensions.items():
             try:

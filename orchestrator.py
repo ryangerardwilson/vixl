@@ -37,6 +37,8 @@ class Orchestrator:
 
         self.command = CommandPane()
         self.exec = CommandExecutor(app_state)
+        if hasattr(self.command, "set_extension_names"):
+            self.command.set_extension_names(self.exec.get_extension_names())
 
         self.focus = 0  # 0=df, 1=cmd, 2=overlay
 

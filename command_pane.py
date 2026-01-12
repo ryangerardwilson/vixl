@@ -1,4 +1,5 @@
 import curses
+import difflib
 
 
 class CommandPane:
@@ -9,6 +10,18 @@ class CommandPane:
         self.active = False
         self.history = []
         self.history_idx = None  # None means not navigating history
+        self.extension_names = []
+        self.ghost_attr = curses.A_DIM
+        try:
+            curses.start_color()
+            curses.use_default_colors()
+            # Light foreground on default background so ghost text remains visible
+            fg = curses.COLOR_WHITE
+            bg = -1
+            curses.init_pair(9, fg, bg)
+            self.ghost_attr = curses.color_pair(9) | curses.A_DIM
+        except curses.error:
+            self.ghost_attr = curses.A_DIM
 
     # ---------- state helpers ----------
     def reset(self):
@@ -36,6 +49,10 @@ class CommandPane:
         self.history = list(entries or [])
         self.history_idx = None
 
+    def set_extension_names(self, names):
+        self.extension_names = sorted(names or [])
+        self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
+
     def _apply_history(self):
         if self.history_idx is None:
             return
@@ -45,6 +62,71 @@ class CommandPane:
             self.buffer = ""
         self.cursor = len(self.buffer)
         self.hscroll = 0
+
+    # ---------- completion helpers ----------
+    def _extract_df_token(self):
+        prefix = self.buffer[: self.cursor]
+        after = self.buffer[self.cursor :]
+        if after and (after[0].isalnum() or after[0] == "_"):
+            return None
+
+        idx = prefix.rfind("df.")
+        if idx == -1:
+            return None
+
+        token = prefix[idx + 3 :]
+        if len(token) == 0:
+            return None
+        if not all(ch.isalnum() or ch == "_" for ch in token):
+            return None
+
+        return (idx + 3, self.cursor, token)
+
+    def _choose_suggestion(self, token):
+        if not token or not self.extension_names:
+            return None
+
+        prefix_matches = [name for name in self.extension_names if name.startswith(token)]
+        if prefix_matches:
+            prefix_matches.sort(key=lambda x: (len(x), x))
+            chosen = prefix_matches[0]
+            display = chosen[len(token) :]
+            return chosen, display
+
+        close = difflib.get_close_matches(token, self.extension_names, n=1, cutoff=0.6)
+        if close:
+            chosen = close[0]
+            if chosen.startswith(token):
+                display = chosen[len(token) :]
+            else:
+                display = f" -> df.{chosen}"
+            return chosen, display
+        return None
+
+    def _get_suggestion(self):
+        token_info = self._extract_df_token()
+        if not token_info:
+            return None
+        start, end, token = token_info
+        suggestion = self._choose_suggestion(token)
+        if not suggestion:
+            return None
+        chosen, display = suggestion
+        return {
+            "token": chosen,
+            "display": display,
+            "start": start,
+            "end": end,
+        }
+
+    def _apply_suggestion(self, suggestion):
+        token_start = suggestion["start"]
+        token_end = suggestion["end"]
+        token = suggestion["token"]
+        self.buffer = self.buffer[:token_start] + token + self.buffer[token_end:]
+        self.cursor = token_start + len(token)
+        self.hscroll = min(self.hscroll, max(0, self.cursor))
+        self.history_idx = None
 
     # ---------- input handling ----------
     def handle_key(self, ch):
@@ -76,6 +158,12 @@ class CommandPane:
                         self.hscroll = 0
                     else:
                         self._apply_history()
+            return None
+
+        if ch == 9:  # Tab
+            suggestion = self._get_suggestion()
+            if suggestion:
+                self._apply_suggestion(suggestion)
             return None
 
         # submit
@@ -144,6 +232,20 @@ class CommandPane:
             win.addnstr(0, len(prompt), visible, text_w)
         except curses.error:
             pass
+
+        if self.active:
+            suggestion = self._get_suggestion()
+            if suggestion:
+                display = suggestion.get("display", "") or ""
+                cursor_col = self.cursor - self.hscroll
+                if display and 0 <= cursor_col < text_w:
+                    ghost_start = len(prompt) + cursor_col
+                    remaining = text_w - cursor_col
+                    ghost_text = display[:remaining]
+                    try:
+                        win.addnstr(0, ghost_start, ghost_text, remaining, self.ghost_attr)
+                    except curses.error:
+                        pass
 
         if active and self.active:
             cx = len(prompt) + (self.cursor - self.hscroll)
