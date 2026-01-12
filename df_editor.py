@@ -993,7 +993,13 @@ class DfEditor:
 
                     if ch == ord("e"):
                         self._show_leader_status(",e")
-                        self._enter_cell_insert_at_end(col, base)
+                        is_expanded = getattr(self.state, "expand_all_rows", False) or (
+                            self.grid.curr_row in getattr(self.state, "expanded_rows", set())
+                        )
+                        if is_expanded:
+                            self.queue_external_edit(preserve_cell_mode=False)
+                        else:
+                            self._enter_cell_insert_at_end(col, base)
                         return
 
                     if ch == ord("v"):
@@ -1299,6 +1305,12 @@ class DfEditor:
                 return
 
             if ch == ord("i"):
+                is_expanded = getattr(self.state, "expand_all_rows", False) or (
+                    self.grid.curr_row in getattr(self.state, "expanded_rows", set())
+                )
+                if is_expanded:
+                    self.queue_external_edit(preserve_cell_mode=False)
+                    return
                 self.cell_col = col
                 self.cell_buffer = base
                 if not self.cell_buffer.endswith(" "):

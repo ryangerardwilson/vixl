@@ -164,7 +164,7 @@ Characteristics:
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
 - Single-line command bar; Enter/Ctrl+E executes; Esc cancels; Ctrl+P/Ctrl+N history.
 - Output modal appears only when there is output; shortcuts modal via `?`; both close with Esc/q/Enter; j/k scroll.
-- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`, `, v` (external edit via `$VISUAL`/`$EDITOR`, syncs back with status), `, y` (copy df to clipboard as TSV via wl-copy); `,er` expands/collapses the current row; `,ear` expands/collapses all rows; `,ec` collapses all expansions; Ctrl+L remains the 20% right jump.
+- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`, `, v` (external edit via `$VISUAL`/`$EDITOR`, syncs back with status), `, y` (copy df to clipboard as TSV via wl-copy); `,er` expands/collapses the current row; `,ear` expands/collapses all rows; `,ec` collapses all expansions; expanded rows wrap on word boundaries (hard-break only for overlong words); when expanded, `i` and `, e` open the external editor; Ctrl+L remains the 20% right jump.
 - Save-As flow: inline prompt on Ctrl+S/Ctrl+T when unsaved; validates .csv/.parquet; Ctrl+T exits only after successful save.
 - Overlays auto-size to content up to 50% of terminal height, centered.
 

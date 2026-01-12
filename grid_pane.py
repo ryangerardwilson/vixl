@@ -214,8 +214,42 @@ class GridPane:
                 if part == "":
                     lines.append("")
                 else:
-                    for i in range(0, len(part), width):
-                        lines.append(part[i : i + width])
+                    words = part.split(" ")
+                    current = ""
+                    for word in words:
+                        if current == "":
+                            if len(word) <= width:
+                                current = word
+                            else:
+                                # hard-break overlong word
+                                for i in range(0, len(word), width):
+                                    lines.append(word[i : i + width])
+                                    if len(lines) >= max_lines:
+                                        break
+                                if len(lines) >= max_lines:
+                                    break
+                                current = ""
+                        else:
+                            if len(current) + 1 + len(word) <= width:
+                                current = f"{current} {word}"
+                            else:
+                                lines.append(current)
+                                if len(lines) >= max_lines:
+                                    break
+                                if len(word) <= width:
+                                    current = word
+                                else:
+                                    for i in range(0, len(word), width):
+                                        lines.append(word[i : i + width])
+                                        if len(lines) >= max_lines:
+                                            break
+                                    current = ""
+                        if len(lines) >= max_lines:
+                            break
+                    if len(lines) >= max_lines:
+                        break
+                    if current or current == "":
+                        lines.append(current)
                 if len(lines) >= max_lines:
                     break
             if not lines:
@@ -234,7 +268,26 @@ class GridPane:
                 if part == "":
                     lines += 1
                 else:
-                    lines += max(1, (len(part) + width - 1) // width)
+                    words = part.split(" ")
+                    current = ""
+                    for word in words:
+                        if current == "":
+                            if len(word) <= width:
+                                current = word
+                            else:
+                                lines += max(1, (len(word) + width - 1) // width)
+                        else:
+                            if len(current) + 1 + len(word) <= width:
+                                current = f"{current} {word}"
+                            else:
+                                lines += 1
+                                if len(word) <= width:
+                                    current = word
+                                else:
+                                    lines += max(1, (len(word) + width - 1) // width)
+                                    current = ""
+                    if current or current == "":
+                        lines += 1
             return max(1, lines)
 
         # header
