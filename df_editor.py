@@ -43,6 +43,7 @@ class DfEditor:
         self.external_proc = None
         self.external_tmp_path = None
         self.external_meta = None
+        self.external_receiving = False
 
     # ---------- helpers ----------
     def _coerce_cell_value(self, col, text):
@@ -219,10 +220,16 @@ class DfEditor:
         c = min(max(0, self.grid.curr_col), max(0, total_cols - 1))
         col = self.state.df.columns[c]
 
-        self.pending_edit_snapshot = {"row": r, "col": c, "col_name": col}
+        idx_label = self.state.df.index[r] if len(self.state.df.index) > r else r
+        self.pending_edit_snapshot = {
+            "row": r,
+            "col": c,
+            "col_name": col,
+            "idx_label": idx_label,
+        }
         self.pending_preserve_cell_mode = preserve_cell_mode
         self.pending_external_edit = True
-        self._set_status(f"Editing (row {r + 1}, col {c + 1})", 600)
+        self._set_status(f"Editing '{col}' at index {idx_label}", 600)
         self._reset_count()
 
     def run_pending_external_edit(self):
@@ -301,12 +308,18 @@ class DfEditor:
         if self.external_proc.poll() is None:
             return
 
+        if not self.external_receiving:
+            self.external_receiving = True
+            self._set_status("Receiving new data from editor", 5)
+            return
+
         rc = self.external_proc.returncode
         tmp_path = self.external_tmp_path
         meta = self.external_meta or {}
         self.external_proc = None
         self.external_tmp_path = None
         self.external_meta = None
+        self.external_receiving = False
 
         base = meta.get("base", "")
         col = meta.get("col_name", "")
