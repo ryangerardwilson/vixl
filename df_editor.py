@@ -350,8 +350,9 @@ class DfEditor:
             if preserve_cell_mode:
                 self.cell_col = col
                 self.cell_buffer = new_text
-                self.cell_cursor = min(len(self.cell_buffer), self.cell_cursor)
+                self.cell_cursor = 0
                 self.cell_hscroll = 0
+                self.mode = "cell_normal"
                 self._autoscroll_cell_normal()
             self._reset_count()
             return
@@ -366,10 +367,10 @@ class DfEditor:
             if preserve_cell_mode:
                 self.cell_col = col
                 self.cell_buffer = new_text
-                self.cell_cursor = len(self.cell_buffer)
+                self.cell_cursor = 0
                 self.cell_hscroll = 0
-                self._autoscroll_cell_normal()
                 self.mode = "cell_normal"
+                self._autoscroll_cell_normal()
             self._set_status("Cell updated (editor)", 2)
         except Exception:
             self._set_status(f"Invalid value for column '{col}'", 3)
