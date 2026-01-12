@@ -175,11 +175,7 @@ class CommandPane:
         replacement = suggestion["replacement"]
         self.buffer = self.buffer[:token_start] + replacement + self.buffer[token_end:]
 
-        paren_idx = replacement.find("(")
-        if paren_idx != -1:
-            self.cursor = token_start + paren_idx + 1
-        else:
-            self.cursor = token_start + len(replacement)
+        self.cursor = token_start + len(replacement)
 
         self.hscroll = min(self.hscroll, max(0, self.cursor))
         self.history_idx = None

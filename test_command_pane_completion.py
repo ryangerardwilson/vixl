@@ -16,7 +16,7 @@ def test_custom_df_vixl_template_inserts_full_and_sets_cursor_inside_parens():
     _apply_completion(pane)
 
     assert pane.get_buffer() == "df.vixl.distribution_ascii_bar(bins=10)"
-    assert pane.get_buffer()[pane.cursor - 1] == "("
+    assert pane.cursor == len(pane.get_buffer())
 
 
 def test_extension_completion_fallback_when_no_custom_match():
@@ -40,5 +40,5 @@ def test_df_base_template_inserts_and_positions_cursor():
     _apply_completion(pane)
 
     assert pane.get_buffer() == "df.pivot()"
-    # Cursor should be placed just after the opening paren
-    assert pane.cursor == pane.get_buffer().index("(") + 1
+    # Cursor should be at the end of the inserted template
+    assert pane.cursor == len(pane.get_buffer())
