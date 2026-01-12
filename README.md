@@ -31,7 +31,7 @@ python main.py <csv-or-parquet-file>
   ```
 - Then reload your shell (or run `source ~/.bashrc`).
 - If completion is not detected, Vixl prints a warning and continues to launch. To silence the warning without enabling completion, set `VIXL_SKIP_COMPLETION_CHECK=1` in your environment.
-- Behavior: after activation, `python main.py <TAB>` and `vixl <TAB>` suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths. Dotfiles and dot-directories are hidden unless you start the path with a leading `.`; `__pycache__/` is also hidden unless you explicitly type that prefix.
+- Behavior: after activation, **only** `vixl <TAB>` is completed; `python main.py` is intentionally not hooked to avoid interfering with ordinary Python. Completions suggest only `.csv` and `.parquet` files for the first argument; directories are still offered so you can descend paths. Dotfiles and dot-directories are hidden unless you start the path with a leading `.`; `__pycache__/` is also hidden unless you explicitly type that prefix.
 - For a friendly command name, create a symlink in a PATH directory (and make `main.py` executable if needed), e.g.: `ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"` (or set an alias `alias vixl='python /path/to/main.py'`). Completion covers the `vixl` command once the bashrc block is sourced.
 
 ---
@@ -114,10 +114,13 @@ python main.py <csv-or-parquet-file>
 - Mutation contract:
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`. Without this, changes from extension calls are discarded.
   - Natural commands (no extension calls) auto-commit the sandboxed `df`.
-- Config: `~/.config/vixl/config.py` supports `AUTO_COMMIT = True/False` (default False).
-- Config (optional, JSON): `~/.config/vixl/config.json` supports `cmd_mode.tab_fuzzy_expansions_register` for cmd-mode Tab insertions. Example:
+- Config: `~/.config/vixl/config.json` (JSON-only). Supported keys:
+  - `AUTO_COMMIT` (bool, default False)
+  - `cmd_mode.tab_fuzzy_expansions_register` (list of strings) for cmd-mode Tab insertions.
+  Example:
   ```json
   {
+    "AUTO_COMMIT": false,
     "cmd_mode": {
       "tab_fuzzy_expansions_register": [
         "df.vixl.distribution_ascii_bar(bins=10)",

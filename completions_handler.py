@@ -47,14 +47,9 @@ _vixl_files() {
     local hide_dotfiles=1
     [[ "$cur" == .* ]] && hide_dotfiles=0
 
-    if [[ "$cmd" == "python" || "$cmd" == "python3" ]]; then
-        [[ ${#COMP_WORDS[@]} -ge 2 && "${COMP_WORDS[1]}" == "main.py" ]] || return 0
-        [[ $COMP_CWORD -eq 2 ]] || return 0
-    elif [[ "$cmd" == "main.py" || "$cmd" == "vixl" ]]; then
-        [[ $COMP_CWORD -eq 1 ]] || return 0
-    else
-        return 0
-    fi
+    # Only activate for the 'vixl' command; do not affect python/main.py
+    [[ "$cmd" == "vixl" ]] || return 0
+    [[ $COMP_CWORD -eq 1 ]] || return 0
 
     COMPREPLY=()
     while IFS= read -r f; do
@@ -74,9 +69,6 @@ _vixl_files() {
     return 0
 }
 
-complete -o filenames -F _vixl_files python
-complete -o filenames -F _vixl_files python3
-complete -o filenames -F _vixl_files main.py
 complete -o filenames -F _vixl_files vixl
 """
         self.BASH_COMPLETION_FILE.write_text(script)
@@ -89,10 +81,16 @@ complete -o filenames -F _vixl_files vixl
             text = self.BASH_COMPLETION_FILE.read_text()
         except OSError:
             return True
+        legacy_bindings = (
+            "complete -o filenames -F _vixl_files python" in text
+            or "complete -o filenames -F _vixl_files python3" in text
+            or "complete -o filenames -F _vixl_files main.py" in text
+        )
         return (
             "complete -o filenames -F _vixl_files vixl" not in text
             or "HIDE_DOTFILES" not in text
             or "HIDE_PYCACHE" not in text
+            or legacy_bindings
         )
 
     def _rc_paths(self) -> list[Path]:

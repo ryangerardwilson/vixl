@@ -4,7 +4,6 @@ HOME = os.path.expanduser("~")
 CONFIG_DIR = os.path.join(HOME, ".config", "vixl")
 HISTORY_PATH = os.path.join(CONFIG_DIR, "history.log")
 EXTENSIONS_DIR = os.path.join(CONFIG_DIR, "extensions")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.py")
 CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings
@@ -28,16 +27,6 @@ def load_config():
         "AUTO_COMMIT": AUTO_COMMIT_DEFAULT,
         "TAB_FUZZY_EXPANSIONS_REGISTER": list(TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT),
     }
-    if os.path.exists(CONFIG_FILE):
-        try:
-            ns = {}
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                code = f.read()
-            exec(compile(code, CONFIG_FILE, "exec"), ns, ns)
-            if "AUTO_COMMIT" in ns:
-                cfg["AUTO_COMMIT"] = bool(ns["AUTO_COMMIT"])
-        except Exception:
-            pass
 
     if os.path.exists(CONFIG_JSON):
         try:
@@ -45,21 +34,21 @@ def load_config():
 
             with open(CONFIG_JSON, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            cmd_mode = data.get("cmd_mode") if isinstance(data, dict) else None
-            reg = (
-                cmd_mode.get("tab_fuzzy_expansions_register")
-                if isinstance(cmd_mode, dict)
-                else None
-            )
-            if isinstance(reg, list):
-                cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] = [
-                    str(item) for item in reg if isinstance(item, str)
-                ]
+            if isinstance(data, dict):
+                if "AUTO_COMMIT" in data:
+                    cfg["AUTO_COMMIT"] = bool(data["AUTO_COMMIT"])
+                cmd_mode = data.get("cmd_mode")
+                reg = (
+                    cmd_mode.get("tab_fuzzy_expansions_register")
+                    if isinstance(cmd_mode, dict)
+                    else None
+                )
+                if isinstance(reg, list):
+                    cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] = [
+                        str(item) for item in reg if isinstance(item, str)
+                    ]
         except Exception:
             pass
 
     return cfg
 
-
-# Example config.py the user can create:
-# AUTO_COMMIT = True
