@@ -36,6 +36,14 @@ class DfEditor:
         # Repeat last action (mutations only)
         self.last_action = None
 
+        # External editor (queued and active) state
+        self.pending_external_edit = False
+        self.pending_preserve_cell_mode = False
+        self.pending_edit_snapshot = None
+        self.external_proc = None
+        self.external_tmp_path = None
+        self.external_meta = None
+
     # ---------- helpers ----------
     def _coerce_cell_value(self, col, text):
         dtype = self.state.df[col].dtype
@@ -184,49 +192,88 @@ class DfEditor:
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
         return f"{editor} {shlex.quote(tmp_path)}"
 
-    def _launch_in_alacritty(self, editor_cmd: str) -> bool:
+    def _launch_in_alacritty(self, editor_cmd: str):
         try:
-            curses.def_prog_mode()
-        except curses.error:
-            pass
-        try:
-            curses.endwin()
-        except curses.error:
-            pass
-
-        success = False
-        try:
-            subprocess.run(
-                ["alacritty", "-e", "bash", "-lc", editor_cmd],
-                check=True,
+            proc = subprocess.Popen(
+                ["alacritty", "-e", "bash", "-lc", editor_cmd]
             )
-            success = True
+            return proc
         except FileNotFoundError:
-            success = False
-        except subprocess.CalledProcessError:
-            success = False
-        finally:
-            try:
-                curses.reset_prog_mode()
-                try:
-                    curses.curs_set(1)
-                except curses.error:
-                    pass
-            except curses.error:
-                pass
-        return success
+            return None
+        except Exception:
+            return None
 
-    def _edit_cell_in_editor(self, preserve_cell_mode: bool, new_window: bool):
+    def queue_external_edit(self, preserve_cell_mode: bool):
+        if self.external_proc is not None:
+            self._set_status("Already editing externally", 3)
+            self._reset_count()
+            return
         if len(self.state.df.columns) == 0 or len(self.state.df) == 0:
             self._set_status("No cell to edit", 3)
+            self._reset_count()
             return
 
         total_rows = len(self.state.df)
         total_cols = len(self.state.df.columns)
         r = min(max(0, self.grid.curr_row), max(0, total_rows - 1))
         c = min(max(0, self.grid.curr_col), max(0, total_cols - 1))
-
         col = self.state.df.columns[c]
+
+        self.pending_edit_snapshot = {"row": r, "col": c, "col_name": col}
+        self.pending_preserve_cell_mode = preserve_cell_mode
+        self.pending_external_edit = True
+        self._set_status(f"Editing (row {r + 1}, col {c + 1})", 600)
+        self._reset_count()
+
+    def run_pending_external_edit(self):
+        if not self.pending_external_edit:
+            return
+        if self.external_proc is not None:
+            return
+
+        snap = self.pending_edit_snapshot or {}
+        r = snap.get("row", self.grid.curr_row)
+        c = snap.get("col", self.grid.curr_col)
+        col = snap.get("col_name") or (self.state.df.columns[c] if len(self.state.df.columns) else "")
+
+        self.pending_external_edit = False
+        self.pending_edit_snapshot = None
+
+        proc, tmp_path, base = self._start_external_edit_process(
+            row_override=r,
+            col_override=c,
+            col_name=col,
+        )
+        if proc is None:
+            self._set_status("Open in Alacritty failed", 3)
+            self.pending_preserve_cell_mode = False
+            return
+
+        self.external_proc = proc
+        self.external_tmp_path = tmp_path
+        self.external_meta = {
+            "row": r,
+            "col": c,
+            "col_name": col,
+            "base": base,
+            "preserve_cell_mode": self.pending_preserve_cell_mode,
+        }
+        self.pending_preserve_cell_mode = False
+
+    def _start_external_edit_process(
+        self,
+        row_override: int,
+        col_override: int,
+        col_name: str,
+    ):
+        if len(self.state.df.columns) == 0 or len(self.state.df) == 0:
+            return None, None, None
+
+        total_rows = len(self.state.df)
+        total_cols = len(self.state.df.columns)
+        r = min(max(0, row_override), max(0, total_rows - 1))
+        c = min(max(0, col_override), max(0, total_cols - 1))
+
         val = self.state.df.iloc[r, c] if total_rows > 0 else None
         base = "" if (val is None or pd.isna(val)) else str(val)
 
@@ -239,54 +286,52 @@ class DfEditor:
             tmp.close()
 
         editor_cmd = self._build_editor_command(tmp_path)
-
-        launched = True
-        if new_window:
-            launched = self._launch_in_alacritty(editor_cmd)
-            if not launched:
-                self._set_status("Open in Alacritty failed", 3)
-        else:
-            try:
-                curses.def_prog_mode()
-            except curses.error:
-                pass
-            try:
-                curses.endwin()
-            except curses.error:
-                pass
-            try:
-                subprocess.run(["bash", "-lc", editor_cmd], check=True)
-            except FileNotFoundError:
-                launched = False
-            except subprocess.CalledProcessError:
-                launched = False
-            finally:
-                try:
-                    curses.reset_prog_mode()
-                    try:
-                        curses.curs_set(1)
-                    except curses.error:
-                        pass
-                except curses.error:
-                    pass
-                if not launched:
-                    self._set_status("Edit canceled", 3)
-
-        try:
-            with open(tmp_path, "r", encoding="utf-8") as fh:
-                new_text = fh.read()
-        except Exception:
-            new_text = base
-        finally:
+        proc = self._launch_in_alacritty(editor_cmd)
+        if proc is None:
             try:
                 os.unlink(tmp_path)
             except Exception:
                 pass
+            return None, None, None
+        return proc, tmp_path, base
 
-        if not launched:
+    def _complete_external_edit_if_done(self):
+        if self.external_proc is None:
+            return
+        if self.external_proc.poll() is None:
             return
 
-        new_text = new_text.rstrip("\n")
+        rc = self.external_proc.returncode
+        tmp_path = self.external_tmp_path
+        meta = self.external_meta or {}
+        self.external_proc = None
+        self.external_tmp_path = None
+        self.external_meta = None
+
+        base = meta.get("base", "")
+        col = meta.get("col_name", "")
+        r = meta.get("row", self.grid.curr_row)
+        c = meta.get("col", self.grid.curr_col)
+        preserve_cell_mode = meta.get("preserve_cell_mode", False)
+
+        new_text = base
+        if tmp_path:
+            try:
+                with open(tmp_path, "r", encoding="utf-8") as fh:
+                    new_text = fh.read()
+            except Exception:
+                new_text = base
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+        if rc not in (0, None):
+            self._set_status("Edit canceled", 3)
+            return
+
+        new_text = (new_text or "").rstrip("\n")
         if new_text == base:
             self._set_status("No changes", 2)
             if preserve_cell_mode:
@@ -298,8 +343,8 @@ class DfEditor:
             self._reset_count()
             return
 
-        self._push_undo()
         try:
+            self._push_undo()
             coerced = self._coerce_cell_value(col, new_text)
             self.state.df.iloc[r, c] = coerced
             self.grid.df = self.state.df
@@ -898,8 +943,7 @@ class DfEditor:
 
                     if ch == ord("v"):
                         self._show_leader_status(",v")
-                        self._edit_cell_in_editor(preserve_cell_mode=False, new_window=True)
-                        self._reset_count()
+                        self.queue_external_edit(preserve_cell_mode=False)
                         return
 
                     if ch == ord("i"):
@@ -1122,10 +1166,7 @@ class DfEditor:
                         return
                     if ch == ord("v"):
                         self._show_leader_status(",v")
-                        self._edit_cell_in_editor(
-                            preserve_cell_mode=True, new_window=True
-                        )
-                        self._reset_count()
+                        self.queue_external_edit(preserve_cell_mode=True)
                         return
                     if ch == ord("c"):
                         self.cell_leader_state = "c"
