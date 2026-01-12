@@ -87,9 +87,9 @@ python main.py <csv-or-parquet-file>
 - Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
-- Row expansion (leader): `,er` expands/collapses the current row; `,ear` expands/collapses all rows; `,ec` collapses all expansions. Expanded rows wrap vertically on word boundaries (hard-break only for overlong words) within existing column widths.
+- Row expansion (leader): `,xr` expands/collapses the current row; `,xar` expands/collapses all rows; `,xc` collapses all expansions. Expanded rows wrap vertically on word boundaries (hard-break only for overlong words) within existing column widths.
 - Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
-- Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer). When the current row is expanded (via `,er`/`,ear`), `i` and `, e` open the external editor instead of inline insert.
+- Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer). When the current row is expanded (via `,xr`/`,xar`), `i` and `, e` open the external editor instead of inline insert.
 - External edit current cell: `, v` launches your `$VISUAL`/`$EDITOR` (via Alacritty if available); status shows "Receiving new data from editor" while syncing; returns to cell_normal at the cell start.
 - Clear cell: `x` (in df mode)
 - Insert rows: `, i r a` (insert above), `, i r b` (insert below); Delete row: `, d r`

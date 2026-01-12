@@ -175,8 +175,8 @@ class DfEditor:
             "plus_r": ",+r",
             "minus": ",-",
             "minus_r": ",-r",
-            "e": ",e",
-            "ea": ",ea",
+            "x": ",x",
+            "xa": ",xa",
         }
 
         return mapping.get(state, ",")
@@ -945,10 +945,6 @@ class DfEditor:
                         self._reset_count()
                         return
 
-                    if ch == ord("e"):
-                        self.df_leader_state = "e"
-                        self._show_leader_status(self._leader_seq("e"))
-                        return
 
                     if ch == ord("j"):
                         if total_rows == 0:
@@ -1005,6 +1001,11 @@ class DfEditor:
                     if ch == ord("v"):
                         self._show_leader_status(",v")
                         self.queue_external_edit(preserve_cell_mode=False)
+                        return
+
+                    if ch == ord("x"):
+                        self.df_leader_state = "x"
+                        self._show_leader_status(self._leader_seq("x"))
                         return
 
                     if ch == ord("i"):
@@ -1107,26 +1108,26 @@ class DfEditor:
                     self._show_leader_status("")
                     return
 
-                if state == "e":
+                if state == "x":
                     if ch == ord("r"):
-                        self._show_leader_status(",er")
+                        self._show_leader_status(",xr")
                         self._toggle_row_expanded()
                         return
                     if ch == ord("a"):
-                        self.df_leader_state = "ea"
-                        self._show_leader_status(self._leader_seq("ea"))
+                        self.df_leader_state = "xa"
+                        self._show_leader_status(self._leader_seq("xa"))
                         return
                     if ch == ord("c"):
-                        self._show_leader_status(",ec")
+                        self._show_leader_status(",xc")
                         self._collapse_all_rows()
                         return
                     self._show_leader_status("")
                     self._reset_count()
                     return
 
-                if state == "ea":
+                if state == "xa":
                     if ch == ord("r"):
-                        self._show_leader_status(",ear")
+                        self._show_leader_status(",xar")
                         self._toggle_all_rows_expanded()
                         return
                     self._show_leader_status("")
@@ -1240,6 +1241,13 @@ class DfEditor:
 
                 if state == "leader":
                     if ch == ord("e"):
+                        is_expanded = getattr(self.state, "expand_all_rows", False) or (
+                            self.grid.curr_row in getattr(self.state, "expanded_rows", set())
+                        )
+                        if is_expanded:
+                            self._show_leader_status(",v")
+                            self.queue_external_edit(preserve_cell_mode=True)
+                            return
                         # Emulate `$` then enter insert
                         self.df_leader_state = None
                         self.cell_leader_state = None
