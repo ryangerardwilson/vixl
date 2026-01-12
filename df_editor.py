@@ -1,5 +1,9 @@
 # ~/Apps/vixl/df_editor.py
 import curses
+import os
+import shlex
+import subprocess
+import tempfile
 import pandas as pd
 
 
@@ -175,6 +179,143 @@ class DfEditor:
             if getattr(cp, "active", False):
                 return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
+
+    def _build_editor_command(self, tmp_path: str) -> str:
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
+        return f"{editor} {shlex.quote(tmp_path)}"
+
+    def _launch_in_alacritty(self, editor_cmd: str) -> bool:
+        try:
+            curses.def_prog_mode()
+        except curses.error:
+            pass
+        try:
+            curses.endwin()
+        except curses.error:
+            pass
+
+        success = False
+        try:
+            subprocess.run(
+                ["alacritty", "-e", "bash", "-lc", editor_cmd],
+                check=True,
+            )
+            success = True
+        except FileNotFoundError:
+            success = False
+        except subprocess.CalledProcessError:
+            success = False
+        finally:
+            try:
+                curses.reset_prog_mode()
+                try:
+                    curses.curs_set(1)
+                except curses.error:
+                    pass
+            except curses.error:
+                pass
+        return success
+
+    def _edit_cell_in_editor(self, preserve_cell_mode: bool, new_window: bool):
+        if len(self.state.df.columns) == 0 or len(self.state.df) == 0:
+            self._set_status("No cell to edit", 3)
+            return
+
+        total_rows = len(self.state.df)
+        total_cols = len(self.state.df.columns)
+        r = min(max(0, self.grid.curr_row), max(0, total_rows - 1))
+        c = min(max(0, self.grid.curr_col), max(0, total_cols - 1))
+
+        col = self.state.df.columns[c]
+        val = self.state.df.iloc[r, c] if total_rows > 0 else None
+        base = "" if (val is None or pd.isna(val)) else str(val)
+
+        tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8")
+        tmp_path = tmp.name
+        try:
+            tmp.write(base)
+            tmp.flush()
+        finally:
+            tmp.close()
+
+        editor_cmd = self._build_editor_command(tmp_path)
+
+        launched = True
+        if new_window:
+            launched = self._launch_in_alacritty(editor_cmd)
+            if not launched:
+                self._set_status("Open in Alacritty failed", 3)
+        else:
+            try:
+                curses.def_prog_mode()
+            except curses.error:
+                pass
+            try:
+                curses.endwin()
+            except curses.error:
+                pass
+            try:
+                subprocess.run(["bash", "-lc", editor_cmd], check=True)
+            except FileNotFoundError:
+                launched = False
+            except subprocess.CalledProcessError:
+                launched = False
+            finally:
+                try:
+                    curses.reset_prog_mode()
+                    try:
+                        curses.curs_set(1)
+                    except curses.error:
+                        pass
+                except curses.error:
+                    pass
+                if not launched:
+                    self._set_status("Edit canceled", 3)
+
+        try:
+            with open(tmp_path, "r", encoding="utf-8") as fh:
+                new_text = fh.read()
+        except Exception:
+            new_text = base
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        if not launched:
+            return
+
+        new_text = new_text.rstrip("\n")
+        if new_text == base:
+            self._set_status("No changes", 2)
+            if preserve_cell_mode:
+                self.cell_col = col
+                self.cell_buffer = new_text
+                self.cell_cursor = min(len(self.cell_buffer), self.cell_cursor)
+                self.cell_hscroll = 0
+                self._autoscroll_cell_normal()
+            self._reset_count()
+            return
+
+        self._push_undo()
+        try:
+            coerced = self._coerce_cell_value(col, new_text)
+            self.state.df.iloc[r, c] = coerced
+            self.grid.df = self.state.df
+            self._set_last_action("cell_set", value=coerced)
+            self.pending_count = None
+            if preserve_cell_mode:
+                self.cell_col = col
+                self.cell_buffer = new_text
+                self.cell_cursor = len(self.cell_buffer)
+                self.cell_hscroll = 0
+                self._autoscroll_cell_normal()
+                self.mode = "cell_normal"
+            self._set_status("Cell updated (editor)", 2)
+        except Exception:
+            self._set_status(f"Invalid value for column '{col}'", 3)
+        self._reset_count()
 
     # ---------- counts ----------
     def _reset_last_action(self):
@@ -755,6 +896,12 @@ class DfEditor:
                         self._enter_cell_insert_at_end(col, base)
                         return
 
+                    if ch == ord("v"):
+                        self._show_leader_status(",v")
+                        self._edit_cell_in_editor(preserve_cell_mode=False, new_window=True)
+                        self._reset_count()
+                        return
+
                     if ch == ord("i"):
                         self.df_leader_state = "i"
                         self._show_leader_status(self._leader_seq("i"))
@@ -971,6 +1118,13 @@ class DfEditor:
                         )
                         self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
                         self.mode = "cell_insert"
+                        self._reset_count()
+                        return
+                    if ch == ord("v"):
+                        self._show_leader_status(",v")
+                        self._edit_cell_in_editor(
+                            preserve_cell_mode=True, new_window=True
+                        )
                         self._reset_count()
                         return
                     if ch == ord("c"):

@@ -35,6 +35,7 @@ class ShortcutHelpHandler:
             "  n - enter cell_normal on current cell (leader sequences are shown in status)",
             "  i - edit cell (preload)",
             "  , e - edit cell (preload)",
+            "  , v - edit cell in $EDITOR (Alacritty window)",
             "  , c c - edit cell empty",
             "  x - clear current cell",
             "  , i r a - insert row above",
@@ -63,5 +64,6 @@ class ShortcutHelpHandler:
             "  (Numeric prefixes) h/l, w/b",
             "  h / l - move cursor within buffer; 0 / $ - line edges; w / b - word nav",
             "  , e / , c c",
+            "  , v - edit current cell in $EDITOR (Alacritty window)",
             "  i - insert; Esc - back to df normal",
         ]
