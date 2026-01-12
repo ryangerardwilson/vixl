@@ -68,10 +68,12 @@ python main.py <csv-or-parquet-file>
 
 ### Command bar (single-line)
 - Enter: `:` (from df focus)
-- Execute: Enter / Ctrl+E
+- Execute: Enter
 - Cancel: Esc
 - History: Ctrl+P / Ctrl+N (Ctrl+N past newest clears)
-- Edit keys: Left/Right/Home/End, Backspace; Emacs-style: Alt+F / Alt+B (word fwd/back), Ctrl+W (delete word backward), Ctrl+U (kill to line start)
+- Edit/navigation keys: Left/Right/Home/End, Backspace; Emacs-style: Alt+F / Alt+B (word fwd/back), Ctrl+W (delete word backward), Ctrl+U (kill to line start), Ctrl+H / Ctrl+D (move left/right), Ctrl+A / Ctrl+E (line start/end)
+
+> Note: Vixl is vi-first for grid navigation, but the command bar deliberately uses Emacs-style editing keys. In a single-line, insert-first, REPL-like input (like a terminal), Emacs word-motion/kill bindings provide faster, lower-friction text editing than modal vi navigation, so they are enabled here.
 
 ### Output modal
 - Appears only when there is output from a command.
