@@ -281,13 +281,21 @@ class CommandPane:
                 self.history_idx = None
             return None
 
-        if ch in (curses.KEY_BACKSPACE, 127, 8):
+        if ch in (curses.KEY_BACKSPACE, 127):
             if self.cursor > 0:
                 self.buffer = (
                     self.buffer[: self.cursor - 1] + self.buffer[self.cursor :]
                 )
                 self.cursor -= 1
             self.history_idx = None
+            return None
+
+        if ch == 8:  # Ctrl+H, move left
+            self.cursor = max(0, self.cursor - 1)
+            return None
+
+        if ch == 4:  # Ctrl+D, move right
+            self.cursor = min(len(self.buffer), self.cursor + 1)
             return None
 
         if ch == curses.KEY_LEFT:

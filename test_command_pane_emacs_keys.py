@@ -42,6 +42,16 @@ def test_ctrl_u_kills_to_start():
     assert pane.cursor == 0
 
 
+def test_ctrl_h_d_moves_left_right():
+    pane = CommandPane()
+    pane.set_buffer("abcd")
+    pane.cursor = 2
+    _feed(pane, [8])  # Ctrl+H move left
+    assert pane.cursor == 1
+    _feed(pane, [4])  # Ctrl+D move right
+    assert pane.cursor == 2
+
+
 def test_esc_alone_cancels():
     pane = CommandPane()
     pane.activate()
