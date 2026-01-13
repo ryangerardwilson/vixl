@@ -83,29 +83,24 @@ python main.py <csv-or-parquet-file>
 - `?` (from df) opens the shortcuts list.
 - Close: Esc / q / Enter; Scroll: j / k
 
-### DF navigation & editing (df normal)
-- Numeric prefixes (counts) supported for: h/j/k/l, Ctrl+J/K/H/L, ,ira / ,irb, ,dr, ,x+ / ,x-; in cell_normal: h/l and w/b
+### DF navigation & editing
+- Numeric prefixes (counts) supported for: h/j/k/l, Ctrl+J/K/H/L, ,ira / ,irb, ,dr, ,x+ / ,x-
 - Repeat last change: `.` (mutations only; excludes column insert/rename/delete and command bar commands)
 - Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
 - Row expansion (leader): `,xr` expands/collapses the current row; `,xar` expands/collapses all rows; `,xc` collapses all expansions. Expanded rows wrap vertically on word boundaries (hard-break only for overlong words) within existing column widths.
-- Open command: `:`; `n` enters cell_normal on current cell (leader sequences show in the status bar as you type)
-- Edit cell: `i` (preload value), or `, e` (preload), or `, c c` (empty buffer). When the current row is expanded (via `,xr`/`,xar`), `i` and `, e` open the external editor instead of inline insert.
-- External edit current cell: `, v` launches your `$VISUAL`/`$EDITOR` (via Alacritty if available); status shows "Receiving new data from editor" while syncing; returns to cell_normal at the cell start.
-- Clear cell: `x` (in df mode)
+- Open command bar: `:`
+- Edit cell: press `i`. Vixl suspends curses, opens **vim** in the current terminal with the cell value in a temp file, and resumes when vim exits. Exit code 0 commits the edit (with dtype coercion). Non-zero exit cancels with no changes.
+- Clear cell: `x`
 - Insert rows: `, i r a` (insert above), `, i r b` (insert below); Delete row: `, d r`
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
 - Adjust row lines (height): `,x+` (increase), `,x-` (decrease, min 1)
 - Copy to clipboard (via `wl-copy`): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value.
-- Preview JSON (read-only): `, p j` opens the current cell value as pretty-formatted JSON in Vim (Alacritty), view-only.
+- Preview JSON (read-only): `, p j` opens the current cell as pretty JSON in Vim (read-only flags) within the same terminal session.
 - `?` opens shortcuts
 
-
-### Cell edit modes
-- `cell_insert`: type to edit; Backspace deletes; Esc commits to `cell_normal`.
-- `cell_normal`: h / l moves within buffer; 0 / $ jump to line edges; w / b move by word; `, e` / `, c c` / `, d c` / `, n r`; `, v` opens the external editor for the current cell and returns with the cursor at the start; `i` enters insert; Esc returns to df normal.
 
 ### History
 - Stored at `~/.config/vixl/history.log`.

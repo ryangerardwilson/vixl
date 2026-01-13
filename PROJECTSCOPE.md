@@ -106,24 +106,13 @@ Rules:
 
 ---
 
-## 8. Insert & Command Interaction
+## 8. Editing & Command Interaction
 
-In **df mode**, interaction is strictly modal and intentional.
-
-- **df Normal mode** is used for navigation and selection only
-- **df Insert mode** is an intent-to-command bridge, not a free-form spreadsheet editor
-
-Behavior of df Insert mode:
-
-- `i` generates a context-aware Pandas mutation command
-- The prefilled command opens in the command pane
-- Users edit and execute explicitly in **command pane Insert mode**
-
-The grid is a navigation and visualization surface, never a text editor. All
-text entry occurs in the command pane, and all data mutation flows through
-explicit Python commands.
-
-Selection mirrors Vim visual mode semantics.
+- DF mode handles navigation, selection, and per-cell actions.
+- Pressing `i` opens **vim** in the current terminal with the focused cell value in a temp file; exiting vim with status 0 commits the edit (dtype-coerced), non-zero cancels.
+- The grid never enters an inline text-editing mode; all inline editing was removed in favor of vim.
+- Structural/bulk mutations (insert columns, run pandas transforms, etc.) remain explicit Python commands typed into the command bar (`:`).
+- The command bar continues to provide a sandboxed `df`/`pd`/`np` context for arbitrary expressions.
 
 ---
 
@@ -162,19 +151,17 @@ Characteristics:
 
 ### Features
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
-- Single-line command bar; Enter/Ctrl+E executes; Esc cancels; Ctrl+P/Ctrl+N history.
+- Single-line command bar; Enter executes; Esc cancels; Ctrl+P/Ctrl+N history.
 - Output modal appears only when there is output; shortcuts modal via `?`; both close with Esc/q/Enter; j/k scroll.
-- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i`, `, e`, `, c c`, `, d c`, `, n r`, `, v` (external edit via `$VISUAL`/`$EDITOR`, syncs back with status), `, y` (copy df to clipboard as TSV via wl-copy); `,xr` expands/collapses the current row; `,xar` expands/collapses all rows; `,xc` collapses all expansions; expanded rows wrap on word boundaries (hard-break only for overlong words); when expanded, `i` and `, e` open the external editor; Ctrl+L remains the 20% right jump.
+- DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i` (launch vim to edit current cell), `x`, `, i r a`, `, i r b`, `, d r`, `, i c a`, `, i c b`, `, d c`, `, r n c`, `, y a`, `, y c`, `,xr`, `,xar`, `,xc`, `,x+`, `,x-`, `, h`, `, l`, `, k`, `, j`, `, p j`. Expanded rows wrap on word boundaries (hard-break only for overlong words). Vim-based editing works regardless of expansion state.
 - Save-As flow: inline prompt on Ctrl+S/Ctrl+T when unsaved; validates .csv/.parquet; Ctrl+T exits only after successful save.
 - Overlays auto-size to content up to 50% of terminal height, centered.
 
 ### Keymap (canonical)
 - Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
-- Command bar: : enter; Enter/Ctrl+E execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
+- Command bar: `:` enter; Enter execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
 - Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
-- DF normal: h/j/k/l move; H/L col highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; : command; i edit; , e edit; , c c empty edit; , d c clear; , n r insert row; ,xr expand/collapse current row; ,xar expand/collapse all rows; ,xc collapse all; , v external edit (opens `$VISUAL`/`$EDITOR`, status shows while syncing); , h first col; , l last col; , k first row; , j last row; , y copy df to clipboard (TSV via wl-copy); ? shortcuts.
-- Cell insert: type; Backspace; Esc commits to cell_normal.
-- Cell normal: h/l move within buffer; , e / , c c / , d c / , n r; , v external edit (returns cursor to start after sync); i insert; Esc back to df normal.
+- DF mode: h/j/k/l move; H/L column highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; `:` command bar; `i` open vim for current cell; `x` clear cell; `, i r a` / `, i r b` insert rows; `, d r` delete row; `, i c a` / `, i c b` insert columns; `, d c` delete column; `, r n c` rename column; `,xr` toggle current row expansion; `,xar` toggle all rows; `,xc` collapse all expansions; `,x+` / `,x-` adjust row height; `, h` first column; `, l` last column; `, k` first row; `, j` last row; `, y a` copy entire df (TSV via wl-copy); `, y c` copy current cell; `, p j` preview cell as pretty JSON (vim read-only flags); `?` shortcuts.
 
 ### File locations
 - History: `~/.config/vixl/history.log`
