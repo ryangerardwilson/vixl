@@ -11,7 +11,7 @@ transparency over how their data is transformed.
 ## Installation (venv)
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ryangerardwilson/vixl.git
 cd vixl
 python3 -m venv .venv
 source .venv/bin/activate
