@@ -144,10 +144,10 @@ Characteristics:
 ### Architecture
 - Entry: `main.py` → `LoadingScreen` → `Orchestrator`
 - Layout: table + shared bottom strip (status/command/prompt); overlays for output/shortcuts (content-sized, ≤50% terminal height).
-- Execution: sandboxed `df`; natural commands auto-commit; extension calls require explicit commit (`(df, True)` or `commit_df=True` + `df = ...`).
+- Execution: sandboxed `df`; commits occur only when an extension explicitly commits or when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
 - History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N).
-- Extensions: loaded from `~/.config/vixl/extensions/`; config at `~/.config/vixl/config.py` (AUTO_COMMIT flag).
+- Extensions: loaded from `~/.config/vixl/extensions/`; config at `~/.config/vixl/config.json`.
 
 ### Features
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
@@ -161,12 +161,12 @@ Characteristics:
 - Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
 - Command bar: `:` enter; Enter execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
 - Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
-- DF mode: h/j/k/l move; H/L column highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; `:` command bar; `i` open vim for current cell; `x` clear cell; `, i r a` / `, i r b` insert rows; `, d r` delete row; `, i c a` / `, i c b` insert columns; `, d c` delete column; `, r n c` rename column; `,xr` toggle current row expansion; `,xar` toggle all rows; `,xc` collapse all expansions; `,x+` / `,x-` adjust row height; `, h` first column; `, l` last column; `, k` first row; `, j` last row; `, y a` copy entire df (TSV via wl-copy); `, y c` copy current cell; `, p j` preview cell as pretty JSON (vim read-only flags); `?` shortcuts.
+- DF mode: h/j/k/l move; H/L column highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; `:` command bar; `i` open vim for current cell; `x` clear cell; `, i r a` / `, i r b` insert rows; `, d r` delete row; `, i c a` / `, i c b` insert columns; `, d c` delete column; `, r n c` rename column; `,xr` toggle current row expansion; `,xar` toggle all rows; `,xc` collapse all expansions; `,x+` / `,x-` adjust row height; `, h` first column; `, l` last column; `, k` first row; `, j` last row; `, y a` / `, y c` copy to clipboard using the configured command; `, p j` preview cell as pretty JSON (vim read-only flags); `?` shortcuts.
 
 ### File locations
 - History: `~/.config/vixl/history.log`
 - Extensions: `~/.config/vixl/extensions/`
-- Config: `~/.config/vixl/config.py` (AUTO_COMMIT)
+- Config: `~/.config/vixl/config.json`
 - Default df: created in `main.py` when no arg is provided.
 
 - The history file is the single source of truth

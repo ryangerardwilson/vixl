@@ -80,6 +80,7 @@ class Orchestrator:
         # allow external editor to run in current terminal
         if hasattr(self.df_editor, "ctx"):
             self.df_editor.ctx.run_interactive = self._run_interactive_in_terminal
+            self.df_editor.ctx.config = getattr(self.exec, "config", {})
         # wire undo into column prompt
         if hasattr(self.column_prompt, "set_push_undo"):
             self.column_prompt.set_push_undo(self.df_editor._push_undo)

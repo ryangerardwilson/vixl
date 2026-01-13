@@ -97,7 +97,7 @@ python main.py <csv-or-parquet-file>
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
 - Adjust row lines (height): `,x+` (increase), `,x-` (decrease, min 1)
-- Copy to clipboard (via `wl-copy`): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value.
+- Copy to clipboard (configurable command): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value. Set `"clipboard_interface_command": ["wl-copy"]` (Wayland) or `"clipboard_interface_command": ["xclip", "-selection", "clipboard", "-in"]` (X11) in `~/.config/vixl/config.json` to enable.
 - Preview JSON (read-only): `, p j` opens the current cell as pretty JSON in Vim (read-only flags) within the same terminal session.
 - `?` opens shortcuts
 
@@ -110,15 +110,17 @@ python main.py <csv-or-parquet-file>
 - Location: `~/.config/vixl/extensions/*.py`
 - Loaded at startup; functions are exposed under `df.vixl.<name>` to avoid pandas attribute collisions.
 - Mutation contract:
-  - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`. Without this, changes from extension calls are discarded.
-  - Natural commands (no extension calls) auto-commit the sandboxed `df`.
+  - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
+  - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `~/.config/vixl/config.json` (JSON-only). Supported keys:
-  - `AUTO_COMMIT` (bool, default False)
   - `cmd_mode.tab_fuzzy_expansions_register` (list of strings) for cmd-mode Tab insertions.
+  - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
+    - Wayland: `["wl-copy"]`
+    - X11: `["xclip", "-selection", "clipboard", "-in"]`
   Example:
   ```json
   {
-    "AUTO_COMMIT": false,
+    "clipboard_interface_command": ["wl-copy"],
     "cmd_mode": {
       "tab_fuzzy_expansions_register": [
         "df.vixl.distribution_ascii_bar(bins=10)",
@@ -179,21 +181,11 @@ python main.py <csv-or-parquet-file>
 - Multi-line command pane removed; output pane is no longer side-by-side—now modal only.
 - Explicit save and save-on-exit
 
-### df Mode: Normal vs Insert
+### Editing philosophy
 
-In **df mode**, interaction is strictly modal and scoped to the grid:
-
-- **df Normal mode** is used for navigation and selection only. It never mutates data.
-- **df Insert mode** never edits the grid. Instead, it generates a context-aware Pandas mutation command and opens it in the command pane.
-
-For example, pressing `i` on a cell pre-fills a command such as:
-
-```python
-df.iloc[row, col] = value
-```
-
-Users edit and execute the command explicitly in **command pane Insert mode**.
-The grid is a navigation and visualization surface, never a text editor.
+- The grid is for navigation and selection. Pressing `i` launches vim in the current terminal with the cell value in a temp file; exiting vim with status 0 commits the change (dtype-coerced), non-zero cancels.
+- Structural or multi-cell mutations remain explicit Python commands typed into the command bar (`:`).
+- There are no inline cell modes; the clipboard command is configurable via `clipboard_interface_command` in `~/.config/vixl/config.json`.
 
 ---
 

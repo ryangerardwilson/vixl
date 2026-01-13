@@ -7,8 +7,8 @@ EXTENSIONS_DIR = os.path.join(CONFIG_DIR, "extensions")
 CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings
-AUTO_COMMIT_DEFAULT = False
 TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT = []
+CLIPBOARD_INTERFACE_COMMAND_DEFAULT = None
 
 
 def ensure_config_dirs():
@@ -24,8 +24,8 @@ def ensure_config_dirs():
 
 def load_config():
     cfg = {
-        "AUTO_COMMIT": AUTO_COMMIT_DEFAULT,
         "TAB_FUZZY_EXPANSIONS_REGISTER": list(TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT),
+        "CLIPBOARD_INTERFACE_COMMAND": CLIPBOARD_INTERFACE_COMMAND_DEFAULT,
     }
 
     if os.path.exists(CONFIG_JSON):
@@ -35,8 +35,6 @@ def load_config():
             with open(CONFIG_JSON, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                if "AUTO_COMMIT" in data:
-                    cfg["AUTO_COMMIT"] = bool(data["AUTO_COMMIT"])
                 cmd_mode = data.get("cmd_mode")
                 reg = (
                     cmd_mode.get("tab_fuzzy_expansions_register")
@@ -47,6 +45,11 @@ def load_config():
                     cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] = [
                         str(item) for item in reg if isinstance(item, str)
                     ]
+                clip_cmd = data.get("clipboard_interface_command")
+                if isinstance(clip_cmd, list) and all(
+                    isinstance(item, str) for item in clip_cmd
+                ):
+                    cfg["CLIPBOARD_INTERFACE_COMMAND"] = clip_cmd
         except Exception:
             pass
 

@@ -39,6 +39,7 @@ def test_y_copies_df_and_yc_copies_cell():
     grid = DummyGrid()
     paginator = DummyPaginator()
     editor = DfEditor(state, grid, paginator, lambda *args, **kwargs: None, column_prompt=None)
+    editor.ctx.config = {"CLIPBOARD_INTERFACE_COMMAND": ["fake-clip"]}
 
     with patch("subprocess.run") as run:
         # , y a => yank all
@@ -46,7 +47,7 @@ def test_y_copies_df_and_yc_copies_cell():
         editor.handle_key(ord("y"))
         editor.handle_key(ord("a"))
         assert run.call_count == 1
-        assert run.call_args[0][0] == ["wl-copy"]
+        assert run.call_args[0][0] == ["fake-clip"]
         df_call = run.call_args_list[0]
         assert df_call.kwargs.get("text") is True
         assert df_call.kwargs.get("input") == state.df.to_csv(sep="\t", index=False)
@@ -57,5 +58,6 @@ def test_y_copies_df_and_yc_copies_cell():
         editor.handle_key(ord("c"))
         assert run.call_count == 2
         cell_call = run.call_args_list[1]
+        assert cell_call.args[0] == ["fake-clip"]
         assert cell_call.kwargs.get("text") is True
         assert cell_call.kwargs.get("input") == "1"

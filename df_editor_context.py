@@ -26,6 +26,7 @@ class DfEditorContext:
 
     # Callback to run interactive commands (e.g., external editor) in current terminal
     run_interactive: Optional[Callable[[list], int]] = None
+    config: Optional[dict] = None
 
 
 CTX_ATTRS: Set[str] = {
@@ -41,4 +42,5 @@ CTX_ATTRS: Set[str] = {
     "pending_external_edit",
     "pending_edit_snapshot",
     "run_interactive",
+    "config",
 }

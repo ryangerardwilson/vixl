@@ -354,24 +354,42 @@ class DfEditorDfMode:
 
     def _handle_leader_y(self, ch, r, c):
         if ch == ord("a"):
+            cmd = None
+            if getattr(self.ctx, "config", None):
+                cmd = self.ctx.config.get("CLIPBOARD_INTERFACE_COMMAND")
+            if not cmd:
+                self.ctx._set_status("Clipboard not configured", 3)
+                self.counts.reset()
+                return True
             try:
                 import subprocess
 
                 tsv_data = self.ctx.state.df.to_csv(sep="\t", index=False)
-                subprocess.run(["wl-copy"], input=tsv_data, text=True, check=True)
+                subprocess.run(cmd, input=tsv_data, text=True, check=True)
                 self.ctx._set_status("DF copied", 3)
+            except FileNotFoundError:
+                self.ctx._set_status("Clipboard command not found", 3)
             except Exception:
                 self.ctx._set_status("Copy failed", 3)
             self.counts.reset()
             return True
         if ch == ord("c"):
+            cmd = None
+            if getattr(self.ctx, "config", None):
+                cmd = self.ctx.config.get("CLIPBOARD_INTERFACE_COMMAND")
+            if not cmd:
+                self.ctx._set_status("Clipboard not configured", 3)
+                self.counts.reset()
+                return True
             try:
                 import subprocess
 
                 value = self.ctx.state.df.iloc[r, c]
                 value = "" if (value is None or isna(value)) else str(value)
-                subprocess.run(["wl-copy"], input=value, text=True, check=True)
+                subprocess.run(cmd, input=value, text=True, check=True)
                 self.ctx._set_status("Cell copied", 3)
+            except FileNotFoundError:
+                self.ctx._set_status("Clipboard command not found", 3)
             except Exception:
                 self.ctx._set_status("Copy failed", 3)
             self.counts.reset()

@@ -3,6 +3,7 @@ import sys
 import os
 import importlib.util
 import types
+import ast
 import numpy as np
 import pandas as pd
 
@@ -42,6 +43,33 @@ class CommandExecutor:
         ensure_config_dirs()
         self.config = load_config()
         self._extensions = self._load_extensions()
+
+    # ---------- AST helpers ----------
+    def _roots_at_df(self, node):
+        cur = node
+        while True:
+            if isinstance(cur, ast.Name):
+                return cur.id == "df"
+            if isinstance(cur, ast.Attribute):
+                cur = cur.value
+                continue
+            if isinstance(cur, ast.Subscript):
+                cur = cur.value
+                continue
+            return False
+
+    def _detect_df_assignment(self, parsed):
+        for n in ast.walk(parsed):
+            if isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                targets = []
+                if isinstance(n, ast.Assign):
+                    targets.extend(n.targets)
+                else:
+                    targets.append(n.target)
+                for t in targets:
+                    if self._roots_at_df(t):
+                        return True
+        return False
 
     # ---------- extensions ----------
     def _load_extensions(self):
@@ -100,15 +128,13 @@ class CommandExecutor:
         # bind extensions to sandbox df with flagging
         self._bind_extensions(env["df"], ext_flag=ext_called_flag)
 
-        auto_commit = bool(self.config.get("AUTO_COMMIT", False))
-
-        import ast
 
         old_out, old_err = sys.stdout, sys.stderr
         try:
             sys.stdout, sys.stderr = stdout, stderr
 
             parsed = ast.parse(code)
+            env["_df_assignment"] = self._detect_df_assignment(parsed)
             last_value = None
 
             if parsed.body and isinstance(parsed.body[-1], ast.Expr):
@@ -131,12 +157,7 @@ class CommandExecutor:
                 last_value = None  # suppress printing of the mutation tuple
             elif env.get("commit_df") and isinstance(env.get("df"), pd.DataFrame):
                 committed_df = env.get("df")
-            elif not env.get("_ext_called", [False])[0] and isinstance(
-                env.get("df"), pd.DataFrame
-            ):
-                # natural command (no extension calls) commits by default
-                committed_df = env.get("df")
-            elif auto_commit and isinstance(env.get("df"), pd.DataFrame):
+            elif env.get("_df_assignment", False) and isinstance(env.get("df"), pd.DataFrame):
                 committed_df = env.get("df")
 
             if committed_df is not None:
