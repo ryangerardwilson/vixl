@@ -45,6 +45,128 @@ class DfEditor:
         self.external_meta = None
         self.external_receiving = False
 
+    # ---------- helpers ----------
+    def _coerce_cell_value(self, col_name: str, text: str):
+        text = "" if text is None else str(text)
+        try:
+            dtype = self.state.df[col_name].dtype
+        except Exception:
+            dtype = object
+
+        stripped = text.strip()
+        if pd.api.types.is_integer_dtype(dtype):
+            if stripped == "":
+                return pd.NA
+            return int(stripped)
+
+        if pd.api.types.is_float_dtype(dtype):
+            if stripped == "":
+                return float("nan")
+            return float(stripped)
+
+        if pd.api.types.is_bool_dtype(dtype):
+            if stripped == "":
+                return pd.NA
+            lowered = stripped.lower()
+            if lowered in {"1", "true", "t", "yes", "y", "on"}:
+                return True
+            if lowered in {"0", "false", "f", "no", "n", "off"}:
+                return False
+            raise ValueError(f"Cannot coerce '{text}' to boolean")
+
+        if pd.api.types.is_datetime64_any_dtype(dtype):
+            if stripped == "":
+                return pd.NaT
+            return pd.to_datetime(stripped, errors="raise")
+
+        return text
+
+    def _autoscroll_insert(self):
+        cw = max(1, self.grid.get_col_width(self.grid.curr_col))
+        if self.cell_cursor < self.cell_hscroll:
+            self.cell_hscroll = self.cell_cursor
+        elif self.cell_cursor > self.cell_hscroll + cw - 1:
+            self.cell_hscroll = self.cell_cursor - (cw - 1)
+
+        max_scroll = max(0, len(self.cell_buffer) - cw + 1)
+        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+
+    def _autoscroll_cell_normal(self, prefer_left: bool = False, margin: int = 2):
+        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
+        lines = max(1, getattr(self.state, "row_lines", 1))
+        span = max(1, cw * lines)
+        buf_len = len(self.cell_buffer)
+
+        max_scroll = max(0, buf_len - span)
+
+        if self.cell_cursor < self.cell_hscroll:
+            self.cell_hscroll = self.cell_cursor
+        elif self.cell_cursor >= self.cell_hscroll + span:
+            if prefer_left:
+                self.cell_hscroll = max(0, self.cell_cursor - max(0, margin))
+            else:
+                self.cell_hscroll = self.cell_cursor - span + 1
+
+        self.cell_hscroll = min(max(self.cell_hscroll, 0), max_scroll)
+
+    def _is_word_char(self, ch: str) -> bool:
+        return ch.isalnum() or ch == "_"
+
+    def _cell_word_forward(self):
+        buf = self.cell_buffer
+        n = len(buf)
+        idx = self.cell_cursor
+        if idx >= n:
+            return n
+
+        def is_word(i):
+            return self._is_word_char(buf[i])
+
+        if idx < n and is_word(idx):
+            while idx < n and is_word(idx):
+                idx += 1
+        while idx < n and not is_word(idx):
+            idx += 1
+        return idx
+
+    def _cell_word_backward(self):
+        buf = self.cell_buffer
+        if not buf or self.cell_cursor == 0:
+            return 0
+
+        def is_word(i):
+            return self._is_word_char(buf[i])
+
+        idx = max(0, self.cell_cursor - 1)
+        if not is_word(idx):
+            while idx > 0 and not is_word(idx):
+                idx -= 1
+        while idx > 0 and is_word(idx - 1):
+            idx -= 1
+        return idx
+
+    def _get_word_bounds_at_or_after(self, idx: int):
+        buf = self.cell_buffer
+        n = len(buf)
+        if n == 0:
+            return None
+        i = max(0, min(idx, n - 1))
+
+        while i < n and not self._is_word_char(buf[i]):
+            i += 1
+        if i >= n:
+            return None
+
+        start = i
+        while start > 0 and self._is_word_char(buf[start - 1]):
+            start -= 1
+
+        end = i
+        while end < n and self._is_word_char(buf[end]):
+            end += 1
+
+        return start, end
+
     # ---------- leader helpers ----------
     def _leader_seq(self, state: str | None) -> str:
         if not state:
@@ -261,13 +383,22 @@ class DfEditor:
         self.external_receiving = False
 
         base = meta.get("base", "")
-        col = meta.get("col_name", "")
         r = meta.get("row", self.grid.curr_row)
         c = meta.get("col", self.grid.curr_col)
         preserve_cell_mode = meta.get("preserve_cell_mode", False)
 
+        col_name_raw = meta.get("col_name")
+        col_name = col_name_raw if isinstance(col_name_raw, str) and col_name_raw else None
+        if col_name is None:
+            if len(self.state.df.columns) == 0:
+                self._set_status("No columns to update", 3)
+                return
+            c = max(0, min(c, len(self.state.df.columns) - 1))
+            col_name = str(self.state.df.columns[c])
+
         new_text = base
         if tmp_path:
+
             try:
                 with open(tmp_path, "r", encoding="utf-8") as fh:
                     new_text = fh.read()
@@ -287,7 +418,7 @@ class DfEditor:
         if new_text == base:
             self._set_status("No changes", 2)
             if preserve_cell_mode:
-                self.cell_col = col
+                self.cell_col = col_name
                 self.cell_buffer = new_text
                 self.cell_cursor = 0
                 self.cell_hscroll = 0
@@ -298,21 +429,24 @@ class DfEditor:
 
         try:
             self._push_undo()
-            coerced = self._coerce_cell_value(col, new_text)
+            coerced = self._coerce_cell_value(col_name, new_text)
             self.state.df.iloc[r, c] = coerced
             self.grid.df = self.state.df
+            self.paginator.update_total_rows(len(self.state.df))
+            self.paginator.ensure_row_visible(r)
             self._set_last_action("cell_set", value=coerced)
             self.pending_count = None
             if preserve_cell_mode:
-                self.cell_col = col
+                self.cell_col = col_name
                 self.cell_buffer = new_text
                 self.cell_cursor = 0
                 self.cell_hscroll = 0
                 self.mode = "cell_normal"
                 self._autoscroll_cell_normal()
             self._set_status("Cell updated (editor)", 2)
-        except Exception:
-            self._set_status(f"Invalid value for column '{col}'", 3)
+
+        except Exception as e:
+            self._set_status(f"Cell update failed: {e}", 3)
         self._reset_count()
 
     # ---------- counts ----------
