@@ -1,6 +1,7 @@
 # ~/Apps/vixl/df_editor_df_mode.py
 # df_editor_df_mode.py retains pandas import for isna usage
 from pandas import isna
+from cell_coercion import coerce_cell_value
 
 
 class DfEditorDfMode:
@@ -11,29 +12,22 @@ class DfEditorDfMode:
         ctx,
         counts,
         undo_mgr,
-        cell,
         external,
         df_ops,
         show_leader_status_cb,
         leader_seq_cb,
-        queue_external_edit_cb,
         open_json_preview_cb,
     ):
         self.ctx = ctx
         self.counts = counts
         self.undo_mgr = undo_mgr
-        self.cell = cell
         self.external = external
         self.df_ops = df_ops
         self._show_leader_status = show_leader_status_cb
         self._leader_seq = leader_seq_cb
-        self._queue_external_edit = queue_external_edit_cb
         self._open_json_preview = open_json_preview_cb
 
     def handle_key(self, ch: int) -> bool:
-        if self.ctx.mode != "normal":
-            return False
-
         total_rows = len(self.ctx.state.df)
         total_cols = len(self.ctx.state.df.columns)
 
@@ -78,16 +72,6 @@ class DfEditorDfMode:
         jump_cols = max(1, round(max(1, total_cols) * 0.20))
 
         # 'n' enters cell_normal
-        if ch == ord("n") and not self.ctx.df_leader_state:
-            self.ctx.cell_col = col_name
-            self.ctx.cell_buffer = base
-            self.ctx.cell_cursor = 0
-            self.ctx.cell_hscroll = 0
-            self.ctx.mode = "cell_normal"
-            self.cell._autoscroll_cell_normal()
-            self.counts.reset()
-            return True
-
         # leader state machine
         if self.ctx.df_leader_state:
             return self._handle_df_leader(ch, total_rows, total_cols, r, c, base)
@@ -166,7 +150,7 @@ class DfEditorDfMode:
             r, c = self.ctx.grid.curr_row, self.ctx.grid.curr_col
             col_name = self.ctx.state.df.columns[c]
             try:
-                self.ctx.state.df.iloc[r, c] = self.cell._coerce_cell_value(col_name, "")
+                self.ctx.state.df.iloc[r, c] = coerce_cell_value(self.ctx.state.df, col_name, "")
             except Exception:
                 self.ctx.state.df.iloc[r, c] = ""
             self.ctx.grid.df = self.ctx.state.df
@@ -176,19 +160,7 @@ class DfEditorDfMode:
             return True
 
         if ch == ord("i"):
-            is_expanded = getattr(self.ctx.state, "expand_all_rows", False) or (
-                self.ctx.grid.curr_row in getattr(self.ctx.state, "expanded_rows", set())
-            )
-            if is_expanded:
-                self.external.queue_external_edit(preserve_cell_mode=False)
-                return True
-            self.ctx.cell_col = col_name
-            self.ctx.cell_buffer = base
-            if not self.ctx.cell_buffer.endswith(" "):
-                self.ctx.cell_buffer += " "
-            self.ctx.cell_cursor = len(self.ctx.cell_buffer) - 1
-            self.ctx.mode = "cell_insert"
-            self.counts.reset()
+            self.external.queue_external_edit()
             return True
 
         # leader entry
@@ -360,20 +332,6 @@ class DfEditorDfMode:
             self.ctx.grid.curr_col = total_cols - 1
             self.ctx.grid.adjust_col_viewport()
             self.counts.reset()
-            return True
-        if ch == ord("e"):
-            self._show_leader_status(",e")
-            is_expanded = getattr(self.ctx.state, "expand_all_rows", False) or (
-                self.ctx.grid.curr_row in getattr(self.ctx.state, "expanded_rows", set())
-            )
-            if is_expanded:
-                self._queue_external_edit(preserve_cell_mode=False)
-            else:
-                self.df_ops.enter_cell_insert_at_end(self.ctx.state.df.columns[self.ctx.grid.curr_col], base)
-            return True
-        if ch == ord("v"):
-            self._show_leader_status(",v")
-            self._queue_external_edit(preserve_cell_mode=False)
             return True
         if ch == ord("x"):
             self.ctx.df_leader_state = "x"

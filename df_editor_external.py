@@ -1,23 +1,23 @@
 import os
-import shlex
 import tempfile
 
 import pandas as pd
+
+from cell_coercion import coerce_cell_value
 
 
 class DfEditorExternal:
     """Handles external-editor workflows and JSON preview."""
 
-    def __init__(self, ctx, counts, cell, push_undo_cb, set_last_action_cb):
+    def __init__(self, ctx, counts, push_undo_cb, set_last_action_cb):
         self.ctx = ctx
         self.counts = counts
-        self.cell = cell
         self._push_undo = push_undo_cb
         self._set_last_action = set_last_action_cb
 
     # ---------- public entrypoints ----------
-    def queue_external_edit(self, preserve_cell_mode: bool):
-        if self.ctx.external_proc is not None:
+    def queue_external_edit(self):
+        if self.ctx.pending_external_edit:
             self.ctx._set_status("Already editing externally", 3)
             self.counts.reset()
             return
@@ -25,6 +25,7 @@ class DfEditorExternal:
             self.ctx._set_status("No cell to edit", 3)
             self.counts.reset()
             return
+
 
         total_rows = len(self.ctx.state.df)
         total_cols = len(self.ctx.state.df.columns)
@@ -39,7 +40,6 @@ class DfEditorExternal:
             "col_name": col,
             "idx_label": idx_label,
         }
-        self.ctx.pending_preserve_cell_mode = preserve_cell_mode
         self.ctx.pending_external_edit = True
         self.ctx._set_status(f"Editing '{col}' at index {idx_label}", 600)
         self.counts.reset()
@@ -60,7 +60,6 @@ class DfEditorExternal:
         tmp_path, base = self._prepare_temp_file(r, c)
         if tmp_path is None:
             self.ctx._set_status("Open external editor failed", 3)
-            self.ctx.pending_preserve_cell_mode = False
             return
 
         argv = self._build_editor_argv(tmp_path, read_only=False)
@@ -78,9 +77,6 @@ class DfEditorExternal:
             except Exception:
                 pass
 
-        preserve_cell_mode = self.ctx.pending_preserve_cell_mode
-        self.ctx.pending_preserve_cell_mode = False
-
         if not col_name:
             if len(self.ctx.state.df.columns) == 0:
                 self.ctx._set_status("No columns to update", 3)
@@ -95,32 +91,18 @@ class DfEditorExternal:
         new_text = (new_text or "").rstrip("\n")
         if new_text == base:
             self.ctx._set_status("No changes", 2)
-            if preserve_cell_mode:
-                self.ctx.cell_col = col_name
-                self.ctx.cell_buffer = new_text
-                self.ctx.cell_cursor = 0
-                self.ctx.cell_hscroll = 0
-                self.ctx.mode = "cell_normal"
-                self.cell._autoscroll_cell_normal()
             self.counts.reset()
             return
 
         try:
             self._push_undo()
-            coerced = self.cell._coerce_cell_value(col_name, new_text)
+            coerced = coerce_cell_value(self.ctx.state.df, col_name, new_text)
             self.ctx.state.df.iloc[r, c] = coerced
             self.ctx.grid.df = self.ctx.state.df
             self.ctx.paginator.update_total_rows(len(self.ctx.state.df))
             self.ctx.paginator.ensure_row_visible(r)
             self._set_last_action("cell_set", value=coerced)
             self.ctx.pending_count = None
-            if preserve_cell_mode:
-                self.ctx.cell_col = col_name
-                self.ctx.cell_buffer = new_text
-                self.ctx.cell_cursor = 0
-                self.ctx.cell_hscroll = 0
-                self.ctx.mode = "cell_normal"
-                self.cell._autoscroll_cell_normal()
             self.ctx._set_status("Cell updated (editor)", 2)
         except Exception as exc:
             self.ctx._set_status(f"Cell update failed: {exc}", 3)
@@ -199,22 +181,15 @@ class DfEditorExternal:
         return tmp_path, base
 
     def _build_editor_argv(self, tmp_path: str, read_only: bool = False) -> list[str]:
-        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
-        argv = shlex.split(editor)
-        if not argv:
-            argv = ["vim"]
-
-        ro_args: list[str] = []
-        base = os.path.basename(argv[0]) if argv else ""
-        if read_only and base in {"vim", "nvim"}:
-            ro_args = [
+        argv: list[str] = ["vim"]
+        if read_only:
+            argv += [
                 "-n",
                 "-R",
                 "-M",
                 "+setlocal nobuflisted noswapfile buftype=nofile bufhidden=wipe nowrap readonly nomodifiable nonumber norelativenumber shortmess+=I",
             ]
-
-        return argv + ro_args + [tmp_path]
+        return argv + [tmp_path]
 
     def _run_editor(self, argv: list[str]) -> int:
         runner = getattr(self.ctx, "run_interactive", None)

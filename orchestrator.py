@@ -144,16 +144,6 @@ class Orchestrator:
             self.grid.draw(
                 self.layout.table_win,
                 active=(self.focus == 0),
-                editing=(
-                    self.focus == 0
-                    and self.df_editor.mode in ("cell_insert", "cell_normal")
-                ),
-                insert_mode=(self.focus == 0 and self.df_editor.mode == "cell_insert"),
-                edit_row=self.grid.curr_row,
-                edit_col=self.grid.curr_col,
-                edit_buffer=self.df_editor.cell_buffer,
-                edit_cursor=self.df_editor.cell_cursor,
-                edit_hscroll=self.df_editor.cell_hscroll,
                 page_start=self.paginator.page_start,
                 page_end=self.paginator.page_end,
                 row_lines=self.state.row_lines,
@@ -182,12 +172,7 @@ class Orchestrator:
                         text = f" {self.status_msg}"
                     else:
                         if self.focus == 0:
-                            if self.df_editor.mode == "cell_insert":
-                                mode = "DF:CELL-INSERT"
-                            elif self.df_editor.mode == "cell_normal":
-                                mode = "DF:CELL-NORMAL"
-                            else:
-                                mode = "DF"
+                            mode = "DF"
                         elif self.focus == 1:
                             mode = "CMD"
                         else:

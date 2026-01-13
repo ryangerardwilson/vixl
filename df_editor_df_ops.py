@@ -9,17 +9,6 @@ class DfEditorDfOps:
         self.counts = counts
         self.undo_mgr = undo_mgr
 
-    # ----- cell helpers -----
-    def enter_cell_insert_at_end(self, col, base):
-        self.ctx.cell_col = col
-        self.ctx.cell_buffer = base
-        if not self.ctx.cell_buffer.endswith(" "):
-            self.ctx.cell_buffer += " "
-        self.ctx.cell_cursor = len(self.ctx.cell_buffer)
-        cw = max(1, self.ctx.grid.get_rendered_col_width(self.ctx.grid.curr_col))
-        self.ctx.cell_hscroll = max(0, len(self.ctx.cell_buffer) - cw + 1)
-        self.ctx.mode = "cell_insert"
-
     # ----- row height / expansion -----
     def adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
         current = self.ctx.state.row_lines
@@ -159,10 +148,5 @@ class DfEditorDfOps:
         total_cols = len(self.ctx.state.df.columns)
         self.ctx.grid.curr_col = min(col_idx, max(0, total_cols - 1))
         self.ctx.grid.adjust_col_viewport()
-        if total_cols == 0:
-            self.ctx.cell_buffer = ""
-            self.ctx.cell_cursor = 0
-            self.ctx.cell_hscroll = 0
-            self.ctx.mode = "normal"
         self.ctx._set_status(f"Deleted column '{col_name}'", 3)
         self.undo_mgr.set_last_action("col_delete", col_name=col_name)

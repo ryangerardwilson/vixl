@@ -7,11 +7,11 @@ import pandas as pd
 
 from df_editor_context import DfEditorContext, CTX_ATTRS
 from df_editor_counts import DfEditorCounts
-from df_editor_cell import DfEditorCell
 from df_editor_external import DfEditorExternal
 from df_editor_undo import DfEditorUndo
 from df_editor_df_ops import DfEditorDfOps
 from df_editor_df_mode import DfEditorDfMode
+from cell_coercion import coerce_cell_value
 
 
 class DfEditor:
@@ -43,25 +43,10 @@ class DfEditor:
         )
         object.__setattr__(
             self,
-            "cell",
-            DfEditorCell(
-                ctx=self.ctx,
-                counts=self.counts,
-                push_undo_cb=self._push_undo,
-                set_last_action_cb=self._set_last_action,
-                repeat_last_action_cb=self._repeat_last_action,
-                leader_seq_cb=self._leader_seq,
-                show_leader_status_cb=self._show_leader_status,
-                queue_external_edit_cb=self._queue_external_edit_internal,
-            ),
-        )
-        object.__setattr__(
-            self,
             "external",
             DfEditorExternal(
                 ctx=self.ctx,
                 counts=self.counts,
-                cell=self.cell,
                 push_undo_cb=self._push_undo,
                 set_last_action_cb=self._set_last_action,
             ),
@@ -73,16 +58,13 @@ class DfEditor:
                 ctx=self.ctx,
                 counts=self.counts,
                 undo_mgr=self.undo_mgr,
-                cell=self.cell,
                 external=self.external,
                 df_ops=self.df_ops,
                 show_leader_status_cb=self._show_leader_status,
                 leader_seq_cb=self._leader_seq,
-                queue_external_edit_cb=self._queue_external_edit_internal,
                 open_json_preview_cb=self._open_cell_json_preview,
             ),
         )
-
     def __getattr__(self, name):
         if name in CTX_ATTRS:
             return getattr(self.ctx, name)
@@ -148,38 +130,6 @@ class DfEditor:
         self.ctx._leader_ttl = value
 
     @property
-    def mode(self):
-        return self.ctx.mode
-
-    @mode.setter
-    def mode(self, value):
-        self.ctx.mode = value
-
-    @property
-    def cell_buffer(self):
-        return self.ctx.cell_buffer
-
-    @cell_buffer.setter
-    def cell_buffer(self, value):
-        self.ctx.cell_buffer = value
-
-    @property
-    def cell_cursor(self):
-        return self.ctx.cell_cursor
-
-    @cell_cursor.setter
-    def cell_cursor(self, value):
-        self.ctx.cell_cursor = value
-
-    @property
-    def cell_hscroll(self):
-        return self.ctx.cell_hscroll
-
-    @cell_hscroll.setter
-    def cell_hscroll(self, value):
-        self.ctx.cell_hscroll = value
-
-    @property
     def pending_count(self):
         return self.ctx.pending_count
 
@@ -189,25 +139,7 @@ class DfEditor:
 
     # ---------- helpers ----------
     def _coerce_cell_value(self, col_name: str, text: str):
-        return self.cell._coerce_cell_value(col_name, text)
-
-    def _autoscroll_insert(self):
-        self.cell._autoscroll_insert()
-
-    def _autoscroll_cell_normal(self, prefer_left: bool = False, margin: int = 2):
-        self.cell._autoscroll_cell_normal(prefer_left=prefer_left, margin=margin)
-
-    def _is_word_char(self, ch: str) -> bool:
-        return self.cell._is_word_char(ch)
-
-    def _cell_word_forward(self):
-        return self.cell._cell_word_forward()
-
-    def _cell_word_backward(self):
-        return self.cell._cell_word_backward()
-
-    def _get_word_bounds_at_or_after(self, idx: int):
-        return self.cell._get_word_bounds_at_or_after(idx)
+        return coerce_cell_value(self.state.df, col_name, text)
 
     def _value_is_na(self, v) -> bool:
         try:
@@ -246,12 +178,8 @@ class DfEditor:
     def _open_cell_json_preview(self, row: int, col: int):
         self.external.open_cell_json_preview(row, col)
 
-    def queue_external_edit(self, preserve_cell_mode: bool):
-        self.external.queue_external_edit(preserve_cell_mode)
-
-    def _queue_external_edit_internal(self, preserve_cell_mode: bool):
-        """Internal helper so cell controller can queue edits without recursion."""
-        self.external.queue_external_edit(preserve_cell_mode)
+    def queue_external_edit(self):
+        self.external.queue_external_edit()
 
     def run_pending_external_edit(self):
         self.external.run_pending_external_edit()
@@ -341,9 +269,6 @@ class DfEditor:
     def redo(self):
         self.undo_mgr.redo()
 
-    def _enter_cell_insert_at_end(self, col, base):
-        self.df_ops.enter_cell_insert_at_end(col, base)
-
     def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
         self.df_ops.adjust_row_lines(delta, minimum=minimum, maximum=maximum)
 
@@ -376,9 +301,4 @@ class DfEditor:
 
     # ---------- public API ----------
     def handle_key(self, ch):
-        # Delegate to appropriate handler based on mode
-        if self.cell.handle_key(ch):
-            return
-        if self.mode == "normal":
-            self.df_mode.handle_key(ch)
-            return
+        self.df_mode.handle_key(ch)

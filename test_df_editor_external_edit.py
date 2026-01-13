@@ -79,26 +79,7 @@ def test_external_edit_updates_string_cell():
 
     editor.external._prepare_temp_file = fake_prepare
 
-    editor.queue_external_edit(False)
-    editor.run_pending_external_edit()
-
-    try:
-        os.unlink(tmp_path)
-    except OSError:
-        pass
-
-    assert editor.state.df.iloc[0, 0] == "new value"
-    assert grid.df.iloc[0, 0] == "new value"
-
-
-def test_external_edit_coerces_int64_column():
-    df = pd.DataFrame({"a": pd.Series([pd.NA], dtype="Int64")})
-    editor, grid, _ = _make_editor(df)
-
-    tmp_path = _tempfile_with_contents("42")
-    editor.external._prepare_temp_file = lambda _r, _c: (tmp_path, "")
-
-    editor.queue_external_edit(False)
+    editor.queue_external_edit()
     editor.run_pending_external_edit()
 
     try:

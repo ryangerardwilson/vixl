@@ -11,13 +11,7 @@ class DfEditorContext:
     column_prompt: Any = None
     _leader_ttl: float = 1.5
 
-    # Cell editing state
-    mode: str = "normal"  # normal | cell_normal | cell_insert
-    cell_buffer: str = ""
-    cell_cursor: int = 0
-    cell_hscroll: int = 0
-    cell_col: Optional[Any] = None
-    cell_leader_state: Optional[str] = None
+    # DF leader state
     df_leader_state: Optional[str] = None
 
     # Numeric prefix (counts)
@@ -28,12 +22,7 @@ class DfEditorContext:
 
     # External editor state
     pending_external_edit: bool = False
-    pending_preserve_cell_mode: bool = False
     pending_edit_snapshot: Optional[dict] = None
-    external_proc: Optional[Any] = None
-    external_tmp_path: Optional[str] = None
-    external_meta: Optional[dict] = None
-    external_receiving: bool = False
 
     # Callback to run interactive commands (e.g., external editor) in current terminal
     run_interactive: Optional[Callable[[list], int]] = None
@@ -46,21 +35,10 @@ CTX_ATTRS: Set[str] = {
     "_set_status",
     "column_prompt",
     "_leader_ttl",
-    "mode",
-    "cell_buffer",
-    "cell_cursor",
-    "cell_hscroll",
-    "cell_col",
-    "cell_leader_state",
     "df_leader_state",
     "pending_count",
     "last_action",
     "pending_external_edit",
-    "pending_preserve_cell_mode",
     "pending_edit_snapshot",
-    "external_proc",
-    "external_tmp_path",
-    "external_meta",
-    "external_receiving",
     "run_interactive",
 }

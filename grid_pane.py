@@ -128,13 +128,6 @@ class GridPane:
         self,
         win,
         active=False,
-        editing=False,
-        insert_mode=False,
-        edit_row=None,
-        edit_col=None,
-        edit_buffer=None,
-        edit_cursor=None,
-        edit_hscroll=0,
         page_start=0,
         page_end=None,
         row_lines=1,
@@ -314,11 +307,8 @@ class GridPane:
             max_lines = base_height
             for c in visible_cols:
                 eff_cw = self.rendered_col_widths.get(c, widths[c])
-                if editing and abs_r == edit_row and c == edit_col:
-                    text = edit_buffer or ""
-                else:
-                    val = self.df.iloc[abs_r, c]
-                    text = "" if (val is None or pd.isna(val)) else str(val)
+                val = self.df.iloc[abs_r, c]
+                text = "" if (val is None or pd.isna(val)) else str(val)
                 max_lines = max(max_lines, _wrap_cell_line_count(text, eff_cw))
             row_heights.append(max_lines)
 
@@ -375,16 +365,10 @@ class GridPane:
                 cw = widths[c]
                 eff_cw = min(self.rendered_col_widths.get(c, cw), max(1, w - x - 1))
 
-                use_hscroll = editing and (r == edit_row and c == edit_col)
+                val = self.df.iloc[r, c]
+                text = "" if (val is None or pd.isna(val)) else str(val)
 
-                if use_hscroll:
-                    text = edit_buffer or ""
-                else:
-                    val = self.df.iloc[r, c]
-                    text = "" if (val is None or pd.isna(val)) else str(val)
-
-                start = edit_hscroll if use_hscroll else 0
-                wrapped_lines = _wrap_cell(text[start:], eff_cw, row_h)
+                wrapped_lines = _wrap_cell(text, eff_cw, row_h)
 
                 base_attr = curses.color_pair(self.PAIR_CELL_TEXT)
                 attr = base_attr
@@ -397,43 +381,17 @@ class GridPane:
                         and c == self.curr_col
                     )
                 )
-                if (not editing) and active_cell:
+                if active_cell:
                     attr = base_attr | curses.A_REVERSE
-
-                is_cursor_target = use_hscroll and edit_cursor is not None
-                cursor_line = -1
-                cursor_col = -1
-                if is_cursor_target:
-                    cursor_val = int(edit_cursor or 0)
-                    relative_pos = max(0, cursor_val - start)
-                    cursor_line = min(row_h - 1, relative_pos // eff_cw)
-                    cursor_col = relative_pos % eff_cw
 
                 eff_cw_int = int(eff_cw)
                 for line_idx, line_text in enumerate(wrapped_lines):
                     line_y = y_cursor + line_idx
                     if line_y >= h - 1:
                         break
-                    visible_len = len(line_text)
                     cell = line_text.rjust(eff_cw_int)
                     win.addnstr(line_y, x, cell, eff_cw_int, attr)
 
-                    if (
-                        is_cursor_target
-                        and cursor_line >= 0
-                        and cursor_col >= 0
-                        and line_idx == cursor_line
-                    ):
-                        text_start_x = x + (eff_cw_int - visible_len)
-                        pos = min(cursor_col, visible_len)
-                        cx = text_start_x + pos
-                        cx = max(x, min(x + eff_cw_int - 1, cx))
-                        caret_attr = base_attr | curses.A_REVERSE
-                        if insert_mode:
-                            win.addnstr(line_y, cx, " ", 1, caret_attr)
-                        else:
-                            ch = line_text[pos] if pos < visible_len else " "
-                            win.addnstr(line_y, cx, ch, 1, caret_attr)
 
                 x += eff_cw + 1
 
