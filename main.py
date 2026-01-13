@@ -10,12 +10,27 @@ os.environ.setdefault("ESCDELAY", "25")
 from orchestrator import Orchestrator
 from app_state import AppState
 
+try:
+    from _version import __version__
+except Exception:
+    __version__ = "0.0.0"
+
 
 def main():
+    args = sys.argv[1:]
+
+    if "--version" in args or "-V" in args:
+        print(__version__)
+        return
+
+    if "--help" in args or "-h" in args:
+        print("vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n")
+        return
+
     CompletionHandler().ensure_ready()
 
-    has_path = len(sys.argv) == 2
-    path = sys.argv[1] if has_path else None
+    has_path = len(args) == 1
+    path = args[0] if has_path else None
     handler = FileTypeHandler(path) if path else None
 
     from loading_screen import LoadingScreen, LoadState
