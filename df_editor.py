@@ -12,6 +12,7 @@ from df_editor_external import DfEditorExternal
 from df_editor_undo import DfEditorUndo
 from df_editor_df_ops import DfEditorDfOps
 from df_editor_df_mode import DfEditorDfMode
+from df_editor_df_mode import DfEditorDfMode
 
 
 class DfEditor:
@@ -64,6 +65,22 @@ class DfEditor:
                 cell=self.cell,
                 push_undo_cb=self._push_undo,
                 set_last_action_cb=self._set_last_action,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "df_mode",
+            DfEditorDfMode(
+                ctx=self.ctx,
+                counts=self.counts,
+                undo_mgr=self.undo_mgr,
+                cell=self.cell,
+                external=self.external,
+                df_ops=self.df_ops,
+                show_leader_status_cb=self._show_leader_status,
+                leader_seq_cb=self._leader_seq,
+                queue_external_edit_cb=self._queue_external_edit_internal,
+                open_json_preview_cb=self._open_cell_json_preview,
             ),
         )
         object.__setattr__(
@@ -383,7 +400,6 @@ class DfEditor:
             return
 
         if self.mode == "normal":
-            # Delegate to df_mode; if it handled the key, stop here.
             if self.df_mode.handle_key(ch):
                 return
 
