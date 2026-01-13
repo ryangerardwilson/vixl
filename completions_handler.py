@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
+import config_paths
 
 
 class CompletionHandler:
-    CONFIG_DIR = Path.home() / ".config" / "vixl"
+    CONFIG_DIR = Path(config_paths.CONFIG_DIR)
     COMPLETIONS_DIR = CONFIG_DIR / "completions"
     BASH_COMPLETION_FILE = COMPLETIONS_DIR / "vixl.bash"
     BASH_MARKER_ENV = "VIXL_BASH_COMPLETION_ACTIVE"
@@ -108,10 +109,11 @@ complete -o filenames -F _vixl_files vixl
         return self.BASHRC_MARKER_BEGIN in text and self.BASHRC_MARKER_END in text
 
     def _print_completion_instructions(self, rc_paths: list[Path]) -> None:
+        completion_path = self.BASH_COMPLETION_FILE
         block = (
             f"{self.BASHRC_MARKER_BEGIN}\n"
-            'if [ -f "$HOME/.config/vixl/completions/vixl.bash" ]; then\n'
-            '    source "$HOME/.config/vixl/completions/vixl.bash"\n'
+            f'if [ -f "{completion_path}" ]; then\n'
+            f'    source "{completion_path}"\n'
             "fi\n"
             f"{self.BASHRC_MARKER_END}\n"
         )
@@ -128,5 +130,6 @@ complete -o filenames -F _vixl_files vixl
             '   ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"\n'
             f"To skip this warning, set {self.SKIP_CHECK_ENV}=1 in your environment.\n"
             f"Missing: env marker={self.BASH_MARKER_ENV}=='1', rc marker block.\n"
+            f"Completion script location: {completion_path}\n"
         )
         print(message)

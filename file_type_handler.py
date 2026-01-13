@@ -27,6 +27,7 @@ class FileTypeHandler:
                 df = pd.DataFrame()
                 self._write(df)
                 return df
+            self._ensure_parquet_engine()
             return pd.read_parquet(self.path)
 
         print("Unsupported file type (use .csv or .parquet)")
@@ -39,7 +40,25 @@ class FileTypeHandler:
         if self.ext == ".csv":
             df.to_csv(self.path, index=False)
         elif self.ext == ".parquet":
+            self._ensure_parquet_engine()
             df.to_parquet(self.path)
         else:
             print("Unsupported file type (use .csv or .parquet)")
             sys.exit(1)
+
+    def _ensure_parquet_engine(self):
+        try:
+            import pyarrow  # noqa: F401
+            return
+        except ImportError:
+            pass
+        try:
+            import fastparquet  # noqa: F401
+            return
+        except ImportError:
+            pass
+        print(
+            "Parquet support requires pyarrow (recommended) or fastparquet. "
+            "Install via: pip install pyarrow"
+        )
+        sys.exit(1)

@@ -156,6 +156,7 @@ Characteristics:
 - DF navigation/editing: h/j/k/l, H/L, J/K, `:`, `i` (launch vim to edit current cell), `x`, `, i r a`, `, i r b`, `, d r`, `, i c a`, `, i c b`, `, d c`, `, r n c`, `, y a`, `, y c`, `,xr`, `,xar`, `,xc`, `,x+`, `,x-`, `, h`, `, l`, `, k`, `, j`, `, p j`. Expanded rows wrap on word boundaries (hard-break only for overlong words). Vim-based editing works regardless of expansion state.
 - Save-As flow: inline prompt on Ctrl+S/Ctrl+T when unsaved; validates .csv/.parquet; Ctrl+T exits only after successful save.
 - Overlays auto-size to content up to 50% of terminal height, centered.
+- Parquet support requires `pyarrow` (recommended) or `fastparquet` to be installed.
 
 ### Keymap (canonical)
 - Global: Ctrl+C/Ctrl+X exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
@@ -164,9 +165,9 @@ Characteristics:
 - DF mode: h/j/k/l move; H/L column highlight; J/K row highlight; Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; `:` command bar; `i` open vim for current cell; `x` clear cell; `, i r a` / `, i r b` insert rows; `, d r` delete row; `, i c a` / `, i c b` insert columns; `, d c` delete column; `, r n c` rename column; `,xr` toggle current row expansion; `,xar` toggle all rows; `,xc` collapse all expansions; `,x+` / `,x-` adjust row height; `, h` first column; `, l` last column; `, k` first row; `, j` last row; `, y a` / `, y c` copy to clipboard using the configured command; `, p j` preview cell as pretty JSON (vim read-only flags); `?` shortcuts.
 
 ### File locations
-- History: `~/.config/vixl/history.log`
-- Extensions: `~/.config/vixl/extensions/`
-- Config: `~/.config/vixl/config.json`
+- History: `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`)
+- Extensions: `$XDG_CONFIG_HOME/vixl/extensions/`
+- Config: `$XDG_CONFIG_HOME/vixl/config.json`
 - Default df: created in `main.py` when no arg is provided.
 
 - The history file is the single source of truth

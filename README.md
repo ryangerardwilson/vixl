@@ -16,7 +16,7 @@ Run the application via the root entrypoint:
 python main.py <csv-or-parquet-file>
 ```
 
-- CSV and Parquet files are supported
+- CSV is always supported; Parquet requires `pyarrow` (recommended) or `fastparquet`.
 - If the file does not exist, a blank file is created automatically
 
 ### Bash completion (auto-provisioned, warning-only)
@@ -97,7 +97,7 @@ python main.py <csv-or-parquet-file>
 - Column ops: `, i c a` (insert col after), `, i c b` (insert col before), `, d c` (delete col), `, r n c` (rename col). Insert prompts for name + dtype (object, Int64, float64, boolean, datetime64[ns]).
 - Go to edges: `, h` (first col), `, l` (last col), `, k` (first row), `, j` (last row)
 - Adjust row lines (height): `,x+` (increase), `,x-` (decrease, min 1)
-- Copy to clipboard (configurable command): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value. Set `"clipboard_interface_command": ["wl-copy"]` (Wayland) or `"clipboard_interface_command": ["xclip", "-selection", "clipboard", "-in"]` (X11) in `~/.config/vixl/config.json` to enable.
+- Copy to clipboard (configurable command): `, y a` copies the entire DataFrame as TSV; `, y c` copies the current cell value. Set `"clipboard_interface_command": ["wl-copy"]` (Wayland) or `"clipboard_interface_command": ["xclip", "-selection", "clipboard", "-in"]` (X11) in `$XDG_CONFIG_HOME/vixl/config.json` (default `~/.config/vixl/config.json`).
 - Preview JSON (read-only): `, p j` opens the current cell as pretty JSON in Vim (read-only flags) within the same terminal session.
 - `?` opens shortcuts
 
@@ -112,7 +112,7 @@ python main.py <csv-or-parquet-file>
 - Mutation contract:
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
-- Config: `~/.config/vixl/config.json` (JSON-only). Supported keys:
+- Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
   - `cmd_mode.tab_fuzzy_expansions_register` (list of strings) for cmd-mode Tab insertions.
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
@@ -130,6 +130,7 @@ python main.py <csv-or-parquet-file>
     }
   }
   ```
+- Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
 - Examples (save under `~/.config/vixl/extensions/`):
    1) multiply_cols (explicit commit)
       ```python
