@@ -8,6 +8,7 @@ from df_editor_context import DfEditorContext, CTX_ATTRS
 from df_editor_counts import DfEditorCounts
 from df_editor_cell import DfEditorCell
 from df_editor_external import DfEditorExternal
+from df_editor_undo import DfEditorUndo
 
 
 class DfEditor:
@@ -27,6 +28,7 @@ class DfEditor:
             ),
         )
         object.__setattr__(self, "counts", DfEditorCounts(self.ctx))
+        object.__setattr__(self, "undo_mgr", DfEditorUndo(self.ctx, self.counts))
         object.__setattr__(
             self,
             "cell",
@@ -225,10 +227,10 @@ class DfEditor:
 
     # ---------- counts ----------
     def _reset_last_action(self):
-        self.last_action = None
+        self.undo_mgr.reset_last_action()
 
     def _set_last_action(self, action_type: str, **kwargs):
-        self.last_action = {"type": action_type, **kwargs}
+        self.undo_mgr.set_last_action(action_type, **kwargs)
 
     def _repeat_last_action(self):
         if not self.last_action:
@@ -288,79 +290,22 @@ class DfEditor:
 
     # ---------- undo/redo ----------
     def _snapshot_state(self):
-        return {
-            "df": self.state.df.copy(deep=True),
-            "curr_row": self.grid.curr_row,
-            "curr_col": self.grid.curr_col,
-            "row_offset": self.grid.row_offset,
-            "col_offset": self.grid.col_offset,
-            "highlight_mode": self.grid.highlight_mode,
-        }
+        return self.undo_mgr.snapshot_state()
 
     def _restore_state(self, snap):
-        self.state.df = snap["df"]
-        self.grid.df = self.state.df
-        self.grid.highlight_mode = snap.get("highlight_mode", "cell")
-        self.paginator.update_total_rows(len(self.state.df))
-        self.grid.curr_row = min(
-            max(0, snap.get("curr_row", 0)), max(0, len(self.state.df) - 1)
-        )
-        self.grid.curr_col = min(
-            max(0, snap.get("curr_col", 0)),
-            max(0, len(self.state.df.columns) - 1),
-        )
-        self.grid.row_offset = max(0, snap.get("row_offset", 0))
-        self.grid.col_offset = max(0, snap.get("col_offset", 0))
-        self.paginator.ensure_row_visible(self.grid.curr_row)
-        self.grid.highlight_mode = "cell"
-        self.mode = "normal"
-        self.cell_buffer = ""
-        self.cell_cursor = 0
-        self.cell_hscroll = 0
-        self.pending_count = None
+        self.undo_mgr.restore_state(snap)
 
     def _push_undo(self):
-        if not hasattr(self.state, "undo_stack"):
-            return
-        snap = self._snapshot_state()
-        self.state.undo_stack.append(snap)
-        if len(self.state.undo_stack) > getattr(self.state, "undo_max_depth", 50):
-            self.state.undo_stack.pop(0)
-        if hasattr(self.state, "redo_stack"):
-            self.state.redo_stack.clear()
+        self.undo_mgr.push_undo()
 
     def _push_redo(self):
-        if hasattr(self.state, "redo_stack"):
-            self.state.redo_stack.append(self._snapshot_state())
+        self.undo_mgr.push_redo()
 
     def undo(self):
-        if not getattr(self.state, "undo_stack", None):
-            self._set_status("Nothing to undo", 2)
-            self._reset_count()
-            return
-        current = self._snapshot_state()
-        self._push_redo()
-        snap = self.state.undo_stack.pop()
-        self._restore_state(snap)
-        remaining = len(self.state.undo_stack)
-        self._set_status(f"Undone ({remaining} more)" if remaining else "Undone", 2)
-        self.pending_count = None
+        self.undo_mgr.undo()
 
     def redo(self):
-        if not getattr(self.state, "redo_stack", None):
-            self._set_status("Nothing to redo", 2)
-            self._reset_count()
-            return
-        current = self._snapshot_state()
-        if hasattr(self.state, "undo_stack"):
-            self.state.undo_stack.append(current)
-            if len(self.state.undo_stack) > getattr(self.state, "undo_max_depth", 50):
-                self.state.undo_stack.pop(0)
-        snap = self.state.redo_stack.pop()
-        self._restore_state(snap)
-        remaining = len(self.state.redo_stack)
-        self._set_status(f"Redone ({remaining} more)" if remaining else "Redone", 2)
-        self.pending_count = None
+        self.undo_mgr.redo()
 
     def _enter_cell_insert_at_end(self, col, base):
         self.cell_col = col
