@@ -35,6 +35,9 @@ class DfEditorContext:
     external_meta: Optional[dict] = None
     external_receiving: bool = False
 
+    # Callback to run interactive commands (e.g., external editor) in current terminal
+    run_interactive: Optional[Callable[[list], int]] = None
+
 
 CTX_ATTRS: Set[str] = {
     "state",
@@ -59,4 +62,5 @@ CTX_ATTRS: Set[str] = {
     "external_tmp_path",
     "external_meta",
     "external_receiving",
+    "run_interactive",
 }

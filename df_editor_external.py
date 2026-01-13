@@ -1,6 +1,5 @@
 import os
 import shlex
-import subprocess
 import tempfile
 
 import pandas as pd
@@ -48,8 +47,6 @@ class DfEditorExternal:
     def run_pending_external_edit(self):
         if not self.ctx.pending_external_edit:
             return
-        if self.ctx.external_proc is not None:
-            return
 
         snap = self.ctx.pending_edit_snapshot or {}
         r = snap.get("row", self.ctx.grid.curr_row)
@@ -60,71 +57,36 @@ class DfEditorExternal:
         self.ctx.pending_external_edit = False
         self.ctx.pending_edit_snapshot = None
 
-        proc, tmp_path, base = self._start_external_edit_process(r, c, col_name)
-        if proc is None:
-            self.ctx._set_status("Open in Alacritty failed", 3)
+        tmp_path, base = self._prepare_temp_file(r, c)
+        if tmp_path is None:
+            self.ctx._set_status("Open external editor failed", 3)
             self.ctx.pending_preserve_cell_mode = False
             return
 
-        self.ctx.external_proc = proc
-        self.ctx.external_tmp_path = tmp_path
-        self.ctx.external_meta = {
-            "row": r,
-            "col": c,
-            "col_name": col_name,
-            "base": base,
-            "preserve_cell_mode": self.ctx.pending_preserve_cell_mode,
-        }
+        argv = self._build_editor_argv(tmp_path, read_only=False)
+        rc = self._run_editor(argv)
+
+        new_text = base
+        try:
+            with open(tmp_path, "r", encoding="utf-8") as fh:
+                new_text = fh.read()
+        except Exception:
+            new_text = base
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        preserve_cell_mode = self.ctx.pending_preserve_cell_mode
         self.ctx.pending_preserve_cell_mode = False
 
-    def complete_external_edit_if_done(self):
-        proc = self.ctx.external_proc
-        if proc is None:
-            return
-        if proc.poll() is None:
-            return
-
-        if not self.ctx.external_receiving:
-            self.ctx.external_receiving = True
-            self.ctx._set_status("Receiving new data from editor", 5)
-            return
-
-        rc = proc.returncode
-        tmp_path = self.ctx.external_tmp_path
-        meta = self.ctx.external_meta or {}
-
-        self.ctx.external_proc = None
-        self.ctx.external_tmp_path = None
-        self.ctx.external_meta = None
-        self.ctx.external_receiving = False
-
-        base = meta.get("base", "")
-        r = meta.get("row", self.ctx.grid.curr_row)
-        c = meta.get("col", self.ctx.grid.curr_col)
-        preserve_cell_mode = meta.get("preserve_cell_mode", False)
-
-        col_name_raw = meta.get("col_name")
-        if isinstance(col_name_raw, str) and col_name_raw:
-            col_name = col_name_raw
-        else:
+        if not col_name:
             if len(self.ctx.state.df.columns) == 0:
                 self.ctx._set_status("No columns to update", 3)
                 return
             c = max(0, min(c, len(self.ctx.state.df.columns) - 1))
             col_name = str(self.ctx.state.df.columns[c])
-
-        new_text = base
-        if tmp_path:
-            try:
-                with open(tmp_path, "r", encoding="utf-8") as fh:
-                    new_text = fh.read()
-            except Exception:
-                new_text = base
-            finally:
-                try:
-                    os.unlink(tmp_path)
-                except Exception:
-                    pass
 
         if rc not in (0, None):
             self.ctx._set_status("Edit canceled", 3)
@@ -164,6 +126,9 @@ class DfEditorExternal:
             self.ctx._set_status(f"Cell update failed: {exc}", 3)
         self.counts.reset()
 
+    def complete_external_edit_if_done(self):
+        return
+
     def open_cell_json_preview(self, row: int, col: int):
         total_rows = len(self.ctx.state.df)
         total_cols = len(self.ctx.state.df.columns)
@@ -198,22 +163,23 @@ class DfEditorExternal:
         finally:
             tmp.close()
 
-        editor_cmd = self._build_editor_command(tmp_path, read_only=True)
-        proc = self._launch_in_alacritty(editor_cmd)
-        if proc is None:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        argv = self._build_editor_argv(tmp_path, read_only=True)
+        rc = self._run_editor(argv)
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+        if rc not in (0, None):
             self.ctx._set_status("JSON preview failed", 3)
             return
 
-        self.ctx._set_status("Opened JSON preview (read-only)", 3)
+        self.ctx._set_status("Opened JSON preview", 3)
 
     # ---------- helpers ----------
-    def _start_external_edit_process(self, row_override: int, col_override: int, col_name: str):
+    def _prepare_temp_file(self, row_override: int, col_override: int):
         if len(self.ctx.state.df.columns) == 0 or len(self.ctx.state.df) == 0:
-            return None, None, None
+            return None, None
 
         total_rows = len(self.ctx.state.df)
         total_cols = len(self.ctx.state.df.columns)
@@ -230,33 +196,32 @@ class DfEditorExternal:
             tmp.flush()
         finally:
             tmp.close()
+        return tmp_path, base
 
-        editor_cmd = self._build_editor_command(tmp_path)
-        proc = self._launch_in_alacritty(editor_cmd)
-        if proc is None:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-            return None, None, None
-        return proc, tmp_path, base
-
-    def _build_editor_command(self, tmp_path: str, read_only: bool = False) -> str:
+    def _build_editor_argv(self, tmp_path: str, read_only: bool = False) -> list[str]:
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
-        if read_only:
-            ro_opts = (
-                "-n -R -M "
-                "+setlocal nobuflisted noswapfile buftype=nofile bufhidden=wipe "
-                "nowrap readonly nomodifiable nonumber norelativenumber shortmess+=I"
-            )
-            return f"{editor} {ro_opts} {shlex.quote(tmp_path)}"
-        return f"{editor} {shlex.quote(tmp_path)}"
+        argv = shlex.split(editor)
+        if not argv:
+            argv = ["vim"]
 
-    def _launch_in_alacritty(self, editor_cmd: str):
+        ro_args: list[str] = []
+        base = os.path.basename(argv[0]) if argv else ""
+        if read_only and base in {"vim", "nvim"}:
+            ro_args = [
+                "-n",
+                "-R",
+                "-M",
+                "+setlocal nobuflisted noswapfile buftype=nofile bufhidden=wipe nowrap readonly nomodifiable nonumber norelativenumber shortmess+=I",
+            ]
+
+        return argv + ro_args + [tmp_path]
+
+    def _run_editor(self, argv: list[str]) -> int:
+        runner = getattr(self.ctx, "run_interactive", None)
+        if not callable(runner):
+            self.ctx._set_status("External editor unavailable", 3)
+            return 1
         try:
-            proc = subprocess.Popen(["alacritty", "-e", "bash", "-lc", editor_cmd])
-            return proc
-        except FileNotFoundError:
-            return None
+            return runner(argv)
         except Exception:
-            return None
+            return 1

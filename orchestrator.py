@@ -2,6 +2,7 @@
 import curses
 import time
 import os
+import subprocess
 
 from grid_pane import GridPane
 from command_pane import CommandPane
@@ -76,11 +77,51 @@ class Orchestrator:
         self.df_editor = DfEditor(
             self.state, self.grid, self.paginator, self._set_status, self.column_prompt
         )
+        # allow external editor to run in current terminal
+        if hasattr(self.df_editor, "ctx"):
+            self.df_editor.ctx.run_interactive = self._run_interactive_in_terminal
         # wire undo into column prompt
         if hasattr(self.column_prompt, "set_push_undo"):
             self.column_prompt.set_push_undo(self.df_editor._push_undo)
 
     # ---------------- helpers ----------------
+
+    def _run_interactive_in_terminal(self, argv):
+        if not argv:
+            return 1
+        try:
+            curses.def_prog_mode()
+        except curses.error:
+            pass
+        try:
+            curses.endwin()
+        except curses.error:
+            pass
+
+        try:
+            result = subprocess.run(argv).returncode
+        except FileNotFoundError:
+            result = 127
+        except Exception:
+            result = 1
+
+        try:
+            curses.reset_prog_mode()
+        except curses.error:
+            pass
+        try:
+            curses.raw()
+            self.stdscr.nodelay(False)
+            self.stdscr.timeout(100)
+        except curses.error:
+            pass
+        try:
+            self.stdscr.clear()
+            self.stdscr.refresh()
+            self.redraw()
+        except Exception:
+            pass
+        return result
 
     def _set_status(self, msg, seconds=3):
         self.status_msg = msg

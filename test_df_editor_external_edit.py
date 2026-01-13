@@ -42,14 +42,6 @@ class DummyPaginator:
         pass
 
 
-class DummyProc:
-    def __init__(self, returncode=0):
-        self.returncode = returncode
-
-    def poll(self):
-        return self.returncode
-
-
 def _make_editor(df):
     state = SimpleNamespace(
         df=df,
@@ -64,48 +56,36 @@ def _make_editor(df):
     paginator = DummyPaginator()
     messages = []
     editor = DfEditor(state, grid, paginator, lambda msg, _=None: messages.append(msg))
+    # Run external editor synchronously without launching a real editor
+    editor.ctx.run_interactive = lambda argv: 0
     return editor, grid, messages
 
 
-def _complete_external_edit(editor, tmp_path, meta_overrides=None):
-    meta = {
-        "row": 0,
-        "col": 0,
-        "col_name": "a",
-        "base": "",
-        "preserve_cell_mode": False,
-    }
-    if meta_overrides:
-        meta.update(meta_overrides)
-
-    editor.external_proc = DummyProc()
-    editor.external_tmp_path = tmp_path
-    editor.external_meta = meta
-    editor.external_receiving = False
-
-    # first call flips into "receiving" state
-    editor._complete_external_edit_if_done()
-    # second call performs the actual read + commit
-    editor._complete_external_edit_if_done()
+def _tempfile_with_contents(text: str) -> str:
+    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8")
+    tmp.write(text)
+    tmp.close()
+    return tmp.name
 
 
 def test_external_edit_updates_string_cell():
     df = pd.DataFrame({"a": ["old"]})
     editor, grid, _ = _make_editor(df)
 
-    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8")
-    try:
-        tmp.write("new value")
-        tmp.close()
+    tmp_path = _tempfile_with_contents("new value")
 
-        _complete_external_edit(
-            editor,
-            tmp.name,
-            meta_overrides={"base": "old"},
-        )
-    finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+    def fake_prepare(_r, _c):
+        return tmp_path, "old"
+
+    editor.external._prepare_temp_file = fake_prepare
+
+    editor.queue_external_edit(False)
+    editor.run_pending_external_edit()
+
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
 
     assert editor.state.df.iloc[0, 0] == "new value"
     assert grid.df.iloc[0, 0] == "new value"
@@ -113,21 +93,19 @@ def test_external_edit_updates_string_cell():
 
 def test_external_edit_coerces_int64_column():
     df = pd.DataFrame({"a": pd.Series([pd.NA], dtype="Int64")})
-    editor, _, _ = _make_editor(df)
+    editor, grid, _ = _make_editor(df)
 
-    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8")
+    tmp_path = _tempfile_with_contents("42")
+    editor.external._prepare_temp_file = lambda _r, _c: (tmp_path, "")
+
+    editor.queue_external_edit(False)
+    editor.run_pending_external_edit()
+
     try:
-        tmp.write("42")
-        tmp.close()
-
-        _complete_external_edit(
-            editor,
-            tmp.name,
-            meta_overrides={"base": "", "col_name": "a"},
-        )
-    finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+        os.unlink(tmp_path)
+    except OSError:
+        pass
 
     assert editor.state.df.iloc[0, 0] == 42
+    assert grid.df.iloc[0, 0] == 42
     assert str(editor.state.df["a"].dtype) == "Int64"
