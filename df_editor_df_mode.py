@@ -1,3 +1,4 @@
+# ~/Apps/vixl/df_editor_df_mode.py
 # df_editor_df_mode.py retains pandas import for isna usage
 from pandas import isna
 
@@ -156,6 +157,38 @@ class DfEditorDfMode:
             self.ctx.paginator.ensure_row_visible(target)
             self.ctx.grid.row_offset = 0
             self.ctx.grid.curr_row = target
+            return True
+
+        if ch == ord("x"):
+            if total_rows == 0 or total_cols == 0:
+                return True
+            self.undo_mgr.push_undo()
+            r, c = self.ctx.grid.curr_row, self.ctx.grid.curr_col
+            col_name = self.ctx.state.df.columns[c]
+            try:
+                self.ctx.state.df.iloc[r, c] = self.cell._coerce_cell_value(col_name, "")
+            except Exception:
+                self.ctx.state.df.iloc[r, c] = ""
+            self.ctx.grid.df = self.ctx.state.df
+            self.ctx._set_status("Cell cleared", 2)
+            self.undo_mgr.set_last_action("cell_clear")
+            self.counts.reset()
+            return True
+
+        if ch == ord("i"):
+            is_expanded = getattr(self.ctx.state, "expand_all_rows", False) or (
+                self.ctx.grid.curr_row in getattr(self.ctx.state, "expanded_rows", set())
+            )
+            if is_expanded:
+                self.external.queue_external_edit(preserve_cell_mode=False)
+                return True
+            self.ctx.cell_col = col_name
+            self.ctx.cell_buffer = base
+            if not self.ctx.cell_buffer.endswith(" "):
+                self.ctx.cell_buffer += " "
+            self.ctx.cell_cursor = len(self.ctx.cell_buffer) - 1
+            self.ctx.mode = "cell_insert"
+            self.counts.reset()
             return True
 
         # leader entry
