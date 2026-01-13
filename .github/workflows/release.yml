@@ -33,8 +33,8 @@ jobs:
             cd /work
             PYBIN="/opt/python/cp311-cp311/bin/python"
             "$PYBIN" -m pip install -U pip
-            "$PYBIN" -m pip install -r requirements.txt
-            "$PYBIN" -m pip install pyinstaller
+            "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
+            "$PYBIN" -m pip install --only-binary=:all: pyinstaller
             echo "__version__ = \"${VERSION}\"" > _version.py
             "$PYBIN" -m PyInstaller --onefile --name vixl main.py
             tar -C dist -czf vixl-linux-x64.tar.gz vixl
