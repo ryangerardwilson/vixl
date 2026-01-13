@@ -2,7 +2,7 @@ name,age,city,age2,age3,notes,extra1,extra2,extra3,extra4,extra5
 John,30,New York,60,303030,This is a very long note that should be truncated in display,a,b,c,d,e
 Jane,25,Los Angeles dsjif j,50,252525,Another extremely long string meant to test pandas truncation behavior,f,g,h,i,j
 Bob,40,Chicago,80,404040,Short note,k,l,m,n,o
-Alice,35,San Francisco,70,353535,Yet another long descriptive text to overflow column width,p,q,r,s,t
+Alice,35,San Francisco jdif sdijf,70,353535,Yet another long descriptive text to overflow column width,p,q,r,s,t
 Eve,28,Boston,56,282828,"Lorem ipsum dolor sit amet, consectetur adipiscing elit",u,v,w,x,y
 Mallory,45,Austin,90,454545,Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua,z,aa,ab,ac,ad
 Trent,33,Denver,66,333333,Testing additional rows for pandas display,ae,af,ag,ah,ai

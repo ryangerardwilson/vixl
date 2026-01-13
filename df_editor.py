@@ -4,6 +4,7 @@ import os
 import shlex
 import pandas as pd
 
+
 from df_editor_context import DfEditorContext, CTX_ATTRS
 from df_editor_counts import DfEditorCounts
 from df_editor_cell import DfEditorCell
@@ -190,6 +191,12 @@ class DfEditor:
 
     def _get_word_bounds_at_or_after(self, idx: int):
         return self.cell._get_word_bounds_at_or_after(idx)
+
+    def _value_is_na(self, v) -> bool:
+        try:
+            return pd.isna(v)
+        except Exception:
+            return False
 
     # ---------- leader helpers ----------
     def _leader_seq(self, state: str | None) -> str:
@@ -401,7 +408,7 @@ class DfEditor:
                 val = None
             else:
                 val = self.state.df.iloc[r, c]
-            base = "" if (val is None or pd.isna(val)) else str(val)
+            base = "" if (val is None or self._value_is_na(val)) else str(val)
 
             visible_rows = max(1, self.paginator.page_end - self.paginator.page_start)
             jump_rows = max(1, round(visible_rows * 0.05))
@@ -528,7 +535,7 @@ class DfEditor:
                         try:
                             import subprocess
 
-                            value = "" if (val is None or pd.isna(val)) else str(val)
+                            value = "" if (val is None or self._value_is_na(val)) else str(val)
                             subprocess.run(["wl-copy"], input=value, text=True, check=True)
                             self._set_status("Cell copied", 3)
                         except Exception:

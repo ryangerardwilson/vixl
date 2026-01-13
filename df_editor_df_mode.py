@@ -1,4 +1,5 @@
-import pandas as pd
+# df_editor_df_mode.py retains pandas import for isna usage
+from pandas import isna
 
 
 class DfEditorDfMode:
@@ -69,7 +70,7 @@ class DfEditorDfMode:
         r, c = self.ctx.grid.curr_row, self.ctx.grid.curr_col
         col_name = self.ctx.state.df.columns[c]
         val = None if total_rows == 0 else self.ctx.state.df.iloc[r, c]
-        base = "" if (val is None or pd.isna(val)) else str(val)
+        base = "" if (val is None or isna(val)) else str(val)
 
         visible_rows = max(1, self.ctx.paginator.page_end - self.ctx.paginator.page_start)
         jump_rows = max(1, round(visible_rows * 0.05))
@@ -377,7 +378,7 @@ class DfEditorDfMode:
                 import subprocess
 
                 value = self.ctx.state.df.iloc[r, c]
-                value = "" if (value is None or pd.isna(value)) else str(value)
+                value = "" if (value is None or isna(value)) else str(value)
                 subprocess.run(["wl-copy"], input=value, text=True, check=True)
                 self.ctx._set_status("Cell copied", 3)
             except Exception:
