@@ -58,10 +58,6 @@ class DfEditor:
             "r": ",r",
             "rn": ",rn",
             "c": ",c",
-            "plus": ",+",
-            "plus_r": ",+r",
-            "minus": ",-",
-            "minus_r": ",-r",
             "x": ",x",
             "xa": ",xa",
             "y": ",y",
@@ -959,16 +955,6 @@ class DfEditor:
                         self._show_leader_status(self._leader_seq("r"))
                         return
 
-                    if ch == ord("+"):
-                        self.df_leader_state = "plus"
-                        self._show_leader_status(self._leader_seq("plus"))
-                        return
-
-                    if ch == ord("-"):
-                        self.df_leader_state = "minus"
-                        self._show_leader_status(self._leader_seq("minus"))
-                        return
-
                 elif state == "y":
                     if ch == ord("a"):
                         try:
@@ -1093,6 +1079,16 @@ class DfEditor:
                         self._show_leader_status(",xc")
                         self._collapse_all_rows()
                         return
+                    if ch == ord("+"):
+                        count = self._consume_count()
+                        self._show_leader_status(",x+")
+                        self._adjust_row_lines(count)
+                        return
+                    if ch == ord("-"):
+                        count = self._consume_count()
+                        self._show_leader_status(",x-")
+                        self._adjust_row_lines(-count)
+                        return
                     self._show_leader_status("")
                     self._reset_count()
                     return
@@ -1101,43 +1097,6 @@ class DfEditor:
                     if ch == ord("r"):
                         self._show_leader_status(",xar")
                         self._toggle_all_rows_expanded()
-                        return
-                    self._show_leader_status("")
-                    self._reset_count()
-                    return
-
-                if state == "plus":
-                    if ch == ord("r"):
-                        self.df_leader_state = "plus_r"
-                        self._show_leader_status(self._leader_seq("plus_r"))
-                        return
-                    self._show_leader_status("")
-                    return
-
-                if state == "plus_r":
-                    if ch == ord("l"):
-                        count = self._consume_count()
-                        self._show_leader_status(",+rl")
-                        self._adjust_row_lines(count)
-                        return
-                    self._show_leader_status("")
-                    self._reset_count()
-                    return
-
-                if state == "minus":
-                    if ch == ord("r"):
-                        self.df_leader_state = "minus_r"
-                        self._show_leader_status(self._leader_seq("minus_r"))
-                        return
-                    self._show_leader_status("")
-                    self._reset_count()
-                    return
-
-                if state == "minus_r":
-                    if ch == ord("l"):
-                        count = self._consume_count()
-                        self._show_leader_status(",-rl")
-                        self._adjust_row_lines(-count)
                         return
                     self._show_leader_status("")
                     self._reset_count()

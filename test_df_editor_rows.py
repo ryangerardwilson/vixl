@@ -64,6 +64,9 @@ class RowInsertLeaderTests(unittest.TestCase):
             file_path=None,
             file_handler=None,
             build_default_row=lambda: {"a": None},
+            row_lines=1,
+            expanded_rows=set(),
+            expand_all_rows=False,
         )
         grid = DummyGrid()
         grid.df = df
@@ -96,6 +99,34 @@ class RowInsertLeaderTests(unittest.TestCase):
 
         self.assertEqual(len(editor.state.df), 2)
         self.assertEqual(editor.grid.curr_row, 1)
+
+    def test_adjust_row_lines_via_x_plus_minus(self):
+        df = pd.DataFrame({"a": [1]})
+        editor, _, _ = self._editor(df, row=0)
+        self.assertEqual(editor.state.row_lines, 1)
+
+        editor.handle_key(ord(","))
+        editor.handle_key(ord("x"))
+        editor.handle_key(ord("+"))
+
+        self.assertEqual(editor.state.row_lines, 2)
+
+        editor.handle_key(ord(","))
+        editor.handle_key(ord("x"))
+        editor.handle_key(ord("-"))
+
+        self.assertEqual(editor.state.row_lines, 1)
+
+    def test_adjust_row_lines_with_count(self):
+        df = pd.DataFrame({"a": [1]})
+        editor, _, _ = self._editor(df, row=0)
+
+        editor.handle_key(ord("3"))
+        editor.handle_key(ord(","))
+        editor.handle_key(ord("x"))
+        editor.handle_key(ord("+"))
+
+        self.assertEqual(editor.state.row_lines, 4)
 
 
 if __name__ == "__main__":
