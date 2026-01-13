@@ -246,8 +246,8 @@ class DfEditorExternal:
         if read_only:
             ro_opts = (
                 "-n -R -M "
-                "+setlocal\ nobuflisted\ noswapfile\ buftype=nofile\ bufhidden=wipe\ "
-                "nowrap\ readonly\ nomodifiable\ nonumber\ norelativenumber\ shortmess+=I"
+                "+setlocal nobuflisted noswapfile buftype=nofile bufhidden=wipe "
+                "nowrap readonly nomodifiable nonumber norelativenumber shortmess+=I"
             )
             return f"{editor} {ro_opts} {shlex.quote(tmp_path)}"
         return f"{editor} {shlex.quote(tmp_path)}"
