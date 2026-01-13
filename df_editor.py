@@ -2,13 +2,12 @@
 import curses
 import os
 import shlex
-import subprocess
-import tempfile
 import pandas as pd
 
 from df_editor_context import DfEditorContext, CTX_ATTRS
 from df_editor_counts import DfEditorCounts
 from df_editor_cell import DfEditorCell
+from df_editor_external import DfEditorExternal
 
 
 class DfEditor:
@@ -39,7 +38,18 @@ class DfEditor:
                 repeat_last_action_cb=self._repeat_last_action,
                 leader_seq_cb=self._leader_seq,
                 show_leader_status_cb=self._show_leader_status,
-                queue_external_edit_cb=self.queue_external_edit,
+                queue_external_edit_cb=self._queue_external_edit_internal,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "external",
+            DfEditorExternal(
+                ctx=self.ctx,
+                counts=self.counts,
+                cell=self.cell,
+                push_undo_cb=self._push_undo,
+                set_last_action_cb=self._set_last_action,
             ),
         )
 
@@ -197,259 +207,21 @@ class DfEditor:
             return
         self._set_status(f"Leader: {seq}", self._leader_ttl)
 
-    def _build_editor_command(self, tmp_path: str, read_only: bool = False) -> str:
-        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
-        if read_only:
-            ro_opts = (
-                "-n -R -M "
-                "+setlocal\ nobuflisted\ noswapfile\ buftype=nofile\ bufhidden=wipe\ "
-                "nowrap\ readonly\ nomodifiable\ nonumber\ norelativenumber\ shortmess+=I"
-            )
-            return f"{editor} {ro_opts} {shlex.quote(tmp_path)}"
-        return f"{editor} {shlex.quote(tmp_path)}"
-
-    def _launch_in_alacritty(self, editor_cmd: str):
-        try:
-            proc = subprocess.Popen(
-                ["alacritty", "-e", "bash", "-lc", editor_cmd]
-            )
-            return proc
-        except FileNotFoundError:
-            return None
-        except Exception:
-            return None
-
     def _open_cell_json_preview(self, row: int, col: int):
-        total_rows = len(self.state.df)
-        total_cols = len(self.state.df.columns)
-        if total_rows == 0 or total_cols == 0:
-            self._set_status("No cell to preview", 3)
-            return
-
-        r = min(max(0, row), max(0, total_rows - 1))
-        c = min(max(0, col), max(0, total_cols - 1))
-        val = self.state.df.iloc[r, c]
-
-        try:
-            import json
-        except ImportError:
-            self._set_status("JSON preview unavailable", 3)
-            return
-
-        if val is None or (hasattr(pd, "isna") and pd.isna(val)):
-            text = "null"
-        else:
-            try:
-                parsed = json.loads(val) if isinstance(val, str) else val
-                text = json.dumps(parsed, indent=2, ensure_ascii=False, default=str)
-            except Exception:
-                text = json.dumps(val, indent=2, ensure_ascii=False, default=str)
-
-        tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8")
-        tmp_path = tmp.name
-        try:
-            tmp.write(text)
-            tmp.flush()
-        finally:
-            tmp.close()
-
-        editor_cmd = self._build_editor_command(tmp_path, read_only=True)
-        proc = self._launch_in_alacritty(editor_cmd)
-        if proc is None:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-            self._set_status("JSON preview failed", 3)
-            return
-
-        self._set_status("Opened JSON preview (read-only)", 3)
+        self.external.open_cell_json_preview(row, col)
 
     def queue_external_edit(self, preserve_cell_mode: bool):
+        self.external.queue_external_edit(preserve_cell_mode)
 
-
-        if self.external_proc is not None:
-            self._set_status("Already editing externally", 3)
-            self._reset_count()
-            return
-        if len(self.state.df.columns) == 0 or len(self.state.df) == 0:
-            self._set_status("No cell to edit", 3)
-            self._reset_count()
-            return
-
-        total_rows = len(self.state.df)
-        total_cols = len(self.state.df.columns)
-        r = min(max(0, self.grid.curr_row), max(0, total_rows - 1))
-        c = min(max(0, self.grid.curr_col), max(0, total_cols - 1))
-        col = self.state.df.columns[c]
-
-        idx_label = self.state.df.index[r] if len(self.state.df.index) > r else r
-        self.pending_edit_snapshot = {
-            "row": r,
-            "col": c,
-            "col_name": col,
-            "idx_label": idx_label,
-        }
-        self.pending_preserve_cell_mode = preserve_cell_mode
-        self.pending_external_edit = True
-        self._set_status(f"Editing '{col}' at index {idx_label}", 600)
-        self._reset_count()
+    def _queue_external_edit_internal(self, preserve_cell_mode: bool):
+        """Internal helper so cell controller can queue edits without recursion."""
+        self.external.queue_external_edit(preserve_cell_mode)
 
     def run_pending_external_edit(self):
-        if not self.pending_external_edit:
-            return
-        if self.external_proc is not None:
-            return
-
-        snap = self.pending_edit_snapshot or {}
-        r = snap.get("row", self.grid.curr_row)
-        c = snap.get("col", self.grid.curr_col)
-        col = snap.get("col_name") or (self.state.df.columns[c] if len(self.state.df.columns) else "")
-
-        self.pending_external_edit = False
-        self.pending_edit_snapshot = None
-
-        proc, tmp_path, base = self._start_external_edit_process(
-            row_override=r,
-            col_override=c,
-            col_name=col,
-        )
-        if proc is None:
-            self._set_status("Open in Alacritty failed", 3)
-            self.pending_preserve_cell_mode = False
-            return
-
-        self.external_proc = proc
-        self.external_tmp_path = tmp_path
-        self.external_meta = {
-            "row": r,
-            "col": c,
-            "col_name": col,
-            "base": base,
-            "preserve_cell_mode": self.pending_preserve_cell_mode,
-        }
-        self.pending_preserve_cell_mode = False
-
-    def _start_external_edit_process(
-        self,
-        row_override: int,
-        col_override: int,
-        col_name: str,
-    ):
-        if len(self.state.df.columns) == 0 or len(self.state.df) == 0:
-            return None, None, None
-
-        total_rows = len(self.state.df)
-        total_cols = len(self.state.df.columns)
-        r = min(max(0, row_override), max(0, total_rows - 1))
-        c = min(max(0, col_override), max(0, total_cols - 1))
-
-        val = self.state.df.iloc[r, c] if total_rows > 0 else None
-        base = "" if (val is None or pd.isna(val)) else str(val)
-
-        tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8")
-        tmp_path = tmp.name
-        try:
-            tmp.write(base)
-            tmp.flush()
-        finally:
-            tmp.close()
-
-        editor_cmd = self._build_editor_command(tmp_path)
-        proc = self._launch_in_alacritty(editor_cmd)
-        if proc is None:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-            return None, None, None
-        return proc, tmp_path, base
+        self.external.run_pending_external_edit()
 
     def _complete_external_edit_if_done(self):
-        if self.external_proc is None:
-            return
-        if self.external_proc.poll() is None:
-            return
-
-        if not self.external_receiving:
-            self.external_receiving = True
-            self._set_status("Receiving new data from editor", 5)
-            return
-
-        rc = self.external_proc.returncode
-        tmp_path = self.external_tmp_path
-        meta = self.external_meta or {}
-        self.external_proc = None
-        self.external_tmp_path = None
-        self.external_meta = None
-        self.external_receiving = False
-
-        base = meta.get("base", "")
-        r = meta.get("row", self.grid.curr_row)
-        c = meta.get("col", self.grid.curr_col)
-        preserve_cell_mode = meta.get("preserve_cell_mode", False)
-
-        col_name_raw = meta.get("col_name")
-        col_name = col_name_raw if isinstance(col_name_raw, str) and col_name_raw else None
-        if col_name is None:
-            if len(self.state.df.columns) == 0:
-                self._set_status("No columns to update", 3)
-                return
-            c = max(0, min(c, len(self.state.df.columns) - 1))
-            col_name = str(self.state.df.columns[c])
-
-        new_text = base
-        if tmp_path:
-
-            try:
-                with open(tmp_path, "r", encoding="utf-8") as fh:
-                    new_text = fh.read()
-            except Exception:
-                new_text = base
-            finally:
-                try:
-                    os.unlink(tmp_path)
-                except Exception:
-                    pass
-
-        if rc not in (0, None):
-            self._set_status("Edit canceled", 3)
-            return
-
-        new_text = (new_text or "").rstrip("\n")
-        if new_text == base:
-            self._set_status("No changes", 2)
-            if preserve_cell_mode:
-                self.cell_col = col_name
-                self.cell_buffer = new_text
-                self.cell_cursor = 0
-                self.cell_hscroll = 0
-                self.mode = "cell_normal"
-                self._autoscroll_cell_normal()
-            self._reset_count()
-            return
-
-        try:
-            self._push_undo()
-            coerced = self._coerce_cell_value(col_name, new_text)
-            self.state.df.iloc[r, c] = coerced
-            self.grid.df = self.state.df
-            self.paginator.update_total_rows(len(self.state.df))
-            self.paginator.ensure_row_visible(r)
-            self._set_last_action("cell_set", value=coerced)
-            self.pending_count = None
-            if preserve_cell_mode:
-                self.cell_col = col_name
-                self.cell_buffer = new_text
-                self.cell_cursor = 0
-                self.cell_hscroll = 0
-                self.mode = "cell_normal"
-                self._autoscroll_cell_normal()
-            self._set_status("Cell updated (editor)", 2)
-
-        except Exception as e:
-            self._set_status(f"Cell update failed: {e}", 3)
-        self._reset_count()
+        self.external.complete_external_edit_if_done()
 
     # ---------- counts ----------
     def _reset_last_action(self):
