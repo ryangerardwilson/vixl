@@ -9,6 +9,7 @@ from df_editor_counts import DfEditorCounts
 from df_editor_cell import DfEditorCell
 from df_editor_external import DfEditorExternal
 from df_editor_undo import DfEditorUndo
+from df_editor_df_ops import DfEditorDfOps
 
 
 class DfEditor:
@@ -29,6 +30,15 @@ class DfEditor:
         )
         object.__setattr__(self, "counts", DfEditorCounts(self.ctx))
         object.__setattr__(self, "undo_mgr", DfEditorUndo(self.ctx, self.counts))
+        object.__setattr__(
+            self,
+            "df_ops",
+            DfEditorDfOps(
+                ctx=self.ctx,
+                counts=self.counts,
+                undo_mgr=self.undo_mgr,
+            ),
+        )
         object.__setattr__(
             self,
             "cell",
@@ -308,157 +318,37 @@ class DfEditor:
         self.undo_mgr.redo()
 
     def _enter_cell_insert_at_end(self, col, base):
-        self.cell_col = col
-        self.cell_buffer = base
-        if not self.cell_buffer.endswith(" "):
-            self.cell_buffer += " "
-        self.cell_cursor = len(self.cell_buffer)
-        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
-        self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
-        self.mode = "cell_insert"
+        self.df_ops.enter_cell_insert_at_end(col, base)
 
     def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
-        current = self.state.row_lines
-        new_value = max(minimum, min(maximum, current + delta))
-        if new_value == current:
-            bound = "minimum" if delta < 0 else "maximum"
-            self._set_status(f"Row lines {bound} reached ({new_value})", 2)
-            return
-        applied_delta = new_value - current
-        self.state.row_lines = new_value
-        self.grid.row_offset = 0
-        self._set_status(f"Row lines set to {self.state.row_lines}", 2)
-        self._set_last_action("adjust_row_lines", delta=applied_delta)
+        self.df_ops.adjust_row_lines(delta, minimum=minimum, maximum=maximum)
 
     def _toggle_row_expanded(self):
-        if len(self.state.df) == 0:
-            self._set_status("No rows to expand", 2)
-            return
-        row = max(0, min(self.grid.curr_row, len(self.state.df) - 1))
-        expanded = getattr(self.state, "expanded_rows", set())
-        if row in expanded:
-            expanded.remove(row)
-            self._set_status("Row collapsed", 2)
-        else:
-            expanded.add(row)
-            self._set_status("Row expanded", 2)
-        self.state.expand_all_rows = False if not expanded else self.state.expand_all_rows
-        self.grid.row_offset = 0
-        self._reset_count()
+        self.df_ops.toggle_row_expanded()
 
     def _toggle_all_rows_expanded(self):
-        self.state.expand_all_rows = not getattr(self.state, "expand_all_rows", False)
-        state = "expanded" if self.state.expand_all_rows else "collapsed"
-        self._set_status(f"All rows {state}", 2)
-        self.grid.row_offset = 0
-        self._reset_count()
+        self.df_ops.toggle_all_rows_expanded()
 
     def _collapse_all_rows(self):
-        self.state.expand_all_rows = False
-        self.state.expanded_rows = set()
-        self.grid.row_offset = 0
-        self._set_status("All rows collapsed", 2)
-        self._reset_count()
+        self.df_ops.collapse_all_rows()
 
     def _start_insert_column(self, after: bool):
-        if self.column_prompt is None:
-            self._set_status("Column prompt unavailable", 3)
-            return
-        if len(self.state.df.columns) == 0:
-            self._set_status("No columns", 3)
-            return
-        if after:
-            self.column_prompt.start_insert_after(self.grid.curr_col)
-        else:
-            self.column_prompt.start_insert_before(self.grid.curr_col)
+        self.df_ops.start_insert_column(after)
 
     def _insert_rows(self, above: bool, count: int = 1):
-        if len(self.state.df.columns) == 0:
-            self._set_status("No columns", 3)
-            return
-        count = max(1, count)
-        self._push_undo()
-        insert_at = (
-            self.grid.curr_row
-            if above
-            else (self.grid.curr_row + 1 if len(self.state.df) > 0 else 0)
-        )
-        row = self.state.build_default_row()
-        new_rows = pd.DataFrame([row] * count, columns=self.state.df.columns)
-        self.state.df = pd.concat(
-            [
-                self.state.df.iloc[:insert_at],
-                new_rows,
-                self.state.df.iloc[insert_at:],
-            ],
-            ignore_index=True,
-        )
-        self.grid.df = self.state.df
-        self.paginator.update_total_rows(len(self.state.df))
-        self.paginator.ensure_row_visible(insert_at)
-        self.grid.curr_row = insert_at
-        self.grid.highlight_mode = "cell"
-        self._set_status(
-            f"Inserted {count} row{'s' if count != 1 else ''} {'above' if above else 'below'}",
-            2,
-        )
-        self._set_last_action("insert_rows", count=count, above=above)
+        self.df_ops.insert_rows(above, count)
 
     def _insert_row(self, above: bool):
-        self._insert_rows(above=above, count=1)
+        self.df_ops.insert_row(above)
 
     def _start_rename_column(self):
-        if self.column_prompt is None:
-            self._set_status("Column prompt unavailable", 3)
-            return
-        if len(self.state.df.columns) == 0:
-            self._set_status("No columns", 3)
-            return
-        self.column_prompt.start_rename(self.grid.curr_col)
+        self.df_ops.start_rename_column()
 
     def _delete_rows(self, count: int = 1):
-        total_rows = len(self.state.df)
-        if total_rows == 0:
-            self._set_status("No rows", 3)
-            return
-        count = max(1, count)
-        self._push_undo()
-        start = self.grid.curr_row
-        end = min(total_rows, start + count)
-        self.state.df = self.state.df.drop(self.state.df.index[start:end]).reset_index(
-            drop=True
-        )
-        self.grid.df = self.state.df
-        total_rows = len(self.state.df)
-        self.grid.curr_row = min(start, max(0, total_rows - 1))
-        self.paginator.update_total_rows(total_rows)
-        if total_rows:
-            self.paginator.ensure_row_visible(self.grid.curr_row)
-        self.grid.highlight_mode = "cell"
-        deleted = end - start
-        self._set_status(f"Deleted {deleted} row{'s' if deleted != 1 else ''}", 2)
-        self._set_last_action("delete_rows", count=deleted)
+        self.df_ops.delete_rows(count)
 
     def _delete_current_column(self):
-        cols = list(self.state.df.columns)
-        if not cols:
-            self._set_status("No columns", 3)
-            return
-        self._push_undo()
-        col_idx = self.grid.curr_col
-        col_name = cols[col_idx]
-        self.state.df.drop(columns=[col_name], inplace=True)
-        self.grid.df = self.state.df
-        total_cols = len(self.state.df.columns)
-        self.grid.curr_col = min(col_idx, max(0, total_cols - 1))
-        self.grid.adjust_col_viewport()
-        if total_cols == 0:
-            self.cell_buffer = ""
-            self.cell_cursor = 0
-            self.cell_hscroll = 0
-            self.mode = "normal"
-        self._set_status(f"Deleted column '{col_name}'", 3)
-        self._set_last_action("col_delete", col_name=col_name)
+        self.df_ops.delete_current_column()
 
     # ---------- public API ----------
     def handle_key(self, ch):
