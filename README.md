@@ -8,24 +8,44 @@ transparency over how their data is transformed.
 
 ---
 
+## Installation (venv)
+
+```bash
+git clone <your-repo-url>
+cd vixl
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -r requirements.txt
+```
+
 ## Running the App
 
-Run the application via the root entrypoint:
+With the virtual environment active:
 
 ```bash
 python main.py <csv-or-parquet-file>
 ```
 
-- CSV is always supported; Parquet requires `pyarrow` (recommended) or `fastparquet`.
+- CSV is always supported; Parquet requires `pyarrow` (installed via requirements.txt).
 - If the file does not exist, a blank file is created automatically
 
+### Optional: create a `vixl` command
+
+```bash
+chmod +x main.py
+ln -sf "$(pwd)/main.py" "$HOME/.local/bin/vixl"
+```
+
+Ensure `~/.local/bin` is on your PATH, and activate the venv before running `vixl`.
+
 ### Bash completion (auto-provisioned, warning-only)
-- On first run, Vixl creates `~/.config/vixl/completions/vixl.bash`.
+- On first run, Vixl creates `$XDG_CONFIG_HOME/vixl/completions/vixl.bash` (default `~/.config/vixl/completions/vixl.bash`).
 - Add this block to your `~/.bashrc` (or `~/.bash_profile` if you do not have a `.bashrc`):
   ```bash
   # >>> vixl bash completion >>>
-  if [ -f "$HOME/.config/vixl/completions/vixl.bash" ]; then
-      source "$HOME/.config/vixl/completions/vixl.bash"
+  if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/vixl/completions/vixl.bash" ]; then
+      source "${XDG_CONFIG_HOME:-$HOME/.config}/vixl/completions/vixl.bash"
   fi
   # <<< vixl bash completion <<<
   ```
@@ -47,8 +67,8 @@ python main.py <csv-or-parquet-file>
 ### Vixl – interactive DataFrame editor (curses)
 - Single-line command bar at the bottom.
 - Modal overlays for output and shortcuts (content-sized, up to 50% of terminal height).
-- Extensions loaded from `~/.config/vixl/extensions`, namespaced under `df.vixl` to avoid pandas collisions.
-- Persistent history at `~/.config/vixl/history.log`.
+- Extensions loaded from `$XDG_CONFIG_HOME/vixl/extensions` (default `~/.config/vixl/extensions`), namespaced under `df.vixl` to avoid pandas collisions.
+- Persistent history at `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`).
 
 ### Quick start
 - No argument: `python main.py`
@@ -103,11 +123,11 @@ python main.py <csv-or-parquet-file>
 
 
 ### History
-- Stored at `~/.config/vixl/history.log`.
+- Stored at `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`).
 - Command bar history navigation: Ctrl+P / Ctrl+N.
 
 ### Extensions
-- Location: `~/.config/vixl/extensions/*.py`
+- Location: `$XDG_CONFIG_HOME/vixl/extensions/*.py` (default `~/.config/vixl/extensions/*.py`)
 - Loaded at startup; functions are exposed under `df.vixl.<name>` to avoid pandas attribute collisions.
 - Mutation contract:
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
@@ -131,7 +151,7 @@ python main.py <csv-or-parquet-file>
   }
   ```
 - Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
-- Examples (save under `~/.config/vixl/extensions/`):
+- Examples (save under `$XDG_CONFIG_HOME/vixl/extensions/`):
    1) multiply_cols (explicit commit)
       ```python
 
@@ -186,7 +206,7 @@ python main.py <csv-or-parquet-file>
 
 - The grid is for navigation and selection. Pressing `i` launches vim in the current terminal with the cell value in a temp file; exiting vim with status 0 commits the change (dtype-coerced), non-zero cancels.
 - Structural or multi-cell mutations remain explicit Python commands typed into the command bar (`:`).
-- There are no inline cell modes; the clipboard command is configurable via `clipboard_interface_command` in `~/.config/vixl/config.json`.
+- There are no inline cell modes; the clipboard command is configurable via `clipboard_interface_command` in `$XDG_CONFIG_HOME/vixl/config.json` (default `~/.config/vixl/config.json`).
 
 ---
 

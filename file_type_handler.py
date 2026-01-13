@@ -52,13 +52,7 @@ class FileTypeHandler:
             return
         except ImportError:
             pass
-        try:
-            import fastparquet  # noqa: F401
-            return
-        except ImportError:
-            pass
         print(
-            "Parquet support requires pyarrow (recommended) or fastparquet. "
-            "Install via: pip install pyarrow"
+            "Parquet support requires pyarrow. Install via: pip install pyarrow"
         )
         sys.exit(1)
