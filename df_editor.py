@@ -7,6 +7,7 @@ import tempfile
 import pandas as pd
 
 from df_editor_context import DfEditorContext, CTX_ATTRS
+from df_editor_counts import DfEditorCounts
 
 
 class DfEditor:
@@ -25,6 +26,7 @@ class DfEditor:
                 _leader_ttl=1.5,
             ),
         )
+        object.__setattr__(self, "counts", DfEditorCounts(self.ctx))
 
     def __getattr__(self, name):
         if name in CTX_ATTRS:
@@ -39,6 +41,96 @@ class DfEditor:
             setattr(self.ctx, name, value)
             return
         object.__setattr__(self, name, value)
+
+    # Explicit property forwarding for the public surface used outside this module.
+    # These properties keep Orchestrator/tests stable while we refactor internals.
+    @property
+    def state(self):
+        return self.ctx.state
+
+    @state.setter
+    def state(self, value):
+        self.ctx.state = value
+
+    @property
+    def grid(self):
+        return self.ctx.grid
+
+    @grid.setter
+    def grid(self, value):
+        self.ctx.grid = value
+
+    @property
+    def paginator(self):
+        return self.ctx.paginator
+
+    @paginator.setter
+    def paginator(self, value):
+        self.ctx.paginator = value
+
+    @property
+    def _set_status(self):
+        return self.ctx._set_status
+
+    @_set_status.setter
+    def _set_status(self, value):
+        self.ctx._set_status = value
+
+    @property
+    def column_prompt(self):
+        return self.ctx.column_prompt
+
+    @column_prompt.setter
+    def column_prompt(self, value):
+        self.ctx.column_prompt = value
+
+    @property
+    def _leader_ttl(self):
+        return self.ctx._leader_ttl
+
+    @_leader_ttl.setter
+    def _leader_ttl(self, value):
+        self.ctx._leader_ttl = value
+
+    @property
+    def mode(self):
+        return self.ctx.mode
+
+    @mode.setter
+    def mode(self, value):
+        self.ctx.mode = value
+
+    @property
+    def cell_buffer(self):
+        return self.ctx.cell_buffer
+
+    @cell_buffer.setter
+    def cell_buffer(self, value):
+        self.ctx.cell_buffer = value
+
+    @property
+    def cell_cursor(self):
+        return self.ctx.cell_cursor
+
+    @cell_cursor.setter
+    def cell_cursor(self, value):
+        self.ctx.cell_cursor = value
+
+    @property
+    def cell_hscroll(self):
+        return self.ctx.cell_hscroll
+
+    @cell_hscroll.setter
+    def cell_hscroll(self, value):
+        self.ctx.cell_hscroll = value
+
+    @property
+    def pending_count(self):
+        return self.ctx.pending_count
+
+    @pending_count.setter
+    def pending_count(self, value):
+        self.ctx.pending_count = value
 
     # ---------- helpers ----------
     def _coerce_cell_value(self, col_name: str, text: str):
@@ -499,20 +591,13 @@ class DfEditor:
 
     # ---------- counts ----------
     def _reset_count(self):
-        self.pending_count = None
+        self.counts.reset()
 
     def _push_count_digit(self, digit: int):
-        if digit < 0 or digit > 9:
-            return
-        if self.pending_count is None:
-            self.pending_count = digit
-        else:
-            self.pending_count = min(9999, self.pending_count * 10 + digit)
+        self.counts.push_digit(digit)
 
     def _consume_count(self, default: int = 1) -> int:
-        count = self.pending_count if self.pending_count is not None else default
-        self.pending_count = None
-        return max(1, count)
+        return self.counts.consume(default)
 
     # ---------- undo/redo ----------
     def _snapshot_state(self):
