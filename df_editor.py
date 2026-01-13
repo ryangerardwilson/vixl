@@ -8,6 +8,7 @@ import pandas as pd
 
 from df_editor_context import DfEditorContext, CTX_ATTRS
 from df_editor_counts import DfEditorCounts
+from df_editor_cell import DfEditorCell
 
 
 class DfEditor:
@@ -27,6 +28,20 @@ class DfEditor:
             ),
         )
         object.__setattr__(self, "counts", DfEditorCounts(self.ctx))
+        object.__setattr__(
+            self,
+            "cell",
+            DfEditorCell(
+                ctx=self.ctx,
+                counts=self.counts,
+                push_undo_cb=self._push_undo,
+                set_last_action_cb=self._set_last_action,
+                repeat_last_action_cb=self._repeat_last_action,
+                leader_seq_cb=self._leader_seq,
+                show_leader_status_cb=self._show_leader_status,
+                queue_external_edit_cb=self.queue_external_edit,
+            ),
+        )
 
     def __getattr__(self, name):
         if name in CTX_ATTRS:
@@ -134,125 +149,25 @@ class DfEditor:
 
     # ---------- helpers ----------
     def _coerce_cell_value(self, col_name: str, text: str):
-        text = "" if text is None else str(text)
-        try:
-            dtype = self.state.df[col_name].dtype
-        except Exception:
-            dtype = object
-
-        stripped = text.strip()
-        if pd.api.types.is_integer_dtype(dtype):
-            if stripped == "":
-                return pd.NA
-            return int(stripped)
-
-        if pd.api.types.is_float_dtype(dtype):
-            if stripped == "":
-                return float("nan")
-            return float(stripped)
-
-        if pd.api.types.is_bool_dtype(dtype):
-            if stripped == "":
-                return pd.NA
-            lowered = stripped.lower()
-            if lowered in {"1", "true", "t", "yes", "y", "on"}:
-                return True
-            if lowered in {"0", "false", "f", "no", "n", "off"}:
-                return False
-            raise ValueError(f"Cannot coerce '{text}' to boolean")
-
-        if pd.api.types.is_datetime64_any_dtype(dtype):
-            if stripped == "":
-                return pd.NaT
-            return pd.to_datetime(stripped, errors="raise")
-
-        return text
+        return self.cell._coerce_cell_value(col_name, text)
 
     def _autoscroll_insert(self):
-        cw = max(1, self.grid.get_col_width(self.grid.curr_col))
-        if self.cell_cursor < self.cell_hscroll:
-            self.cell_hscroll = self.cell_cursor
-        elif self.cell_cursor > self.cell_hscroll + cw - 1:
-            self.cell_hscroll = self.cell_cursor - (cw - 1)
-
-        max_scroll = max(0, len(self.cell_buffer) - cw + 1)
-        self.cell_hscroll = max(0, min(self.cell_hscroll, max_scroll))
+        self.cell._autoscroll_insert()
 
     def _autoscroll_cell_normal(self, prefer_left: bool = False, margin: int = 2):
-        cw = max(1, self.grid.get_rendered_col_width(self.grid.curr_col))
-        lines = max(1, getattr(self.state, "row_lines", 1))
-        span = max(1, cw * lines)
-        buf_len = len(self.cell_buffer)
-
-        max_scroll = max(0, buf_len - span)
-
-        if self.cell_cursor < self.cell_hscroll:
-            self.cell_hscroll = self.cell_cursor
-        elif self.cell_cursor >= self.cell_hscroll + span:
-            if prefer_left:
-                self.cell_hscroll = max(0, self.cell_cursor - max(0, margin))
-            else:
-                self.cell_hscroll = self.cell_cursor - span + 1
-
-        self.cell_hscroll = min(max(self.cell_hscroll, 0), max_scroll)
+        self.cell._autoscroll_cell_normal(prefer_left=prefer_left, margin=margin)
 
     def _is_word_char(self, ch: str) -> bool:
-        return ch.isalnum() or ch == "_"
+        return self.cell._is_word_char(ch)
 
     def _cell_word_forward(self):
-        buf = self.cell_buffer
-        n = len(buf)
-        idx = self.cell_cursor
-        if idx >= n:
-            return n
-
-        def is_word(i):
-            return self._is_word_char(buf[i])
-
-        if idx < n and is_word(idx):
-            while idx < n and is_word(idx):
-                idx += 1
-        while idx < n and not is_word(idx):
-            idx += 1
-        return idx
+        return self.cell._cell_word_forward()
 
     def _cell_word_backward(self):
-        buf = self.cell_buffer
-        if not buf or self.cell_cursor == 0:
-            return 0
-
-        def is_word(i):
-            return self._is_word_char(buf[i])
-
-        idx = max(0, self.cell_cursor - 1)
-        if not is_word(idx):
-            while idx > 0 and not is_word(idx):
-                idx -= 1
-        while idx > 0 and is_word(idx - 1):
-            idx -= 1
-        return idx
+        return self.cell._cell_word_backward()
 
     def _get_word_bounds_at_or_after(self, idx: int):
-        buf = self.cell_buffer
-        n = len(buf)
-        if n == 0:
-            return None
-        i = max(0, min(idx, n - 1))
-
-        while i < n and not self._is_word_char(buf[i]):
-            i += 1
-        if i >= n:
-            return None
-
-        start = i
-        while start > 0 and self._is_word_char(buf[start - 1]):
-            start -= 1
-
-        end = i
-        while end < n and self._is_word_char(buf[end]):
-            end += 1
-
-        return start, end
+        return self.cell._get_word_bounds_at_or_after(idx)
 
     # ---------- leader helpers ----------
     def _leader_seq(self, state: str | None) -> str:
@@ -831,192 +746,11 @@ class DfEditor:
     # ---------- public API ----------
     def handle_key(self, ch):
         # ---------- cell insert ----------
-        if self.mode == "cell_insert":
-            if ch == 27:  # Esc
-                self.cell_buffer = self.cell_buffer.strip()
-
-                r, c = self.grid.curr_row, self.grid.curr_col
-                col = self.cell_col
-                try:
-                    self._push_undo()
-                    val = self._coerce_cell_value(col, self.cell_buffer)
-                    self.state.df.iloc[r, c] = val
-                    self._set_last_action("cell_set", value=val)
-                except Exception:
-                    self._set_status(f"Invalid value for column '{col}'", 3)
-
-                # Clean reset for normal mode
-                self.cell_cursor = 0
-                self.cell_hscroll = 0
-                self.mode = "cell_normal"
-                self._reset_count()
-
-                return
-
-            if ch in (curses.KEY_BACKSPACE, 127, 8):
-                if self.cell_cursor > 0:
-                    self.cell_buffer = (
-                        self.cell_buffer[: self.cell_cursor - 1]
-                        + self.cell_buffer[self.cell_cursor :]
-                    )
-                    self.cell_cursor -= 1
-                self._autoscroll_insert()
-                return
-
-            if 0 <= ch <= 0x10FFFF:
-                try:
-                    ch_str = chr(ch)
-                except ValueError:
-                    return
-                self.cell_buffer = (
-                    self.cell_buffer[: self.cell_cursor]
-                    + ch_str
-                    + self.cell_buffer[self.cell_cursor :]
-                )
-                self.cell_cursor += 1
-                self._autoscroll_insert()
-            return
-
-        # ---------- cell normal ----------
-        if self.mode == "cell_normal":
-            if ch == ord("."):
-                self._repeat_last_action()
-                return
-
-            # ----- numeric prefixes (counts) in cell_normal -----
-            if ch >= ord("0") and ch <= ord("9"):
-                digit = ch - ord("0")
-                # Leading 0 with no pending count is treated as motion to start-of-line
-                if digit == 0 and self.pending_count is None:
-                    self.cell_cursor = 0
-                    self._autoscroll_cell_normal()
-                    return
-                self._push_count_digit(digit)
-                return
-
-            if self.cell_leader_state:
-                state = self.cell_leader_state
-                self.cell_leader_state = None
-
-                if state == "leader":
-                    if ch == ord("e"):
-                        # Emulate `$` then enter insert
-                        self.df_leader_state = None
-                        self.cell_leader_state = None
-                        self.cell_cursor = len(self.cell_buffer)
-                        cw = max(
-                            1, self.grid.get_rendered_col_width(self.grid.curr_col)
-                        )
-                        self.cell_hscroll = max(0, len(self.cell_buffer) - cw + 1)
-                        self.mode = "cell_insert"
-                        self._reset_count()
-                        return
-                    if ch == ord("v"):
-                        self._show_leader_status(",v")
-                        self.queue_external_edit(preserve_cell_mode=True)
-                        return
-                    if ch == ord("c"):
-                        self.cell_leader_state = "c"
-                        self._show_leader_status(self._leader_seq("c"))
-                        return
-                    self._show_leader_status("")
-                    self._reset_count()
-                    return
-
-                    if ch == ord("c"):
-                        self.cell_leader_state = "c"
-                        return
-                    return
-
-                if state == "c" and ch == ord("c"):
-                    self.cell_buffer = ""
-                    self.cell_cursor = 0
-                    self.cell_hscroll = 0
-                    self.mode = "cell_insert"
-                    return
-
-            if ch == ord(","):
-                self.cell_leader_state = "leader"
-                return
-
-            buf_len = len(self.cell_buffer)
-
-            # Apply counts to motions
-            count = self._consume_count() if self.pending_count is not None else 1
-
-            old_cursor = self.cell_cursor
-            new_cursor = old_cursor
-
-            if ch == ord("h"):
-                new_cursor = max(0, old_cursor - count)
-            elif ch == ord("l"):
-                new_cursor = min(buf_len, old_cursor + count)
-            elif ch == ord("0"):
-                new_cursor = 0
-            elif ch == ord("$"):
-                new_cursor = buf_len
-            elif ch == ord("w"):
-                new_cursor = old_cursor
-                buf = self.cell_buffer
-                for _ in range(count):
-                    if new_cursor >= buf_len:
-                        break
-                    self.cell_cursor = new_cursor
-                    next_cursor = self._cell_word_forward()
-                    # If we're inside the last word, don't jump to end-of-buffer.
-                    if (
-                        next_cursor >= buf_len
-                        and new_cursor < buf_len
-                        and buf
-                        and self._is_word_char(buf[new_cursor])
-                    ):
-                        # View-fixup: if the current word is clipped, scroll to reveal it.
-                        cw = max(
-                            1, self.grid.get_rendered_col_width(self.grid.curr_col)
-                        )
-                        lines = max(1, getattr(self.state, "row_lines", 1))
-                        span = max(1, cw * lines)
-                        bounds = self._get_word_bounds_at_or_after(new_cursor)
-                        if bounds:
-                            _, word_end = bounds
-                            visible_end = self.cell_hscroll + span
-                            if word_end > visible_end:
-                                max_scroll = max(0, len(self.cell_buffer) - span)
-                                self.cell_hscroll = min(
-                                    max_scroll, max(0, word_end - span)
-                                )
-                        break
-                    if next_cursor == new_cursor:
-                        break
-                    new_cursor = next_cursor
-            elif ch == ord("b"):
-                new_cursor = old_cursor
-                for _ in range(count):
-                    self.cell_cursor = new_cursor
-                    new_cursor = self._cell_word_backward()
-
-            if new_cursor != old_cursor:
-                self.cell_cursor = new_cursor
-                self._autoscroll_cell_normal(prefer_left=(ch in (ord("w"), ord("b"))))
-                self._reset_count()
-                return
-
-            # If command executed without movement, reset any pending count
-            self._reset_count()
-
-            if ch == ord("i"):
-                self.mode = "cell_insert"
-                return
-
-            if ch == 27:  # Esc - exit cell editing
-                self.mode = "normal"
-                self.cell_buffer = ""
-                self.cell_hscroll = 0
-                return
-
-            return
 
         # ---------- df normal (hover) ----------
+        if self.cell.handle_key(ch):
+            return
+
         if self.mode == "normal":
             total_rows = len(self.state.df)
             total_cols = len(self.state.df.columns)
