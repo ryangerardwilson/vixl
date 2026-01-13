@@ -6,44 +6,39 @@ import subprocess
 import tempfile
 import pandas as pd
 
+from df_editor_context import DfEditorContext, CTX_ATTRS
+
 
 class DfEditor:
     """Handles dataframe editing state and key interactions."""
 
     def __init__(self, state, grid, paginator, set_status_cb, column_prompt=None):
-        self.state = state
-        self.grid = grid
-        self.paginator = paginator
-        self._set_status = set_status_cb
-        self.column_prompt = column_prompt
-        self._leader_ttl = 1.5
+        object.__setattr__(
+            self,
+            "ctx",
+            DfEditorContext(
+                state=state,
+                grid=grid,
+                paginator=paginator,
+                _set_status=set_status_cb,
+                column_prompt=column_prompt,
+                _leader_ttl=1.5,
+            ),
+        )
 
-        # DF cell editing state
-        self.mode = "normal"  # normal | cell_normal | cell_insert
-        self.cell_buffer = ""
-        self.cell_cursor = 0
-        self.cell_hscroll = 0
-        self.cell_col = None
-        self.cell_leader_state = None  # None | 'leader' | 'c'
-        self.df_leader_state = None  # None | 'leader'
+    def __getattr__(self, name):
+        if name in CTX_ATTRS:
+            return getattr(self.ctx, name)
+        raise AttributeError(name)
 
-        # Numeric prefix (Vim-style counts)
-        self.pending_count: int | None = None
-
-        # Undo/redo (managed on AppState stacks)
-        # undo_stack / redo_stack live on state; depth capped by state.undo_max_depth
-
-        # Repeat last action (mutations only)
-        self.last_action = None
-
-        # External editor (queued and active) state
-        self.pending_external_edit = False
-        self.pending_preserve_cell_mode = False
-        self.pending_edit_snapshot = None
-        self.external_proc = None
-        self.external_tmp_path = None
-        self.external_meta = None
-        self.external_receiving = False
+    def __setattr__(self, name, value):
+        if name == "ctx":
+            object.__setattr__(self, name, value)
+            return
+        if name in CTX_ATTRS:
+            setattr(self.ctx, name, value)
+            return
+        object.__setattr__(self, name, value)
 
     # ---------- helpers ----------
     def _coerce_cell_value(self, col_name: str, text: str):
