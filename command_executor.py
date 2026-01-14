@@ -1,7 +1,10 @@
 import io
 import sys
 import os
+import subprocess
+import importlib
 import importlib.util
+import site
 import types
 import ast
 import numpy as np
@@ -40,9 +43,46 @@ class VixlExtensions:
 class CommandExecutor:
     def __init__(self, app_state):
         self.state = app_state
+        self.startup_warnings = []
         ensure_config_dirs()
         self.config = load_config()
+        self._apply_python_path()
         self._extensions = self._load_extensions()
+
+    def _apply_python_path(self):
+        python_path = self.config.get("PYTHON_PATH")
+        if not isinstance(python_path, str) or not python_path.strip():
+            return
+
+        path = os.path.expanduser(os.path.expandvars(python_path.strip()))
+        if not (os.path.isfile(path) and os.access(path, os.X_OK)):
+            self.startup_warnings.append(f"python_path is not executable: {path}")
+            return
+
+        def _query(code):
+            return subprocess.check_output([path, "-c", code], text=True).strip()
+
+        try:
+            purelib = _query("import sysconfig; print(sysconfig.get_paths()['purelib'])")
+            platlib = _query("import sysconfig; print(sysconfig.get_paths()['platlib'])")
+            version = _query(
+                "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            )
+            runtime_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            if version and version != runtime_version:
+                self.startup_warnings.append(
+                    f"python_path targets Python {version}, running Python {runtime_version}; compiled deps may fail"
+                )
+
+            added = False
+            for p in (purelib, platlib):
+                if p:
+                    site.addsitedir(p)
+                    added = True
+            if added:
+                importlib.invalidate_caches()
+        except Exception:
+            self.startup_warnings.append(f"failed to use python_path: {path}")
 
     # ---------- AST helpers ----------
     def _roots_at_df(self, node):

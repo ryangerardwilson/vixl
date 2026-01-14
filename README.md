@@ -153,9 +153,11 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running `vix
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
     - X11: `["xclip", "-selection", "clipboard", "-in"]`
+  - `python_path` (string) — path to a venv’s python executable (e.g. `/home/me/.venv/bin/python`). If set, Vixl adds that interpreter’s `site-packages` to `sys.path` before loading extensions and running cmd-mode code so imports can resolve user-installed packages. For compiled wheels, the venv Python major/minor should match Vixl’s runtime or imports may fail.
   Example:
   ```json
   {
+    "python_path": "/home/me/.venv/bin/python",
     "clipboard_interface_command": ["wl-copy"],
     "cmd_mode": {
       "tab_fuzzy_expansions_register": [

@@ -38,6 +38,8 @@ class Orchestrator:
 
         self.command = CommandPane()
         self.exec = CommandExecutor(app_state)
+        if getattr(self.exec, "startup_warnings", None):
+            self._set_status(self.exec.startup_warnings[0], seconds=6)
         if hasattr(self.command, "set_extension_names"):
             self.command.set_extension_names(self.exec.get_extension_names())
         if hasattr(self.command, "set_custom_expansions"):

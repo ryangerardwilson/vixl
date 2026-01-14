@@ -11,6 +11,7 @@ CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 # default settings
 TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT = []
 CLIPBOARD_INTERFACE_COMMAND_DEFAULT = None
+PYTHON_PATH_DEFAULT = None
 
 
 def ensure_config_dirs():
@@ -28,6 +29,7 @@ def load_config():
     cfg = {
         "TAB_FUZZY_EXPANSIONS_REGISTER": list(TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT),
         "CLIPBOARD_INTERFACE_COMMAND": CLIPBOARD_INTERFACE_COMMAND_DEFAULT,
+        "PYTHON_PATH": PYTHON_PATH_DEFAULT,
     }
 
     if os.path.exists(CONFIG_JSON):
@@ -52,6 +54,10 @@ def load_config():
                     isinstance(item, str) for item in clip_cmd
                 ):
                     cfg["CLIPBOARD_INTERFACE_COMMAND"] = clip_cmd
+
+                py_path = data.get("python_path")
+                if isinstance(py_path, str) and py_path.strip():
+                    cfg["PYTHON_PATH"] = py_path
         except Exception:
             pass
 
