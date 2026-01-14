@@ -171,11 +171,11 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running `vix
 - Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
 - Examples (save under `$XDG_CONFIG_HOME/vixl/extensions/`):
    1) multiply_cols (explicit commit)
-     ```python
-     def multiply_cols(df, col_a, col_b, out_col="product"):
-         df[out_col] = df[col_a] * df[col_b]
-         return df, True
-     ```
+      ```python
+      def multiply_cols(df, col_a, col_b, out_col="product"):
+          df[out_col] = df[col_a] * df[col_b]
+          return df, True
+      ```
   2) add_ratio (commit flag or tuple)
      ```python
      def add_ratio(df, num_col, den_col, out_col="ratio"):
