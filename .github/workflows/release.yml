@@ -37,12 +37,24 @@ jobs:
             bash -lc '
               set -euo pipefail
               yum -y install curl zstd
-              PY_URL=$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
-              test -n "$PY_URL"
-              echo "Using python-build-standalone: $PY_URL"
-              curl -fL "$PY_URL" -o /tmp/python.tar.zst
-              mkdir -p /opt/py
-              tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
+               PY_URL=$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
+               test -n "$PY_URL"
+               echo "Using python-build-standalone: $PY_URL"
+               curl -fL "$PY_URL" -o /tmp/python.tar
+               mkdir -p /opt/py
+               case "$PY_URL" in
+                 *.tar.zst)
+                   tar --use-compress-program=unzstd -xf /tmp/python.tar -C /opt/py
+                   ;;
+                 *.tar.gz)
+                   tar -xzf /tmp/python.tar -C /opt/py
+                   ;;
+                 *)
+                   echo "Unknown python archive format: $PY_URL" >&2
+                   exit 1
+                   ;;
+               esac
+
               PYBIN="/opt/py/python/bin/python3"
               export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
               "$PYBIN" -m pip install -U pip
