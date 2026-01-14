@@ -18,18 +18,12 @@ class GridPane:
             curses.start_color()
             curses.use_default_colors()
             curses.init_pair(self.PAIR_CELL_ACTIVE, -1, curses.COLOR_WHITE)
-            curses.init_pair(
-                self.PAIR_CELL_TEXT, curses.COLOR_WHITE, -1
-            )
+            curses.init_pair(self.PAIR_CELL_TEXT, curses.COLOR_WHITE, -1)
             curses.init_pair(
                 self.PAIR_CURSOR_INSERT, curses.COLOR_BLACK, curses.COLOR_WHITE
             )
-            curses.init_pair(
-                self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, -1
-            )
-            curses.init_pair(
-                self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, -1
-            )
+            curses.init_pair(self.PAIR_CURSOR_NORMAL_BG, curses.COLOR_BLACK, -1)
+            curses.init_pair(self.PAIR_CURSOR_NORMAL_CHAR, curses.COLOR_WHITE, -1)
             curses.init_pair(
                 self.PAIR_CELL_ACTIVE_TEXT, curses.COLOR_BLACK, curses.COLOR_WHITE
             )
@@ -327,7 +321,10 @@ class GridPane:
 
             offset = self.row_offset
             # ensure current row fits in view; slide offset forward if needed
-            while prefix[curr_idx + 1] - prefix[offset] > max_height_budget and offset < curr_idx:
+            while (
+                prefix[curr_idx + 1] - prefix[offset] > max_height_budget
+                and offset < curr_idx
+            ):
                 offset += 1
 
             def _rows_from(start_idx: int):
@@ -356,7 +353,11 @@ class GridPane:
         y_cursor = base_y
         for r in visible_rows:
             idx_in_page = r - page_start
-            row_h = row_heights[idx_in_page] if idx_in_page < len(row_heights) else max(1, row_lines)
+            row_h = (
+                row_heights[idx_in_page]
+                if idx_in_page < len(row_heights)
+                else max(1, row_lines)
+            )
             if y_cursor >= h - 1:
                 break
             win.addnstr(y_cursor, 0, str(r).rjust(row_w), row_w)
@@ -392,7 +393,6 @@ class GridPane:
                     cell = line_text.rjust(eff_cw_int)
                     win.addnstr(line_y, x, cell, eff_cw_int, attr)
 
-
                 x += eff_cw + 1
 
             y_cursor += row_h
@@ -406,4 +406,3 @@ class GridPane:
             pass
 
         win.refresh()
-

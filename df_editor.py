@@ -1,7 +1,4 @@
 # ~/Apps/vixl/df_editor.py
-import curses
-import os
-import shlex
 import pandas as pd
 
 
@@ -65,6 +62,7 @@ class DfEditor:
                 open_json_preview_cb=self._open_cell_json_preview,
             ),
         )
+
     def __getattr__(self, name):
         if name in CTX_ATTRS:
             return getattr(self.ctx, name)

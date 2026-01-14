@@ -63,8 +63,12 @@ class CommandExecutor:
             return subprocess.check_output([path, "-c", code], text=True).strip()
 
         try:
-            purelib = _query("import sysconfig; print(sysconfig.get_paths()['purelib'])")
-            platlib = _query("import sysconfig; print(sysconfig.get_paths()['platlib'])")
+            purelib = _query(
+                "import sysconfig; print(sysconfig.get_paths()['purelib'])"
+            )
+            platlib = _query(
+                "import sysconfig; print(sysconfig.get_paths()['platlib'])"
+            )
             version = _query(
                 "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
             )
@@ -168,7 +172,6 @@ class CommandExecutor:
         # bind extensions to sandbox df with flagging
         self._bind_extensions(env["df"], ext_flag=ext_called_flag)
 
-
         old_out, old_err = sys.stdout, sys.stderr
         try:
             sys.stdout, sys.stderr = stdout, stderr
@@ -197,7 +200,9 @@ class CommandExecutor:
                 last_value = None  # suppress printing of the mutation tuple
             elif env.get("commit_df") and isinstance(env.get("df"), pd.DataFrame):
                 committed_df = env.get("df")
-            elif env.get("_df_assignment", False) and isinstance(env.get("df"), pd.DataFrame):
+            elif env.get("_df_assignment", False) and isinstance(
+                env.get("df"), pd.DataFrame
+            ):
                 committed_df = env.get("df")
 
             if committed_df is not None:

@@ -16,6 +16,8 @@ class DfEditorCounts:
             self.ctx.pending_count = min(9999, self.ctx.pending_count * 10 + digit)
 
     def consume(self, default: int = 1) -> int:
-        count = self.ctx.pending_count if self.ctx.pending_count is not None else default
+        count = (
+            self.ctx.pending_count if self.ctx.pending_count is not None else default
+        )
         self.ctx.pending_count = None
         return max(1, count)

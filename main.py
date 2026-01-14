@@ -24,7 +24,9 @@ def main():
         return
 
     if "--help" in args or "-h" in args:
-        print("vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n")
+        print(
+            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n"
+        )
         return
 
     CompletionHandler().ensure_ready()

@@ -12,7 +12,8 @@ transparency over how their data is transformed.
 
 ### Prebuilt binary (Linux x86_64)
 
-The fastest way to get Vixl is to install the prebuilt PyInstaller binary that ships with each GitHub release:
+The fastest way to get Vixl is to install the prebuilt PyInstaller binary that
+ships with each GitHub release:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh | bash
@@ -53,7 +54,8 @@ chmod +x main.py
 ln -sf "$(pwd)/main.py" "$HOME/.local/bin/vixl"
 ```
 
-Ensure `~/.local/bin` is on your PATH, and activate the venv before running `vixl`.
+Ensure `~/.local/bin` is on your PATH, and activate the venv before running
+`vixl`.
 
 ### Bash completion (auto-provisioned, warning-only)
 - On first run, Vixl creates `$XDG_CONFIG_HOME/vixl/completions/vixl.bash` (default `~/.config/vixl/completions/vixl.bash`).

@@ -59,20 +59,16 @@ class ShortcutHelpHandler:
             "  , y c - copy current cell to clipboard",
             "  , p j - preview current cell as pretty JSON (read-only Vim)",
             "  ? - shortcuts",
-
-
             "",
             "Save prompt",
             "  Enter - save (requires .csv or .parquet)",
             "  Esc - cancel",
             "  Backspace, Left/Right, Home/End - edit path",
-
             "",
             "Column prompt",
             "  Enter - confirm name/dtype",
             "  Esc - cancel",
             "  Backspace, Left/Right, Home/End - edit",
-
             "",
             "Loading screen",
             "  Ctrl+X - abort loading",

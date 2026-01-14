@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def coerce_cell_value(df, col_name, text):
     text = "" if text is None else str(text)
     try:

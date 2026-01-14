@@ -67,10 +67,9 @@ class FileTypeHandler:
     def _ensure_parquet_engine(self):
         try:
             import pyarrow  # noqa: F401
+
             return
         except ImportError:
             pass
-        print(
-            "Parquet support requires pyarrow. Install via: pip install pyarrow"
-        )
+        print("Parquet support requires pyarrow. Install via: pip install pyarrow")
         sys.exit(1)

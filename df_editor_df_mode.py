@@ -67,7 +67,9 @@ class DfEditorDfMode:
         val = None if total_rows == 0 else self.ctx.state.df.iloc[r, c]
         base = "" if (val is None or isna(val)) else str(val)
 
-        visible_rows = max(1, self.ctx.paginator.page_end - self.ctx.paginator.page_start)
+        visible_rows = max(
+            1, self.ctx.paginator.page_end - self.ctx.paginator.page_start
+        )
         jump_rows = max(1, round(visible_rows * 0.05))
         jump_cols = max(1, round(max(1, total_cols) * 0.20))
 
@@ -150,7 +152,9 @@ class DfEditorDfMode:
             r, c = self.ctx.grid.curr_row, self.ctx.grid.curr_col
             col_name = self.ctx.state.df.columns[c]
             try:
-                self.ctx.state.df.iloc[r, c] = coerce_cell_value(self.ctx.state.df, col_name, "")
+                self.ctx.state.df.iloc[r, c] = coerce_cell_value(
+                    self.ctx.state.df, col_name, ""
+                )
             except Exception:
                 self.ctx.state.df.iloc[r, c] = ""
             self.ctx.grid.df = self.ctx.state.df

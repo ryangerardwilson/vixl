@@ -44,7 +44,9 @@ class DfEditorUndo:
             return
         snap = self.snapshot_state()
         self.ctx.state.undo_stack.append(snap)
-        if len(self.ctx.state.undo_stack) > getattr(self.ctx.state, "undo_max_depth", 50):
+        if len(self.ctx.state.undo_stack) > getattr(
+            self.ctx.state, "undo_max_depth", 50
+        ):
             self.ctx.state.undo_stack.pop(0)
         if hasattr(self.ctx.state, "redo_stack"):
             self.ctx.state.redo_stack.clear()
@@ -65,9 +67,7 @@ class DfEditorUndo:
         snap = stack.pop()
         self.restore_state(snap)
         remaining = len(stack)
-        self.ctx._set_status(
-            f"Undone ({remaining} more)" if remaining else "Undone", 2
-        )
+        self.ctx._set_status(f"Undone ({remaining} more)" if remaining else "Undone", 2)
         self.ctx.pending_count = None
 
     def redo(self):
@@ -85,9 +85,7 @@ class DfEditorUndo:
         snap = redo_stack.pop()
         self.restore_state(snap)
         remaining = len(redo_stack)
-        self.ctx._set_status(
-            f"Redone ({remaining} more)" if remaining else "Redone", 2
-        )
+        self.ctx._set_status(f"Redone ({remaining} more)" if remaining else "Redone", 2)
         self.ctx.pending_count = None
 
     # ---------- last action ----------

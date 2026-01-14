@@ -81,8 +81,10 @@ class CommandPane:
         for marker in markers:
             idx = prefix.rfind(marker)
             if idx != -1:
-                if chosen is None or idx > chosen[0] or (
-                    idx == chosen[0] and len(marker) > len(chosen[1])
+                if (
+                    chosen is None
+                    or idx > chosen[0]
+                    or (idx == chosen[0] and len(marker) > len(chosen[1]))
                 ):
                     chosen = (idx, marker)
         if not chosen:
@@ -131,7 +133,9 @@ class CommandPane:
         if marker != "df.vixl." or not token or not self.extension_names:
             return None
 
-        prefix_matches = [name for name in self.extension_names if name.startswith(token)]
+        prefix_matches = [
+            name for name in self.extension_names if name.startswith(token)
+        ]
         if prefix_matches:
             prefix_matches.sort(key=lambda x: (len(x), x))
             chosen = prefix_matches[0]
@@ -357,7 +361,9 @@ class CommandPane:
                     remaining = text_w - cursor_col
                     ghost_text = display[:remaining]
                     try:
-                        win.addnstr(0, ghost_start, ghost_text, remaining, self.ghost_attr)
+                        win.addnstr(
+                            0, ghost_start, ghost_text, remaining, self.ghost_attr
+                        )
                     except curses.error:
                         pass
 

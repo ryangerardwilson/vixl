@@ -26,14 +26,15 @@ class DfEditorExternal:
             self.counts.reset()
             return
 
-
         total_rows = len(self.ctx.state.df)
         total_cols = len(self.ctx.state.df.columns)
         r = min(max(0, self.ctx.grid.curr_row), max(0, total_rows - 1))
         c = min(max(0, self.ctx.grid.curr_col), max(0, total_cols - 1))
         col = self.ctx.state.df.columns[c]
 
-        idx_label = self.ctx.state.df.index[r] if len(self.ctx.state.df.index) > r else r
+        idx_label = (
+            self.ctx.state.df.index[r] if len(self.ctx.state.df.index) > r else r
+        )
         self.ctx.pending_edit_snapshot = {
             "row": r,
             "col": c,

@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -38,7 +38,9 @@ def test_y_copies_df_and_yc_copies_cell():
     )
     grid = DummyGrid()
     paginator = DummyPaginator()
-    editor = DfEditor(state, grid, paginator, lambda *args, **kwargs: None, column_prompt=None)
+    editor = DfEditor(
+        state, grid, paginator, lambda *args, **kwargs: None, column_prompt=None
+    )
     editor.ctx.config = {"CLIPBOARD_INTERFACE_COMMAND": ["fake-clip"]}
 
     with patch("subprocess.run") as run:

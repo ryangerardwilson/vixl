@@ -62,4 +62,3 @@ def load_config():
             pass
 
     return cfg
-

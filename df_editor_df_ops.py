@@ -35,12 +35,16 @@ class DfEditorDfOps:
         else:
             expanded.add(row)
             self.ctx._set_status("Row expanded", 2)
-        self.ctx.state.expand_all_rows = False if not expanded else self.ctx.state.expand_all_rows
+        self.ctx.state.expand_all_rows = (
+            False if not expanded else self.ctx.state.expand_all_rows
+        )
         self.ctx.grid.row_offset = 0
         self.counts.reset()
 
     def toggle_all_rows_expanded(self):
-        self.ctx.state.expand_all_rows = not getattr(self.ctx.state, "expand_all_rows", False)
+        self.ctx.state.expand_all_rows = not getattr(
+            self.ctx.state, "expand_all_rows", False
+        )
         state = "expanded" if self.ctx.state.expand_all_rows else "collapsed"
         self.ctx._set_status(f"All rows {state}", 2)
         self.ctx.grid.row_offset = 0
@@ -120,9 +124,9 @@ class DfEditorDfOps:
         self.undo_mgr.push_undo()
         start = self.ctx.grid.curr_row
         end = min(total_rows, start + count)
-        self.ctx.state.df = self.ctx.state.df.drop(self.ctx.state.df.index[start:end]).reset_index(
-            drop=True
-        )
+        self.ctx.state.df = self.ctx.state.df.drop(
+            self.ctx.state.df.index[start:end]
+        ).reset_index(drop=True)
         self.ctx.grid.df = self.ctx.state.df
         total_rows = len(self.ctx.state.df)
         self.ctx.grid.curr_row = min(start, max(0, total_rows - 1))
