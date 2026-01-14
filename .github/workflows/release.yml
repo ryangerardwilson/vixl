@@ -29,30 +29,60 @@ jobs:
           options: |
             -v ${{ github.workspace }}:/work
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          run: |
-            set -euo pipefail
-            cd /work
-            yum -y install curl zstd
+        run: |
+          set -euo pipefail
+          cd /work
+          yum -y install curl zstd
 
-            PY_URL="$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)"
+          AUTH_ARGS=()
+          if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            AUTH_ARGS=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+          fi
 
-            echo "Using python-build-standalone: $PY_URL"
-            curl -fL "$PY_URL" -o /tmp/python.tar.zst
-            mkdir -p /opt/py
-            tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
+          RELEASES_JSON="$(
+            curl -fsSL \
+              --retry 8 \
+              --retry-all-errors \
+              --connect-timeout 10 \
+              --max-time 60 \
+              ${AUTH_ARGS[@]} \
+              https://api.github.com/repos/indygreg/python-build-standalone/releases?per_page=50
+          )"
 
-            PYBIN="/opt/py/python/bin/python3"
-            export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
+          PY_URL="$(
+            printf '%s' "$RELEASES_JSON" | /opt/python/cp311-cp311/bin/python - <<'PY'
+              import json
+              import re
+              import sys
 
-            "$PYBIN" -m pip install -U pip
-            "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
-            "$PYBIN" -m pip install --only-binary=:all: pyinstaller
+              releases = json.load(sys.stdin)
+              pattern = re.compile(r"cpython-3\.11\.\d+\+\d{8}-x86_64.*-unknown-linux-gnu-.*\.tar\.zst$")
+              for rel in releases:
+                  for asset in rel.get("assets", []):
+                      url = asset.get("browser_download_url", "")
+                      if pattern.search(url):
+                          print(url)
+                          sys.exit(0)
+              raise SystemExit("No matching python-build-standalone asset found for CPython 3.11 x86_64 linux-gnu in last 50 releases")
+PY
+          )"
+}
+          test -n "$PY_URL"
+          echo "Using python-build-standalone: $PY_URL"
+          curl -fL "$PY_URL" -o /tmp/python.tar.zst
+          mkdir -p /opt/py
+          tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
 
-            echo "__version__ = \"${{ env.VERSION }}\"" > _version.py
-            "$PYBIN" -m PyInstaller --onefile --name vixl main.py
-            tar -C dist -czf vixl-linux-x64.tar.gz vixl
+          PYBIN="/opt/py/python/bin/python3"
+          export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
 
+          "$PYBIN" -m pip install -U pip
+          "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
+          "$PYBIN" -m pip install --only-binary=:all: pyinstaller
 
+          echo "__version__ = \"${{ env.VERSION }}\"" > _version.py
+          "$PYBIN" -m PyInstaller --onefile --name vixl main.py
+          tar -C dist -czf vixl-linux-x64.tar.gz vixl
 
       - name: Create release and upload asset
         uses: softprops/action-gh-release@v1
