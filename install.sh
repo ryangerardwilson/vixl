@@ -3,7 +3,9 @@ set -euo pipefail
 
 APP=vixl
 REPO="ryangerardwilson/vixl"
-INSTALL_DIR="$HOME/.${APP}/bin"
+APP_HOME="$HOME/.${APP}"
+INSTALL_DIR="$APP_HOME/bin"
+APP_DIR="$APP_HOME/app"
 
 MUTED='\033[0;2m'
 RED='\033[0;31m'
@@ -93,6 +95,8 @@ else
   command -v tar  >/dev/null 2>&1 || { print_message error "'tar' is required but not installed."; exit 1; }
 
   filename="${APP}-linux-x64.tar.gz"
+  # ensure app dir exists
+  mkdir -p "$APP_DIR"
 
   if [[ -z "$requested_version" ]]; then
     url="https://github.com/${REPO}/releases/latest/download/${filename}"
@@ -130,16 +134,27 @@ else
   curl -# -L -o "$tmp_dir/$filename" "$url"
   tar -xzf "$tmp_dir/$filename" -C "$tmp_dir"
 
-  # Expect the archive to contain a single binary named "vixl"
-  if [[ ! -f "$tmp_dir/${APP}" ]]; then
-    print_message error "Archive did not contain expected binary '${APP}'"
-    print_message info  "Expected: $tmp_dir/${APP}"
+  # Expect the archive to contain a directory named "vixl" with a binary and libs
+  if [[ ! -f "$tmp_dir/${APP}/${APP}" ]]; then
+    print_message error "Archive did not contain expected directory '${APP}/${APP}'"
+    print_message info  "Expected: $tmp_dir/${APP}/${APP}"
     exit 1
   fi
 
-  mv "$tmp_dir/${APP}" "${INSTALL_DIR}/${APP}"
-  chmod 755 "${INSTALL_DIR}/${APP}"
+  # Clean out previous install
+  rm -rf "$APP_DIR"
+  mkdir -p "$APP_DIR"
+
+  # Move entire onedir bundle and create shim in INSTALL_DIR
+  mv "$tmp_dir/${APP}" "$APP_DIR"
   rm -rf "$tmp_dir"
+
+  cat > "${INSTALL_DIR}/${APP}" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+"${HOME}/.${APP}/app/${APP}/${APP}" "\$@"
+EOF
+  chmod 755 "${INSTALL_DIR}/${APP}"
 fi
 
 add_to_path() {
