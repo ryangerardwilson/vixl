@@ -28,23 +28,30 @@ jobs:
           image: quay.io/pypa/manylinux2014_x86_64
           options: |
             -v ${{ github.workspace }}:/work
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           run: |
             set -euo pipefail
             cd /work
             yum -y install curl zstd
-            PY_URL="$(curl -fsSL https://api.github.com/repos/indygreg/python-build-standalone/releases/latest | /opt/python/cp311-cp311/bin/python -c 'import json,re,sys; data=json.load(sys.stdin); pats=[r"cpython-3\.11\.\d+\+\d{8}-x86_64-unknown-linux-gnu-pgo\+lto-full\.tar\.zst$", r"cpython-3\.11\.\d+\+\d{8}-x86_64-unknown-linux-gnu-.*\.tar\.zst$"]; u=next((a.get("browser_download_url", "") for a in data.get("assets", []) if any(re.search(p, a.get("browser_download_url", "")) for p in pats)), ""); print(u) if u else sys.exit("No matching python-build-standalone asset found for CPython 3.11 x86_64 linux-gnu")')"
+
+            PY_URL="$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)"
+
             echo "Using python-build-standalone: $PY_URL"
             curl -fL "$PY_URL" -o /tmp/python.tar.zst
             mkdir -p /opt/py
             tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
+
             PYBIN="/opt/py/python/bin/python3"
             export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
+
             "$PYBIN" -m pip install -U pip
             "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
             "$PYBIN" -m pip install --only-binary=:all: pyinstaller
+
             echo "__version__ = \"${{ env.VERSION }}\"" > _version.py
             "$PYBIN" -m PyInstaller --onefile --name vixl main.py
             tar -C dist -czf vixl-linux-x64.tar.gz vixl
+
 
 
       - name: Create release and upload asset
