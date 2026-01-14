@@ -39,34 +39,8 @@ jobs:
             AUTH_ARGS=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
           fi
 
-          RELEASES_JSON="$(
-            curl -fsSL \
-              --retry 8 \
-              --retry-all-errors \
-              --connect-timeout 10 \
-              --max-time 60 \
-              ${AUTH_ARGS[@]} \
-              https://api.github.com/repos/indygreg/python-build-standalone/releases?per_page=50
-          )"
+          PY_URL=$(GITHUB_TOKEN="${GITHUB_TOKEN:-}" /opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
 
-          PY_URL="$(
-            printf '%s' "$RELEASES_JSON" | /opt/python/cp311-cp311/bin/python - <<'PY'
-              import json
-              import re
-              import sys
-
-              releases = json.load(sys.stdin)
-              pattern = re.compile(r"cpython-3\.11\.\d+\+\d{8}-x86_64.*-unknown-linux-gnu-.*\.tar\.zst$")
-              for rel in releases:
-                  for asset in rel.get("assets", []):
-                      url = asset.get("browser_download_url", "")
-                      if pattern.search(url):
-                          print(url)
-                          sys.exit(0)
-              raise SystemExit("No matching python-build-standalone asset found for CPython 3.11 x86_64 linux-gnu in last 50 releases")
-PY
-          )"
-}
           test -n "$PY_URL"
           echo "Using python-build-standalone: $PY_URL"
           curl -fL "$PY_URL" -o /tmp/python.tar.zst
