@@ -172,7 +172,6 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running `vix
 - Examples (save under `$XDG_CONFIG_HOME/vixl/extensions/`):
    1) multiply_cols (explicit commit)
       ```python
-
      def multiply_cols(df, col_a, col_b, out_col="product"):
          df[out_col] = df[col_a] * df[col_b]
          return df, True
