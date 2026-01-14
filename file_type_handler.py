@@ -2,6 +2,8 @@ import os
 import sys
 import pandas as pd
 
+from default_df_initializer import DefaultDfInitializer
+
 
 class FileTypeHandler:
     def __init__(self, path: str):
@@ -14,21 +16,29 @@ class FileTypeHandler:
             sys.exit(1)
 
     def load_or_create(self) -> pd.DataFrame:
-        if not os.path.exists(self.path):
-            df = pd.DataFrame()
-            self._write(df)
-            return df
+        if not os.path.exists(self.path) or os.path.getsize(self.path) == 0:
+            return self._default_df()
 
         if self.ext == ".csv":
-            return pd.read_csv(self.path)
+            try:
+                df = pd.read_csv(self.path)
+            except pd.errors.EmptyDataError:
+                return self._default_df()
+            return self._ensure_non_empty(df)
         elif self.ext == ".parquet":
-            # Parquet files must be non-empty to be valid
-            if os.path.getsize(self.path) == 0:
-                df = pd.DataFrame()
-                self._write(df)
-                return df
             self._ensure_parquet_engine()
-            return pd.read_parquet(self.path)
+            try:
+                df = pd.read_parquet(self.path)
+            except Exception as exc:
+                try:
+                    import pyarrow
+
+                    if isinstance(exc, pyarrow.ArrowInvalid):
+                        return self._default_df()
+                except Exception:
+                    pass
+                raise
+            return self._ensure_non_empty(df)
 
         print("Unsupported file type (use .csv or .parquet)")
         sys.exit(1)
@@ -45,6 +55,14 @@ class FileTypeHandler:
         else:
             print("Unsupported file type (use .csv or .parquet)")
             sys.exit(1)
+
+    def _ensure_non_empty(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty or df.shape[1] == 0:
+            return self._default_df()
+        return df
+
+    def _default_df(self) -> pd.DataFrame:
+        return DefaultDfInitializer().create()
 
     def _ensure_parquet_engine(self):
         try:
