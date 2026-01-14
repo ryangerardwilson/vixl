@@ -31,13 +31,20 @@ jobs:
           run: |
             set -euo pipefail
             cd /work
-            PYBIN="/opt/python/cp311-cp311/bin/python"
+            yum -y install curl zstd
+            PY_URL="https://github.com/indygreg/python-build-standalone/releases/download/20241202/cpython-3.11.9+20241202-x86_64-unknown-linux-gnu-pgo+lto-full.tar.zst"
+            curl -L "$PY_URL" -o /tmp/python.tar.zst
+            mkdir -p /opt/py
+            tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
+            PYBIN="/opt/py/python/bin/python3"
+            export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
             "$PYBIN" -m pip install -U pip
             "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
             "$PYBIN" -m pip install --only-binary=:all: pyinstaller
             echo "__version__ = \"${{ env.VERSION }}\"" > _version.py
             "$PYBIN" -m PyInstaller --onefile --name vixl main.py
             tar -C dist -czf vixl-linux-x64.tar.gz vixl
+
 
       - name: Create release and upload asset
         uses: softprops/action-gh-release@v1
