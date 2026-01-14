@@ -34,13 +34,7 @@ jobs:
           cd /work
           yum -y install curl zstd
 
-          AUTH_ARGS=()
-          if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-            AUTH_ARGS=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
-          fi
-
           PY_URL=$(GITHUB_TOKEN="${GITHUB_TOKEN:-}" /opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
-
           test -n "$PY_URL"
           echo "Using python-build-standalone: $PY_URL"
           curl -fL "$PY_URL" -o /tmp/python.tar.zst
@@ -54,7 +48,7 @@ jobs:
           "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
           "$PYBIN" -m pip install --only-binary=:all: pyinstaller
 
-          echo "__version__ = \"${{ env.VERSION }}\"" > _version.py
+          echo "__version__ = ""${{ env.VERSION }}""" > _version.py
           "$PYBIN" -m PyInstaller --onefile --name vixl main.py
           tar -C dist -czf vixl-linux-x64.tar.gz vixl
 
