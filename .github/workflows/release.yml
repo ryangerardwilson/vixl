@@ -61,7 +61,11 @@ jobs:
               "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
               "$PYBIN" -m pip install --only-binary=:all: pyinstaller
               echo "__version__ = \"${VERSION}\"" > _version.py
-              "$PYBIN" -m PyInstaller --onefile --name vixl main.py
+              "$PYBIN" -m PyInstaller --clean --onefile --name vixl \
+                --collect-all numpy \
+                --collect-all pandas \
+                --collect-all pyarrow \
+                main.py
               tar -C dist -czf vixl-linux-x64.tar.gz vixl
             '
 

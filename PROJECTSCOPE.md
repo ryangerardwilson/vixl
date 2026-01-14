@@ -21,6 +21,7 @@ inspectable data transformations.
 - Flat project structure (no packages)
 - One primary class per file
 - Clarity and locality over abstraction
+- Release workflow produces self-contained binaries via PyInstaller (Linux x86_64)
 
 ---
 

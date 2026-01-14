@@ -8,7 +8,22 @@ transparency over how their data is transformed.
 
 ---
 
-## Installation (venv)
+## Installation
+
+### Prebuilt binary (Linux x86_64)
+
+The fastest way to get Vixl is to install the prebuilt PyInstaller binary that ships with each GitHub release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh | bash
+```
+
+- Installs to `~/.vixl/bin/vixl` and adds that directory to your PATH (unless you pass `--no-modify-path`).
+- The script auto-detects the latest release. Pin a specific version with `--version`, e.g. `... | bash -s -- --version 0.1.16`.
+- You can install from a local artifact with `--binary /path/to/vixl`.
+- Requirements: Linux x86_64 with `curl` and `tar` available.
+
+### From source (venv)
 
 ```bash
 git clone https://github.com/ryangerardwilson/vixl.git
@@ -21,7 +36,8 @@ pip install -r requirements.txt
 
 ## Running the App
 
-With the virtual environment active:
+- **Binary install**: run `vixl <csv-or-parquet-file>` directly (binary lives in `~/.vixl/bin`).
+- **From source/venv**: activate the venv and run:
 
 ```bash
 python main.py <csv-or-parquet-file>
