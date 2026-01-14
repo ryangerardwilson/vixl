@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -11,32 +11,36 @@ permissions:
 jobs:
   build-release:
     runs-on: ubuntu-latest
+
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set build variables
+      - name: Set version env
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
           echo "TAG=${TAG}" >> "$GITHUB_ENV"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
-      - name: Build (PyInstaller, manylinux2014 x86_64)
-        uses: addnab/docker-run-action@v3
-        with:
-          image: quay.io/pypa/manylinux2014_x86_64
-          options: |
-            -v ${{ github.workspace }}:/work
-            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+      - name: Build linux-x64 binary (PyInstaller)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          cd /work
+
+          # manylinux is CentOS-ish; yum is available
           yum -y install curl zstd
 
-          PY_URL=$(GITHUB_TOKEN="${GITHUB_TOKEN:-}" /opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
+          # Resolve a python-build-standalone tarball URL (3.11)
+          PY_URL=$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
           test -n "$PY_URL"
           echo "Using python-build-standalone: $PY_URL"
+
+          # Install that Python (has shared libpython)
           curl -fL "$PY_URL" -o /tmp/python.tar.zst
           mkdir -p /opt/py
           tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
@@ -48,7 +52,9 @@ jobs:
           "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
           "$PYBIN" -m pip install --only-binary=:all: pyinstaller
 
-          echo "__version__ = ""${{ env.VERSION }}""" > _version.py
+          # Inject release version into runtime
+          echo "__version__ = \"${VERSION}\"" > _version.py
+
           "$PYBIN" -m PyInstaller --onefile --name vixl main.py
           tar -C dist -czf vixl-linux-x64.tar.gz vixl
 
