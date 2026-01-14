@@ -11,10 +11,6 @@ permissions:
 jobs:
   build-release:
     runs-on: ubuntu-latest
-
-    container:
-      image: quay.io/pypa/manylinux2014_x86_64
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,37 +22,36 @@ jobs:
           echo "TAG=${TAG}" >> "$GITHUB_ENV"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
-      - name: Build linux-x64 binary (PyInstaller)
+      - name: Build linux-x64 binary in manylinux2014
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # manylinux is CentOS-ish; yum is available
-          yum -y install curl zstd
-
-          # Resolve a python-build-standalone tarball URL (3.11)
-          PY_URL=$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
-          test -n "$PY_URL"
-          echo "Using python-build-standalone: $PY_URL"
-
-          # Install that Python (has shared libpython)
-          curl -fL "$PY_URL" -o /tmp/python.tar.zst
-          mkdir -p /opt/py
-          tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
-
-          PYBIN="/opt/py/python/bin/python3"
-          export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
-
-          "$PYBIN" -m pip install -U pip
-          "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
-          "$PYBIN" -m pip install --only-binary=:all: pyinstaller
-
-          # Inject release version into runtime
-          echo "__version__ = \"${VERSION}\"" > _version.py
-
-          "$PYBIN" -m PyInstaller --onefile --name vixl main.py
-          tar -C dist -czf vixl-linux-x64.tar.gz vixl
+          docker run --rm \
+            -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+            -e VERSION="${VERSION}" \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            quay.io/pypa/manylinux2014_x86_64 \
+            bash -lc '
+              set -euo pipefail
+              yum -y install curl zstd
+              PY_URL=$(/opt/python/cp311-cp311/bin/python .github/scripts/find-python-url.py)
+              test -n "$PY_URL"
+              echo "Using python-build-standalone: $PY_URL"
+              curl -fL "$PY_URL" -o /tmp/python.tar.zst
+              mkdir -p /opt/py
+              tar --use-compress-program=unzstd -xf /tmp/python.tar.zst -C /opt/py
+              PYBIN="/opt/py/python/bin/python3"
+              export LD_LIBRARY_PATH="/opt/py/python/lib:${LD_LIBRARY_PATH:-}"
+              "$PYBIN" -m pip install -U pip
+              "$PYBIN" -m pip install --only-binary=:all: -r requirements.txt
+              "$PYBIN" -m pip install --only-binary=:all: pyinstaller
+              echo "__version__ = \"${VERSION}\"" > _version.py
+              "$PYBIN" -m PyInstaller --onefile --name vixl main.py
+              tar -C dist -czf vixl-linux-x64.tar.gz vixl
+            '
 
       - name: Create release and upload asset
         uses: softprops/action-gh-release@v1
