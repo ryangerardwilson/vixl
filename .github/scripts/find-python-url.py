@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 
-API_URL = "https://api.github.com/repos/astral-sh/python-build-standalone/releases?per_page=100"
+API_URL = "https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest"
 TOKEN = os.environ.get("GITHUB_TOKEN")
 
 def fetch_releases(max_attempts: int = 8) -> str:
@@ -48,26 +48,47 @@ def fetch_releases(max_attempts: int = 8) -> str:
         sys.stderr.write(proc.stderr or f"curl failed with status {status}\n")
         sys.exit(proc.returncode or 1)
 
-    sys.stderr.write("Exceeded retry attempts fetching releases\n")
+    sys.stderr.write("Exceeded retry attempts fetching latest release\n")
     sys.exit(1)
 
 result = fetch_releases()
 
 try:
-    releases = json.loads(result)
+    release = json.loads(result)
 except json.JSONDecodeError as exc:
-    sys.stderr.write(f"Failed to parse releases JSON: {exc}\n")
+    sys.stderr.write(f"Failed to parse release JSON: {exc}\n")
     sys.exit(1)
 
-pattern = re.compile(r"cpython-3\.11\.\d+\+\d{8}-x86_64.*-unknown-linux-gnu-.*\.tar\.zst$")
-for release in releases:
-    for asset in release.get("assets", []):
-        url = asset.get("browser_download_url", "")
-        if pattern.search(url):
+# Debugging: Print tag name and number of assets
+print(f"Release tag: {release.get('tag_name', 'Unknown')}", file=sys.stderr)
+print(f"Number of assets: {len(release.get('assets', []))}", file=sys.stderr)
+
+pattern = re.compile(
+    r"^cpython-3\.11\.\d+\+\d{8}-x86_64-unknown-linux-gnu-.*install_only.*\.(tar\.gz|tar\.zst)$"
+)
+
+preferred_url = None
+fallback_url = None
+
+for asset in release.get("assets", []):
+    name = asset.get("name", "")
+    url = asset.get("browser_download_url", "")
+
+    if "cpython-3.11" in name and "x86_64-unknown-linux-gnu" in name:
+        print(f"Found relevant asset: {name}", file=sys.stderr)
+
+    if pattern.match(name):
+        if name.endswith(".tar.zst"):
             print(url)
             sys.exit(0)
+        fallback_url = fallback_url or url
+
+if fallback_url:
+    print(fallback_url)
+    sys.exit(0)
 
 sys.stderr.write(
-    "No matching python-build-standalone asset found for CPython 3.11 x86_64 linux-gnu in last 50 releases\n"
+    "No matching python-build-standalone asset found for CPython 3.11 x86_64 linux-gnu in latest release\n"
 )
 sys.exit(1)
+
