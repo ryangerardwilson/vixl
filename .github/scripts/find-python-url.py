@@ -13,7 +13,6 @@ cmd = [
     "-fsSL",
     "--retry",
     "8",
-    "--retry-all-errors",
     "--connect-timeout",
     "10",
     "--max-time",
