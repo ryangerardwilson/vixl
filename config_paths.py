@@ -11,6 +11,7 @@ CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings
 EXPRESSION_REGISTER_DEFAULT = []
+COMMAND_REGISTER_DEFAULT = {}
 CLIPBOARD_INTERFACE_COMMAND_DEFAULT = None
 
 
@@ -28,6 +29,7 @@ def ensure_config_dirs():
 def load_config():
     cfg = {
         "EXPRESSION_REGISTER": list(EXPRESSION_REGISTER_DEFAULT),
+        "COMMAND_REGISTER": dict(COMMAND_REGISTER_DEFAULT),
         "CLIPBOARD_INTERFACE_COMMAND": CLIPBOARD_INTERFACE_COMMAND_DEFAULT,
     }
 
@@ -53,6 +55,33 @@ def load_config():
                     isinstance(item, str) for item in clip_cmd
                 ):
                     cfg["CLIPBOARD_INTERFACE_COMMAND"] = clip_cmd
+
+                cmd_reg = None
+                cmd_mode = data.get("cmd_mode") if isinstance(data, dict) else None
+                if isinstance(cmd_mode, dict):
+                    cmd_reg = cmd_mode.get("command_register")
+                if isinstance(cmd_reg, dict):
+                    for name, spec in cmd_reg.items():
+                        if not isinstance(name, str):
+                            continue
+                        if not isinstance(spec, dict):
+                            continue
+                        argv = spec.get("argv")
+                        if not (isinstance(argv, list) and all(isinstance(x, str) for x in argv)):
+                            continue
+                        timeout = spec.get("timeout_seconds")
+                        if timeout is not None and not isinstance(timeout, (int, float)):
+                            timeout = None
+                        desc = spec.get("description") if isinstance(spec.get("description"), str) else ""
+                        kind = spec.get("kind", "print")
+                        if kind not in {"print", "mutate"}:
+                            kind = "print"
+                        cfg["COMMAND_REGISTER"][name] = {
+                            "argv": argv,
+                            "timeout_seconds": timeout,
+                            "description": desc,
+                            "kind": kind,
+                        }
         except Exception:
             pass
 

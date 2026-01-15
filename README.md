@@ -110,8 +110,8 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 - Cancel: Esc
 - History: Ctrl+P / Ctrl+N (Ctrl+N past newest clears)
 - Edit/navigation keys: Left/Right/Home/End, Backspace; Emacs-style: Alt+F / Alt+B (word fwd/back), Ctrl+W (delete word backward), Ctrl+U (kill to line start), Ctrl+H / Ctrl+D (move left/right), Ctrl+A / Ctrl+E (line start/end)
-- Tab: prefix-complete from the expression register (`cmd_mode.expression_register`); entries may have trailing `# comments` that are match-only.
-- `:%fz/<query>`: fuzzy-loads the best expression register entry (expression + comment scoring) into the command line; `:%fz#/<query>` fuzzy-searches comment/tag text only. Successful `%fz` loads are recorded in command history (Ctrl+P / Ctrl+N); comment-only register entries start with `%fz#/` and never insert into the command line.
+- Tab: prefix-complete from the expression register (`cmd_mode.expression_register`). If the current token starts with `!`, Tab completes from `cmd_mode.command_register` names. Entries may have trailing `# comments` that are match-only.
+- `:%fz/<query>`: fuzzy-loads the best match across expression register entries **and** command register entries (name + description). Expression matches load the expression; command matches load `!<name> `. `:%fz#/<query>` fuzzy-searches comments/descriptions only (expression comments and command descriptions). Successful `%fz` loads are recorded in command history; comment-only register entries start with `%fz#/` and never insert into the command line.
 
 > Note: Vixl is vi-first for grid navigation, but the command bar deliberately uses Emacs-style editing keys. In a single-line, insert-first, REPL-like input (like a terminal), Emacs word-motion/kill bindings provide faster, lower-friction text editing than modal vi navigation, so they are enabled here.
 
@@ -149,12 +149,13 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 
 ### Extensions
 - Location: single file at `$XDG_CONFIG_HOME/vixl/extensions.py` (default `~/.config/vixl/extensions.py`). The older `extensions/*.py` layout is deprecated; move your functions into this file.
-- Loaded for **completion discovery** by static inspection; actual execution happens in the configured `python_path` (remote) whenever you touch `df.vixl` or import anything beyond builtins/np/pd/df.
+- Loaded for **completion discovery** by static inspection; executed in-process with pd/np provided. Imports are not allowed inside `extensions.py`.
 - Mutation contract (unchanged):
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
-- `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions plus `:%fz/<query>` and `:%fz#/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
+  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions plus `:%fz/<query>` and `:%fz#/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
+  - `cmd_mode.command_register` (dict of named external commands) for `!name` invocation; see External Commands below.
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: ["wl-copy"]
     - X11: ["xclip", "-selection", "clipboard", "-in"]
@@ -163,6 +164,30 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 #### Extension constraints
 - `extensions.py` may not import modules. Only Python builtins plus the provided `pd`/`np` symbols are available.
 - This keeps extensions compatible with the bundled runtime; if you need external APIs or compiled deps, prepare your data outside Vixl and load it as CSV/Parquet.
+
+#### External Commands
+- All external commands must be registered under `cmd_mode.command_register` in `$XDG_CONFIG_HOME/vixl/config.json`.
+- Invoke via `:!name <args...>` in the command bar. Unknown names are rejected.
+- Vixl materializes the current DataFrame to a temp directory (Parquet preferred, CSV fallback) and appends the input file path as the **final argv argument**. Env vars set: `VIXL_IN`, `VIXL_IN_PARQUET`, `VIXL_IN_CSV`, `VIXL_OUT_PARQUET`, `VIXL_OUT_TEXT`, `VIXL_CWD`.
+- Commands declare `kind`:
+  - `mutate`: must write `VIXL_OUT_PARQUET`; Vixl loads and commits df. Failure to produce parquet is an error.
+  - `print`: never commits df; Vixl shows stdout/stderr or `VIXL_OUT_TEXT` in the overlay.
+- Template tokens in `argv`: `{out_parquet}`, `{out_text}`, `{cwd}`, `{arg0}`, `{arg1}`, …, `{args}` (all user args spliced). Vixl always appends the input path afterward.
+
+- Example `cmd_mode.command_register` entry:
+  ```json
+  {
+    "cmd_mode": {
+      "command_register": {
+        "get_g1_prod_data": {
+          "argv": ["/home/ryan/bin/get_data", "--query", "{arg0}", "--out", "{out_parquet}"],
+          "timeout_seconds": 60,
+          "description": "Fetch data and write parquet"
+        }
+      }
+    }
+  }
+  ```
 
 - Example `~/.config/vixl/extensions.py`:
 
