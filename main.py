@@ -1,6 +1,8 @@
 import sys
 import os
 import curses
+import subprocess
+
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
 from default_df_initializer import DefaultDfInitializer
@@ -16,6 +18,40 @@ except Exception:
     __version__ = "0.0.0"
 
 
+INSTALL_URL = "https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh"
+
+
+def _run_upgrade():
+    try:
+        curl = subprocess.Popen(
+            ["curl", "-fsSL", INSTALL_URL], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+    except FileNotFoundError:
+        print("Upgrade requires curl", file=sys.stderr)
+        return 1
+
+    try:
+        bash = subprocess.Popen(["bash"], stdin=curl.stdout)
+        if curl.stdout is not None:
+            curl.stdout.close()
+    except FileNotFoundError:
+        print("Upgrade requires bash", file=sys.stderr)
+        curl.terminate()
+        curl.wait()
+        return 1
+
+    bash_rc = bash.wait()
+    curl_rc = curl.wait()
+
+    if curl_rc != 0:
+        stderr = curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
+        if stderr:
+            sys.stderr.write(stderr)
+        return curl_rc
+
+    return bash_rc
+
+
 def main():
     args = sys.argv[1:]
 
@@ -25,9 +61,13 @@ def main():
 
     if "--help" in args or "-h" in args:
         print(
-            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n"
+            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n  vixl --upgrade\n"
         )
         return
+
+    if "--upgrade" in args:
+        rc = _run_upgrade()
+        sys.exit(rc)
 
     CompletionHandler().ensure_ready()
 
