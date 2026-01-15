@@ -6,6 +6,7 @@ CONFIG_HOME = XDG_CONFIG_HOME if XDG_CONFIG_HOME else os.path.join(HOME, ".confi
 CONFIG_DIR = os.path.join(CONFIG_HOME, "vixl")
 HISTORY_PATH = os.path.join(CONFIG_DIR, "history.log")
 EXTENSIONS_DIR = os.path.join(CONFIG_DIR, "extensions")
+EXTENSIONS_PY = os.path.join(CONFIG_DIR, "extensions.py")
 CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings

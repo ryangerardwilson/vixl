@@ -148,9 +148,9 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 - Command bar history navigation: Ctrl+P / Ctrl+N.
 
 ### Extensions
-- Location: `$XDG_CONFIG_HOME/vixl/extensions/*.py` (default `~/.config/vixl/extensions/*.py`)
-- Loaded at startup; functions are exposed under `df.vixl.<name>` to avoid pandas attribute collisions.
-- Mutation contract:
+- Location: single file at `$XDG_CONFIG_HOME/vixl/extensions.py` (default `~/.config/vixl/extensions.py`). The older `extensions/*.py` layout is deprecated; move your functions into this file.
+- Loaded for **completion discovery** by static inspection; actual execution happens in the configured `python_path` (remote) whenever you touch `df.vixl` or import anything beyond builtins/np/pd/df.
+- Mutation contract (unchanged):
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
@@ -158,7 +158,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
     - X11: `["xclip", "-selection", "clipboard", "-in"]`
-  - `python_path` (string) — path to a venv’s python executable (e.g. `/home/me/.venv/bin/python`). If set, Vixl adds that interpreter’s `site-packages` to `sys.path` before loading extensions and running cmd-mode code so imports can resolve user-installed packages. For compiled wheels, the venv Python major/minor should match Vixl’s runtime or imports may fail.
+  - `python_path` (string) — path to the Python interpreter that should execute cmd-mode code/extensions. Any command that imports modules, touches `df.vixl.*`, or references globals outside builtins/np/pd/df runs **remotely** in this interpreter. Pure pandas/numpy/builtins snippets still run locally for speed.
   Example:
   ```json
   {
@@ -174,50 +174,24 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   }
   ```
 - Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
-- Examples (save under `$XDG_CONFIG_HOME/vixl/extensions/`):
-   1) multiply_cols (explicit commit)
-      ```python
-      def multiply_cols(df, col_a, col_b, out_col="product"):
-          df[out_col] = df[col_a] * df[col_b]
-          return df, True
-      ```
-  2) add_ratio (commit flag or tuple)
-     ```python
-     def add_ratio(df, num_col, den_col, out_col="ratio"):
-         df[out_col] = df[num_col] / df[den_col]
-         commit_df = True  # honored if you set it and assign df; or return (df, True)
-         return df, True
-     ```
-  3) top_n (read-only, no commit)
-     ```python
-     def top_n(df, col, n=5):
-         return df.sort_values(col, ascending=False).head(n)
-     ```
-  4) ascii_bar (fun display; no commit)
-     ```python
-     def ascii_bar(df, col, width=40):
-         vals = df[col].fillna(0)
-         maxv = vals.max() if len(vals) else 0
-         lines = []
-         for v in vals:
-             bar_len = 0 if maxv == 0 else int(width * (v / maxv))
-             lines.append("|" + "█" * bar_len)
-         return "\n".join(lines)
-     ```
-     Usage: `df.vixl.ascii_bar("col_a")` → shows a simple bar chart in the output modal.
-  5) normalize_cols (explicit commit)
-     ```python
-     def normalize_cols(df, cols, prefix="norm_"):
-         for c in cols:
-             mx = df[c].max()
-             mn = df[c].min()
-             df[f"{prefix}{c}"] = (df[c] - mn) / (mx - mn) if mx != mn else 0
-         return df, True
-     ```
+- Example `~/.config/vixl/extensions.py`:
+  ```python
+  def multiply_cols(df, col_a, col_b, out_col="product"):
+      df[out_col] = df[col_a] * df[col_b]
+      return df, True
+
+  def top_n(df, col, n=5):
+      return df.sort_values(col, ascending=False).head(n)
+
+  def wiom_data(df, source, query):
+      from wiom_data import WiomData
+      df = WiomData(source).query(query)
+      return df, True
+  ```
 - Usage examples in cmd:
   - `df.vixl.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
   - `df.vixl.top_n("col_a", 3)` (read-only; output modal)
-  - `df.vixl.ascii_bar("col_a")` (bar graph in modal)
+  - `df.vixl.wiom_data(source="genie1_prod", query="select * from t_serviceability_logs order by id desc limit 10")` (remote exec in your python_path)
 
 ### Removed / changed features
 - Leader commands (`,ya`, `,yap`, `,yio`, `,o`, `,df`) removed.
