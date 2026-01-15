@@ -11,6 +11,7 @@ from command_pane import CommandPane
 from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
 from config_paths import HISTORY_PATH, ensure_config_dirs
+from expression_register import parse_expression_register
 from file_type_handler import FileTypeHandler
 from pagination import Paginator
 from history_manager import HistoryManager
@@ -91,7 +92,7 @@ def _phrase_score(q_words, c_words):
     return best
 
 
-def fuzzy_best_match(query, candidates):
+def _fuzzy_best_text_match(query, texts):
     if not isinstance(query, str):
         return None
     normalized_query = _normalize_text(query)
@@ -100,18 +101,21 @@ def fuzzy_best_match(query, candidates):
 
     q_words = normalized_query.split()
     q_skel = _skeleton_text(query)
-    best = None
+    best_index = None
     best_score = -1.0
     best_phrase = -1.0
     best_len = None
-    for idx, cand in enumerate(candidates or []):
-        if not isinstance(cand, str):
+
+    for idx, text in enumerate(texts or []):
+        if not isinstance(text, str):
             continue
-        norm_cand = _normalize_text(cand)
+        if not text.strip():
+            continue
+        norm_cand = _normalize_text(text)
         if not norm_cand:
             continue
         c_words = norm_cand.split()
-        c_skel = _skeleton_text(cand)
+        c_skel = _skeleton_text(text)
 
         overall = difflib.SequenceMatcher(None, q_skel, c_skel).ratio()
         phrase = _phrase_score(q_words, c_words)
@@ -120,7 +124,7 @@ def fuzzy_best_match(query, candidates):
         if phrase >= 0.92:
             score = max(score, 0.9 * phrase)
 
-        cand_len = len(cand)
+        cand_len = len(text)
         if (
             score > best_score
             or (
@@ -137,9 +141,23 @@ def fuzzy_best_match(query, candidates):
             best_score = score
             best_phrase = phrase
             best_len = cand_len
-            best = cand
+            best_index = idx
 
-    return best
+    return best_index
+
+
+def fuzzy_best_match(query, entries):
+    valid_pairs = []
+    for entry in entries or []:
+        match_text = getattr(entry, "match_text", None)
+        if isinstance(match_text, str) and match_text.strip():
+            valid_pairs.append((entry, match_text))
+    if not valid_pairs:
+        return None
+    idx = _fuzzy_best_text_match(query, [text for _, text in valid_pairs])
+    if idx is None:
+        return None
+    return valid_pairs[idx][0]
 
 
 class Orchestrator:
@@ -339,22 +357,67 @@ class Orchestrator:
             self._set_status("No command to execute", 3)
             return
 
-        if code.startswith("%fuzz/"):
-            query = code[len("%fuzz/") :].strip()
-            register = self.exec.config.get("EXPRESSION_REGISTER", [])
+        if code.startswith("%fz#/"):
+            query = code[len("%fz#/") :].strip()
+            raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
+            entries = parse_expression_register(raw_register)
             if not query:
                 self._set_status("Query required", 3)
                 return
-            if not register:
+            if not entries:
                 self._set_status("Expression register empty", 3)
                 return
-            best = fuzzy_best_match(query, register)
-            if not best:
+            comment_texts = []
+            comment_entries = []
+            for entry in entries:
+                comment = getattr(entry, "comment", "").strip()
+                if comment:
+                    comment_texts.append(comment)
+                    comment_entries.append(entry)
+            if not comment_entries:
+                self._set_status("No commented entries", 3)
+                return
+            idx = _fuzzy_best_text_match(query, comment_texts)
+            if idx is None:
+                self._set_status(f"No comment match for: {query}", 3)
+                return
+            best_entry = comment_entries[idx]
+            if getattr(best_entry, "kind", "expression") == "comment_only":
+                self._set_status("Matched comment-only entry", 3)
+                return
+            expr = getattr(best_entry, "expr", "").strip()
+            if not expr:
+                self._set_status("No expression to load", 3)
+                return
+            self.command.set_buffer(expr)
+            self.focus = 1
+            self._set_status(f"Loaded: {expr}", 3)
+            return
+
+        if code.startswith("%fz/"):
+            query = code[len("%fz/") :].strip()
+            raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
+            entries = parse_expression_register(raw_register)
+            if not query:
+                self._set_status("Query required", 3)
+                return
+            if not entries:
+                self._set_status("Expression register empty", 3)
+                return
+            best_entry = fuzzy_best_match(query, entries)
+            if not best_entry:
                 self._set_status(f"No match for: {query}", 3)
                 return
-            self.command.set_buffer(best)
+            if getattr(best_entry, "kind", "expression") == "comment_only":
+                self._set_status("Matched comment-only entry", 3)
+                return
+            expr = getattr(best_entry, "expr", "").strip()
+            if not expr:
+                self._set_status("No expression to load", 3)
+                return
+            self.command.set_buffer(expr)
             self.focus = 1
-            self._set_status(f"Loaded: {best}", 3)
+            self._set_status(f"Loaded: {expr}", 3)
             return
 
         lines = self.exec.execute(code)

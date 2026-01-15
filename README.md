@@ -110,8 +110,8 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 - Cancel: Esc
 - History: Ctrl+P / Ctrl+N (Ctrl+N past newest clears)
 - Edit/navigation keys: Left/Right/Home/End, Backspace; Emacs-style: Alt+F / Alt+B (word fwd/back), Ctrl+W (delete word backward), Ctrl+U (kill to line start), Ctrl+H / Ctrl+D (move left/right), Ctrl+A / Ctrl+E (line start/end)
-- Tab: prefix-complete from the expression register (`cmd_mode.expression_register`)
-- `:%fuzz/<query>`: fuzzy-loads the best expression register entry into the command line (stays in cmd mode; hit Enter again to execute)
+- Tab: prefix-complete from the expression register (`cmd_mode.expression_register`); entries may have trailing `# comments` that are match-only.
+- `:%fz/<query>`: fuzzy-loads the best expression register entry (expression + comment scoring) into the command line; `:%fz#/<query>` fuzzy-searches comment/tag text only. Comment-only register entries start with `%fz#/` and never insert into the command line.
 
 > Note: Vixl is vi-first for grid navigation, but the command bar deliberately uses Emacs-style editing keys. In a single-line, insert-first, REPL-like input (like a terminal), Emacs word-motion/kill bindings provide faster, lower-friction text editing than modal vi navigation, so they are enabled here.
 
@@ -153,7 +153,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
-  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions and `:%fuzz/<query>` fuzzy loads.
+  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions and `:%fz/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
     - X11: `["xclip", "-selection", "clipboard", "-in"]`

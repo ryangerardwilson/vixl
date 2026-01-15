@@ -9,7 +9,7 @@ def _apply_completion(pane: CommandPane):
 
 def test_expression_register_df_vixl_template_inserts_full_and_sets_cursor_inside_parens():
     pane = CommandPane()
-    pane.set_expression_register(["df.vixl.distribution_ascii_bar(bins=10)"])
+    pane.set_expression_register(["df.vixl.distribution_ascii_bar(bins=10) #chart"])
     pane.set_extension_names(["multiply_cols"])
     pane.set_buffer("df.vixl.dis")
 
@@ -34,7 +34,7 @@ def test_extension_completion_fallback_when_no_expression_register_match():
 
 def test_df_base_template_inserts_and_positions_cursor_from_expression_register():
     pane = CommandPane()
-    pane.set_expression_register(["df.pivot()"])
+    pane.set_expression_register(["df.pivot() # pivot"])
     pane.set_extension_names([])
     pane.set_buffer("df.pi")
 

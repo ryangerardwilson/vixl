@@ -10,7 +10,7 @@ class CommandPane:
         self.history = []
         self.history_idx = None  # None means not navigating history
         self.extension_names = []
-        self.expression_register = []
+        self.expression_register_entries = []
         self.meta_pending = False
         self.ghost_attr = curses.A_DIM
         try:
@@ -55,7 +55,11 @@ class CommandPane:
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
     def set_expression_register(self, expressions):
-        self.expression_register = [str(item) for item in (expressions or [])]
+        try:
+            from expression_register import parse_expression_register
+        except ImportError:
+            parse_expression_register = lambda entries: []
+        self.expression_register_entries = parse_expression_register(expressions)
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
     def _apply_history(self):
@@ -99,16 +103,17 @@ class CommandPane:
         return (idx + len(marker), self.cursor, token, marker)
 
     def _choose_expression_register_suggestion(self, token, marker):
-        if not token or not self.expression_register:
+        if not token or not self.expression_register_entries:
             return None
 
         candidates = []
-        for item in self.expression_register:
-            if not isinstance(item, str):
+        for entry in self.expression_register_entries:
+            if getattr(entry, "kind", None) != "expression":
                 continue
-            if not item.startswith(marker):
+            expr = getattr(entry, "expr", "")
+            if not expr.startswith(marker):
                 continue
-            tail = item[len(marker) :]
+            tail = expr[len(marker) :]
             candidates.append(tail)
 
         prefix_matches = [c for c in candidates if c.startswith(token)]
