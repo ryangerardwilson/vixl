@@ -551,6 +551,10 @@ class CommandExecutor:
             with open(req_path, "w", encoding="utf-8") as f:
                 json.dump(request, f)
 
+            clean_env = os.environ.copy()
+            clean_env.pop("PYTHONPATH", None)
+            clean_env.pop("PYTHONHOME", None)
+
             proc = subprocess.run(
                 [
                     self._python_path,
@@ -568,6 +572,8 @@ class CommandExecutor:
                 text=True,
                 capture_output=True,
                 timeout=30,
+                cwd=tmpdir,
+                env=clean_env,
             )
 
             has_response = os.path.exists(resp_path)
