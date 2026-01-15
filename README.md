@@ -85,7 +85,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 ### Vixl – interactive DataFrame editor (curses)
 - Single-line command bar at the bottom.
 - Modal overlays for output and shortcuts (content-sized, up to 50% of terminal height).
-- Extensions loaded from `$XDG_CONFIG_HOME/vixl/extensions` (default `~/.config/vixl/extensions`), namespaced under `df.vixl` to avoid pandas collisions.
+- Extensions discovered from a single file at `$XDG_CONFIG_HOME/vixl/extensions.py` (default `~/.config/vixl/extensions.py`) and executed remotely via the configured `python_path` when referenced as `df.vixl.<name>`.
 - Persistent history at `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`).
 
 ### Quick start
@@ -158,7 +158,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
     - X11: `["xclip", "-selection", "clipboard", "-in"]`
-  - `python_path` (string) — path to the Python interpreter that should execute cmd-mode code/extensions. Any command that imports modules, touches `df.vixl.*`, or references globals outside builtins/np/pd/df runs **remotely** in this interpreter. Pure pandas/numpy/builtins snippets still run locally for speed.
+  - `python_path` (string) — path to the Python interpreter that should execute cmd-mode code/extensions. Commands that import modules, touch `df.vixl.*`, use escape-hatch names, or reference globals outside builtins/np/pd/df run **remotely** in this interpreter. Pure pandas/numpy/builtins snippets still run locally for speed. Install all extension dependencies (especially compiled wheels like `cffi`, `pyarrow`, etc.) into this interpreter.
   Example:
   ```json
   {
@@ -174,6 +174,11 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   }
   ```
 - Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
+
+#### Local vs Remote execution
+- **Local path (fast):** commands that only use Python builtins plus `df`, `pd`, `np`, and any names defined inside the snippet execute inside Vixl’s bundled interpreter.
+- **Remote path:** commands that import modules, reference `df.vixl.*`, use escape-hatch names (`__import__`, `eval`, etc.), or touch globals outside builtins/df/pd/np are executed in your configured `python_path` interpreter. Output/commit semantics are identical between both paths.
+
 - Example `~/.config/vixl/extensions.py`:
   ```python
   def multiply_cols(df, col_a, col_b, out_col="product"):
@@ -191,7 +196,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 - Usage examples in cmd:
   - `df.vixl.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
   - `df.vixl.top_n("col_a", 3)` (read-only; output modal)
-  - `df.vixl.wiom_data(source="genie1_prod", query="select * from t_serviceability_logs order by id desc limit 10")` (remote exec in your python_path)
+  - `df.vixl.wiom_data(source="genie1_prod", query="select * from t_serviceability_logs order by id desc limit 10")` (runs remotely inside your `python_path` interpreter)
 
 ### Removed / changed features
 - Leader commands (`,ya`, `,yap`, `,yio`, `,o`, `,df`) removed.

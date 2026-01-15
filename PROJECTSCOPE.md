@@ -77,10 +77,9 @@ Data invariants:
 
 Users manipulate data by executing Python expressions explicitly.
 
-Execution context provides:
-- `df`: active DataFrame
-- `pd`: pandas
-- `np`: numpy
+Execution contexts:
+- **Local sandbox:** bundled interpreter with `df`, `pd`, `np`, and Python builtins.
+- **Remote sandbox:** subprocess launched via the configured `python_path`, used automatically whenever the code imports modules, references `df.vixl.*`, uses escape-hatch names, or touches globals outside builtins/df/pd/np.
 
 Characteristics:
 - Explicit execution
@@ -88,6 +87,7 @@ Characteristics:
 - Output is captured and displayed
 - Errors do not mutate application state
 - Successful commands are persisted to history
+- Commit semantics (assigning to `df`, returning `(df, True)`, or setting `commit_df = True`) are identical between local and remote execution.
 
 ---
 
@@ -147,10 +147,10 @@ Characteristics:
 ### Architecture
 - Entry: `main.py` → `LoadingScreen` → `Orchestrator`
 - Layout: table + shared bottom strip (status/command/prompt); overlays for output/shortcuts (content-sized, ≤50% terminal height).
-- Execution: sandboxed `df`; commits occur only when an extension explicitly commits or when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
+- Execution: sandboxed `df`; router chooses local or remote interpreter automatically (see Section 6). Commits occur only when an extension explicitly commits or when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
 - History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N).
-- Extensions: loaded from `~/.config/vixl/extensions/`; config at `~/.config/vixl/config.json`.
+- Extensions: defined in `~/.config/vixl/extensions.py`; config at `~/.config/vixl/config.json`.
 
 ### Features
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
@@ -169,7 +169,7 @@ Characteristics:
 
 ### File locations
 - History: `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`)
-- Extensions: `$XDG_CONFIG_HOME/vixl/extensions/`
+- Extensions: `$XDG_CONFIG_HOME/vixl/extensions.py`
 - Config: `$XDG_CONFIG_HOME/vixl/config.json`
 - Default df: created in `main.py` when no arg is provided.
 
