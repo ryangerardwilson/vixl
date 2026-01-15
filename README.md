@@ -129,6 +129,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 - Undo / Redo: `u` / `r`
 - Move: h / j / k / l
 - Big jumps: Ctrl+J / Ctrl+K (~5% rows down/up), Ctrl+H / Ctrl+L (~20% cols left/right)
+- Visual mode: `v` toggles a rectangular selection; Esc exits. In visual mode `d` clears all selected cells (with dtype-aware coercion) and `i` opens Vim once to bulk-fill the selection with a new value.
 - Row expansion (leader): `,xr` expands/collapses the current row; `,xar` expands/collapses all rows; `,xc` collapses all expansions. Expanded rows wrap vertically on word boundaries (hard-break only for overlong words) within existing column widths.
 - Open command bar: `:`
 - Edit cell: press `i`. Vixl suspends curses, opens **vim** in the current terminal with the cell value in a temp file, and resumes when vim exits. Exit code 0 commits the edit (with dtype coercion). Non-zero exit cancels with no changes.

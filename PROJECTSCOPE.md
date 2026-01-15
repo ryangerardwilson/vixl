@@ -99,18 +99,20 @@ Supported highlight modes:
 - Cell-wise (`h j k l`)
 - Row-wise (`J / K`)
 - Column-wise (`H / L`)
+- Visual block (`v` to start/extend a rectangular selection)
 
 Rules:
 - Cursor always remains within visible, valid cells
-- Highlight is always visible
+- Highlight is always visible (visual selections are rendered in-grid)
 - Navigation is column- and row-based, not pixel-based
 
 ---
 
 ## 8. Editing & Command Interaction
 
-- DF mode handles navigation, selection, and per-cell actions.
-- Pressing `i` opens **vim** in the current terminal with the focused cell value in a temp file; exiting vim with status 0 commits the edit (dtype-coerced), non-zero cancels.
+- DF mode handles navigation, visual selection, and per-cell actions.
+- Pressing `i` opens **vim** in the current terminal with the focused cell value in a temp file; exiting vim with status 0 commits the edit (dtype-coerced), non-zero cancels. When visual mode is active, `i` opens Vim once to collect a replacement value and bulk-fills the selected rectangle.
+- Visual mode (`v`) provides a rectangular selection; `d` clears all selected cells (dtype-aware) and Esc exits visual.
 - The grid never enters an inline text-editing mode; all inline editing was removed in favor of vim.
 - Structural/bulk mutations (insert columns, run pandas transforms, etc.) remain explicit Python commands typed into the command bar (`:`).
 - The command bar continues to provide a sandboxed `df`/`pd`/`np` context for arbitrary expressions.
