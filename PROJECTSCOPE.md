@@ -152,7 +152,7 @@ Characteristics:
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
 - History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N). Successful command executions and successful `:%fz/...` / `:%fz#/...` loads are recorded so they can be recalled.
 - Extensions: defined in `~/.config/vixl/extensions.py`; imports are disallowed (only builtins + `pd`/`np` are available); config at `~/.config/vixl/config.json`.
-- External commands: registered in `cmd_mode.command_register`, invoked as `!name ...`. Vixl writes the current df to a temp file and appends the input path as the final argv element. Commands declare `kind` (`mutate` requires writing `VIXL_OUT_PARQUET` to commit df; `print` shows output only). Unknown command names are rejected.
+- External commands: registered in `cmd_mode.command_register`, invoked as `!name ...`. Vixl writes the current df to a temp file and appends the input path as the final argv element. Commands declare `kind` (`mutate` requires writing `VIXL_OUT_PARQUET` to commit df and suppresses overlay output on success; `print` shows output only). Unknown command names are rejected.
 
 ### Features
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.
