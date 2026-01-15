@@ -85,7 +85,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
 ### Vixl – interactive DataFrame editor (curses)
 - Single-line command bar at the bottom.
 - Modal overlays for output and shortcuts (content-sized, up to 50% of terminal height).
-- Extensions discovered from a single file at `$XDG_CONFIG_HOME/vixl/extensions.py` (default `~/.config/vixl/extensions.py`) and executed remotely via the configured `python_path` when referenced as `df.vixl.<name>`.
+- Extensions discovered from a single file at `$XDG_CONFIG_HOME/vixl/extensions.py` (default `~/.config/vixl/extensions.py`) and executed in-process. Extensions must be pure Python using only builtins plus the provided `pd`/`np` symbols; imports in `extensions.py` are not allowed.
 - Persistent history at `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`).
 
 ### Quick start
@@ -154,32 +154,18 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
-  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions plus `:%fz/<query>` and `:%fz#/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
+- `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions plus `:%fz/<query>` and `:%fz#/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
-    - Wayland: `["wl-copy"]`
-    - X11: `["xclip", "-selection", "clipboard", "-in"]`
-  - `python_path` (string) — path to the Python interpreter that should execute cmd-mode code/extensions. Commands that import modules, touch `df.vixl.*`, use escape-hatch names, or reference globals outside builtins/np/pd/df run **remotely** in this interpreter. Pure pandas/numpy/builtins snippets still run locally for speed. Install all extension dependencies (especially compiled wheels like `cffi`, `pyarrow`, etc.) into this interpreter.
-  Example:
-  ```json
-  {
-    "python_path": "/home/me/.venv/bin/python",
-    "clipboard_interface_command": ["wl-copy"],
-    "cmd_mode": {
-      "expression_register": [
-        "df.vixl.distribution_ascii_bar(bins=10)",
-        "df.pivot()",
-        "df.info()"
-      ]
-    }
-  }
-  ```
+    - Wayland: ["wl-copy"]
+    - X11: ["xclip", "-selection", "clipboard", "-in"]
 - Config + completions path respects `$XDG_CONFIG_HOME` (falls back to `~/.config/vixl`).
 
-#### Local vs Remote execution
-- **Local path (fast):** commands that only use Python builtins plus `df`, `pd`, `np`, and any names defined inside the snippet execute inside Vixl’s bundled interpreter.
-- **Remote path:** commands that import modules, reference `df.vixl.*`, use escape-hatch names (`__import__`, `eval`, etc.), or touch globals outside builtins/df/pd/np are executed in your configured `python_path` interpreter. Output/commit semantics are identical between both paths.
+#### Extension constraints
+- `extensions.py` may not import modules. Only Python builtins plus the provided `pd`/`np` symbols are available.
+- This keeps extensions compatible with the bundled runtime; if you need external APIs or compiled deps, prepare your data outside Vixl and load it as CSV/Parquet.
 
 - Example `~/.config/vixl/extensions.py`:
+
   ```python
   def multiply_cols(df, col_a, col_b, out_col="product"):
       df[out_col] = df[col_a] * df[col_b]
@@ -188,15 +174,14 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   def top_n(df, col, n=5):
       return df.sort_values(col, ascending=False).head(n)
 
-  def wiom_data(df, source, query):
-      from wiom_data import WiomData
-      df = WiomData(source).query(query)
+  def add_ratio(df, num_col, den_col, out_col="ratio"):
+      df[out_col] = df[num_col] / df[den_col]
       return df, True
   ```
 - Usage examples in cmd:
   - `df.vixl.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
   - `df.vixl.top_n("col_a", 3)` (read-only; output modal)
-  - `df.vixl.wiom_data(source="genie1_prod", query="select * from t_serviceability_logs order by id desc limit 10")` (runs remotely inside your `python_path` interpreter)
+  - `df.vixl.add_ratio("col_a", "col_b")`
 
 ### Removed / changed features
 - Leader commands (`,ya`, `,yap`, `,yio`, `,o`, `,df`) removed.

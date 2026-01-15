@@ -11,8 +11,7 @@
 - Added a curl-installable Linux x86_64 binary (PyInstaller build) and documented the installer.
 - Release workflow now builds inside manylinux2014 via Docker, bundles NumPy/Pandas/PyArrow assets correctly, and uploads `vixl-linux-x64.tar.gz` on each tag.
 - `install.sh` auto-detects the latest release, handles version pinning, and adds `~/.vixl/bin` to PATH (unless suppressed).
-- Hybrid command execution: pure builtins/df/pd/np commands execute locally, while commands with imports, `df.vixl.*`, escape-hatch names, or other globals run remotely inside the configured `python_path` interpreter. Output and commit semantics are identical between both paths.
-- Extensions now live in a single `$XDG_CONFIG_HOME/vixl/extensions.py` file; the legacy `extensions/*.py` layout is deprecated.
+- Removed `python_path` and remote execution; all commands run in-process. Extensions must be pure Python using only builtins plus the provided `pd`/`np` symbols; imports in `extensions.py` are rejected. The legacy `extensions/*.py` layout remains deprecated; use a single `$XDG_CONFIG_HOME/vixl/extensions.py` file.
 
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
