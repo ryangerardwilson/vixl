@@ -17,7 +17,6 @@ CLIPBOARD_INTERFACE_COMMAND_DEFAULT = None
 
 def ensure_config_dirs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    os.makedirs(EXTENSIONS_DIR, exist_ok=True)
     if not os.path.exists(HISTORY_PATH):
         try:
             with open(HISTORY_PATH, "w", encoding="utf-8") as f:
