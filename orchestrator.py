@@ -3,6 +3,8 @@ import curses
 import time
 import os
 import subprocess
+import re
+import difflib
 
 from grid_pane import GridPane
 from command_pane import CommandPane
@@ -17,6 +19,127 @@ from save_prompt import SavePrompt
 from column_prompt import ColumnPrompt
 from overlay import OverlayView
 from shortcut_help_handler import ShortcutHelpHandler
+
+
+_PUNCT_TO_SPACE = re.compile(r"[\(\)\[\]\{\},.:/+=-]")
+_WHITESPACE = re.compile(r"\s+")
+_VOWELS = re.compile(r"[aeiou]")
+
+
+def _normalize_text(text):
+    if not isinstance(text, str):
+        return ""
+    lowered = text.lower()
+    lowered = _PUNCT_TO_SPACE.sub(" ", lowered)
+    lowered = _WHITESPACE.sub(" ", lowered).strip()
+    return lowered
+
+
+def _skeleton_word(word):
+    return _VOWELS.sub("", word)
+
+
+def _skeleton_text(text):
+    words = _normalize_text(text).split()
+    return " ".join(_skeleton_word(w) for w in words)
+
+
+def _is_subsequence(needle, haystack):
+    it = iter(haystack)
+    for ch in needle:
+        for val in it:
+            if val == ch:
+                break
+        else:
+            return False
+    return True
+
+
+def _token_score(q_word, c_word):
+    qs = _skeleton_word(q_word)
+    cs = _skeleton_word(c_word)
+    if not qs or not cs:
+        return 0.0
+
+    score = 0.0
+    if cs.startswith(qs):
+        score = 1.0
+    elif _is_subsequence(qs, cs):
+        score = 0.7
+
+    # If the non-skeletonized words also prefix-match, honor that strongly.
+    ql = q_word.lower()
+    cl = c_word.lower()
+    if cl.startswith(ql):
+        score = max(score, 0.9)
+    return score
+
+
+def _phrase_score(q_words, c_words):
+    m = len(q_words)
+    n = len(c_words)
+    if m == 0 or n == 0 or m > n:
+        return 0.0
+
+    best = 0.0
+    for i in range(n - m + 1):
+        window = c_words[i : i + m]
+        scores = [_token_score(qw, cw) for qw, cw in zip(q_words, window)]
+        avg = sum(scores) / m if m else 0.0
+        if avg > best:
+            best = avg
+    return best
+
+
+def fuzzy_best_match(query, candidates):
+    if not isinstance(query, str):
+        return None
+    normalized_query = _normalize_text(query)
+    if not normalized_query:
+        return None
+
+    q_words = normalized_query.split()
+    q_skel = _skeleton_text(query)
+    best = None
+    best_score = -1.0
+    best_phrase = -1.0
+    best_len = None
+    for idx, cand in enumerate(candidates or []):
+        if not isinstance(cand, str):
+            continue
+        norm_cand = _normalize_text(cand)
+        if not norm_cand:
+            continue
+        c_words = norm_cand.split()
+        c_skel = _skeleton_text(cand)
+
+        overall = difflib.SequenceMatcher(None, q_skel, c_skel).ratio()
+        phrase = _phrase_score(q_words, c_words)
+
+        score = 0.7 * overall + 0.3 * phrase
+        if phrase >= 0.92:
+            score = max(score, 0.9 * phrase)
+
+        cand_len = len(cand)
+        if (
+            score > best_score
+            or (
+                score == best_score
+                and (
+                    phrase > best_phrase
+                    or (
+                        phrase == best_phrase
+                        and (best_len is None or cand_len < best_len)
+                    )
+                )
+            )
+        ):
+            best_score = score
+            best_phrase = phrase
+            best_len = cand_len
+            best = cand
+
+    return best
 
 
 class Orchestrator:
@@ -42,9 +165,9 @@ class Orchestrator:
             self._set_status(self.exec.startup_warnings[0], seconds=6)
         if hasattr(self.command, "set_extension_names"):
             self.command.set_extension_names(self.exec.get_extension_names())
-        if hasattr(self.command, "set_custom_expansions"):
-            self.command.set_custom_expansions(
-                self.exec.config.get("TAB_FUZZY_EXPANSIONS_REGISTER", [])
+        if hasattr(self.command, "set_expression_register"):
+            self.command.set_expression_register(
+                self.exec.config.get("EXPRESSION_REGISTER", [])
             )
 
         self.focus = 0  # 0=df, 1=cmd, 2=overlay
@@ -214,6 +337,24 @@ class Orchestrator:
             self.command.reset()
             self.focus = 0
             self._set_status("No command to execute", 3)
+            return
+
+        if code.startswith("%fuzz/"):
+            query = code[len("%fuzz/") :].strip()
+            register = self.exec.config.get("EXPRESSION_REGISTER", [])
+            if not query:
+                self._set_status("Query required", 3)
+                return
+            if not register:
+                self._set_status("Expression register empty", 3)
+                return
+            best = fuzzy_best_match(query, register)
+            if not best:
+                self._set_status(f"No match for: {query}", 3)
+                return
+            self.command.set_buffer(best)
+            self.focus = 1
+            self._set_status(f"Loaded: {best}", 3)
             return
 
         lines = self.exec.execute(code)

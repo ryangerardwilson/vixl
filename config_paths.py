@@ -9,7 +9,7 @@ EXTENSIONS_DIR = os.path.join(CONFIG_DIR, "extensions")
 CONFIG_JSON = os.path.join(CONFIG_DIR, "config.json")
 
 # default settings
-TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT = []
+EXPRESSION_REGISTER_DEFAULT = []
 CLIPBOARD_INTERFACE_COMMAND_DEFAULT = None
 PYTHON_PATH_DEFAULT = None
 
@@ -27,7 +27,7 @@ def ensure_config_dirs():
 
 def load_config():
     cfg = {
-        "TAB_FUZZY_EXPANSIONS_REGISTER": list(TAB_FUZZY_EXPANSIONS_REGISTER_DEFAULT),
+        "EXPRESSION_REGISTER": list(EXPRESSION_REGISTER_DEFAULT),
         "CLIPBOARD_INTERFACE_COMMAND": CLIPBOARD_INTERFACE_COMMAND_DEFAULT,
         "PYTHON_PATH": PYTHON_PATH_DEFAULT,
     }
@@ -41,12 +41,12 @@ def load_config():
             if isinstance(data, dict):
                 cmd_mode = data.get("cmd_mode")
                 reg = (
-                    cmd_mode.get("tab_fuzzy_expansions_register")
+                    cmd_mode.get("expression_register")
                     if isinstance(cmd_mode, dict)
                     else None
                 )
                 if isinstance(reg, list):
-                    cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] = [
+                    cfg["EXPRESSION_REGISTER"] = [
                         str(item) for item in reg if isinstance(item, str)
                     ]
                 clip_cmd = data.get("clipboard_interface_command")

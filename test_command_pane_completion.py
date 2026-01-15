@@ -7,9 +7,9 @@ def _apply_completion(pane: CommandPane):
     pane._apply_suggestion(suggestion)
 
 
-def test_custom_df_vixl_template_inserts_full_and_sets_cursor_inside_parens():
+def test_expression_register_df_vixl_template_inserts_full_and_sets_cursor_inside_parens():
     pane = CommandPane()
-    pane.set_custom_expansions(["df.vixl.distribution_ascii_bar(bins=10)"])
+    pane.set_expression_register(["df.vixl.distribution_ascii_bar(bins=10)"])
     pane.set_extension_names(["multiply_cols"])
     pane.set_buffer("df.vixl.dis")
 
@@ -19,11 +19,12 @@ def test_custom_df_vixl_template_inserts_full_and_sets_cursor_inside_parens():
     assert pane.cursor == len(pane.get_buffer())
 
 
-def test_extension_completion_fallback_when_no_custom_match():
+def test_extension_completion_fallback_when_no_expression_register_match():
     pane = CommandPane()
-    pane.set_custom_expansions(["df.vixl.other()"])  # no matching prefix
+    pane.set_expression_register(["df.vixl.other()"])
     pane.set_extension_names(["multiply_cols"])
     pane.set_buffer("df.vixl.mul")
+
 
     _apply_completion(pane)
 
@@ -31,9 +32,9 @@ def test_extension_completion_fallback_when_no_custom_match():
     assert pane.cursor == len(pane.get_buffer())
 
 
-def test_df_base_template_inserts_and_positions_cursor():
+def test_df_base_template_inserts_and_positions_cursor_from_expression_register():
     pane = CommandPane()
-    pane.set_custom_expansions(["df.pivot()"])
+    pane.set_expression_register(["df.pivot()"])
     pane.set_extension_names([])
     pane.set_buffer("df.pi")
 

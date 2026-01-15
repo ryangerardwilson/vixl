@@ -1,5 +1,4 @@
 import curses
-import difflib
 
 
 class CommandPane:
@@ -11,7 +10,7 @@ class CommandPane:
         self.history = []
         self.history_idx = None  # None means not navigating history
         self.extension_names = []
-        self.custom_expansions = []
+        self.expression_register = []
         self.meta_pending = False
         self.ghost_attr = curses.A_DIM
         try:
@@ -55,8 +54,8 @@ class CommandPane:
         self.extension_names = sorted(names or [])
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
-    def set_custom_expansions(self, expansions):
-        self.custom_expansions = [str(item) for item in (expansions or [])]
+    def set_expression_register(self, expressions):
+        self.expression_register = [str(item) for item in (expressions or [])]
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
     def _apply_history(self):
@@ -99,12 +98,12 @@ class CommandPane:
 
         return (idx + len(marker), self.cursor, token, marker)
 
-    def _choose_custom_suggestion(self, token, marker):
-        if not token or not self.custom_expansions:
+    def _choose_expression_register_suggestion(self, token, marker):
+        if not token or not self.expression_register:
             return None
 
         candidates = []
-        for item in self.custom_expansions:
+        for item in self.expression_register:
             if not isinstance(item, str):
                 continue
             if not item.startswith(marker):
@@ -117,15 +116,6 @@ class CommandPane:
             prefix_matches.sort(key=lambda x: (len(x), x))
             chosen = prefix_matches[0]
             display = chosen[len(token) :]
-            return chosen, display
-
-        close = difflib.get_close_matches(token, candidates, n=1, cutoff=0.6)
-        if close:
-            chosen = close[0]
-            if chosen.startswith(token):
-                display = chosen[len(token) :]
-            else:
-                display = f" -> {marker}{chosen}"
             return chosen, display
         return None
 
@@ -141,15 +131,6 @@ class CommandPane:
             chosen = prefix_matches[0]
             display = chosen[len(token) :]
             return chosen, display
-
-        close = difflib.get_close_matches(token, self.extension_names, n=1, cutoff=0.6)
-        if close:
-            chosen = close[0]
-            if chosen.startswith(token):
-                display = chosen[len(token) :]
-            else:
-                display = f" -> df.vixl.{chosen}"
-            return chosen, display
         return None
 
     def _get_suggestion(self):
@@ -158,7 +139,7 @@ class CommandPane:
             return None
         start, end, token, marker = token_info
 
-        suggestion = self._choose_custom_suggestion(token, marker)
+        suggestion = self._choose_expression_register_suggestion(token, marker)
         if not suggestion:
             suggestion = self._choose_extension_suggestion(token, marker)
         if not suggestion:

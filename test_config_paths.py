@@ -18,7 +18,7 @@ def test_load_config_defaults_without_json():
             cfg = config_paths.load_config()
             cfg = config_paths.load_config()
             assert "AUTO_COMMIT" not in cfg
-            assert cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] == []
+            assert cfg["EXPRESSION_REGISTER"] == []
             assert cfg["PYTHON_PATH"] is None
 
         finally:
@@ -36,7 +36,7 @@ def test_load_config_reads_json_overrides():
                 {
                     "python_path": "/tmp/venv/bin/python",
                     "cmd_mode": {
-                        "tab_fuzzy_expansions_register": [
+                        "expression_register": [
                             "df.vixl.foo()",
                             "df.bar()",
                         ]
@@ -52,7 +52,7 @@ def test_load_config_reads_json_overrides():
             config_paths.CONFIG_JSON = str(cfg_path)
             cfg = config_paths.load_config()
             assert "AUTO_COMMIT" not in cfg
-            assert cfg["TAB_FUZZY_EXPANSIONS_REGISTER"] == [
+            assert cfg["EXPRESSION_REGISTER"] == [
                 "df.vixl.foo()",
                 "df.bar()",
             ]

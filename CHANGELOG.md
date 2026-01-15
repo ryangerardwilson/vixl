@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- Renamed cmd-mode `tab_fuzzy_expansions_register` to `expression_register`; Tab completion is prefix-only against that register.
+- Added `:%fuzz/<query>` to fuzzy-load the best expression register entry (phrase-aware) into the command line without executing.
 - Added row expansion: `,xr` toggles expansion of the current row; `,xar` toggles expansion of all rows; `,xc` collapses all expansions. Expanded rows wrap on word boundaries (hard-break only for overlong words) to show full content without widening columns; collapsed default remains single-line.
 - Simplified editing: removed `cell_insert`/`cell_normal` modes and the `n`, `,e`, `,v`, `,c c` workflows. Pressing `i` now suspends curses, opens **vim** in the current terminal with the cell value, and commits on exit status 0 (non-zero cancels). External editing is synchronous—no background polling or Alacritty dependency.
 - Updated df-mode column workflows: `,ica`/`,icb` insert columns (prompt name+dtype), `,dc` delete column, `,rnc` rename column; column prompts share the bottom-strip UX.
