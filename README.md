@@ -153,7 +153,7 @@ Ensure `~/.local/bin` is on your PATH, and activate the venv before running
   - Explicit commit required for extension calls: return `(df, True)`, or set `commit_df = True` and assign `df = new_df`.
   - User-written commands commit only when they assign to `df` (e.g., `df["col"] = ...` or `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Config: `$XDG_CONFIG_HOME/vixl/config.json` (default: `~/.config/vixl/config.json`). Supported keys:
-  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions and `:%fz/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
+  - `cmd_mode.expression_register` (list of strings) for cmd-mode Tab prefix insertions plus `:%fz/<query>` and `:%fz#/<query>` fuzzy loads. Entries may include trailing `# comments` (match-only) or start with `%fz#/` to create comment-only tags.
   - `clipboard_interface_command` (list of strings) — argv to run when copying to the clipboard (reads from stdin). Examples:
     - Wayland: `["wl-copy"]`
     - X11: `["xclip", "-selection", "clipboard", "-in"]`
