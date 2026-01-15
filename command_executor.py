@@ -239,6 +239,7 @@ class CommandExecutor:
             env = os.environ.copy()
             env.pop("PYTHONPATH", None)
             env.pop("PYTHONHOME", None)
+
             env["VIXL_OUT_PARQUET"] = out_parquet
             env["VIXL_OUT_TEXT"] = out_text
             env["VIXL_CWD"] = tmpdir
