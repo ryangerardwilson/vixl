@@ -36,6 +36,10 @@ class GridPane:
         self.col_offset = 0
         self.highlight_mode = "cell"
 
+        # Visual mode rendering state (owned by controller; grid only renders)
+        self.visual_active = False
+        self.visual_rect = None  # (r0, r1, c0, c1)
+
         self.rendered_col_widths = {}
 
     def get_col_width(self, col_idx):
@@ -373,6 +377,11 @@ class GridPane:
 
                 base_attr = curses.color_pair(self.PAIR_CELL_TEXT)
                 attr = base_attr
+                in_visual = False
+                if self.visual_active and self.visual_rect:
+                    r0, r1, c0, c1 = self.visual_rect
+                    in_visual = r0 <= r <= r1 and c0 <= c <= c1
+
                 active_cell = (
                     (self.highlight_mode == "row" and r == self.curr_row)
                     or (self.highlight_mode == "column" and c == self.curr_col)
@@ -382,8 +391,11 @@ class GridPane:
                         and c == self.curr_col
                     )
                 )
+
                 if active_cell:
                     attr = base_attr | curses.A_REVERSE
+                elif in_visual:
+                    attr = base_attr | curses.A_STANDOUT
 
                 eff_cw_int = int(eff_cw)
                 for line_idx, line_text in enumerate(wrapped_lines):

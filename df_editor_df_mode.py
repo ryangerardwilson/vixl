@@ -14,6 +14,7 @@ class DfEditorDfMode:
         undo_mgr,
         external,
         df_ops,
+        visual,
         show_leader_status_cb,
         leader_seq_cb,
         open_json_preview_cb,
@@ -23,6 +24,7 @@ class DfEditorDfMode:
         self.undo_mgr = undo_mgr
         self.external = external
         self.df_ops = df_ops
+        self.visual = visual
         self._show_leader_status = show_leader_status_cb
         self._leader_seq = leader_seq_cb
         self._open_json_preview = open_json_preview_cb
@@ -78,12 +80,22 @@ class DfEditorDfMode:
         if self.ctx.df_leader_state:
             return self._handle_df_leader(ch, total_rows, total_cols, r, c, base)
 
+        # visual toggle (Vim-style)
+        if ch == ord("v"):
+            self.visual.toggle()
+            self.counts.reset()
+            return True
+
         # regular navigation commands
         if ch == ord("u"):
             self.undo_mgr.undo()
+            if getattr(self.visual, "exit", None):
+                self.visual.exit()
             return True
         if ch == ord("r"):
             self.undo_mgr.redo()
+            if getattr(self.visual, "exit", None):
+                self.visual.exit()
             return True
 
         if ch == 10:  # Ctrl+J
@@ -93,6 +105,7 @@ class DfEditorDfMode:
                 self.ctx.paginator.ensure_row_visible(target)
                 self.ctx.grid.row_offset = 0
                 self.ctx.grid.curr_row = target
+                self.visual.post_move()
             return True
 
         if ch == 11:  # Ctrl+K
@@ -102,6 +115,7 @@ class DfEditorDfMode:
                 self.ctx.paginator.ensure_row_visible(target)
                 self.ctx.grid.row_offset = 0
                 self.ctx.grid.curr_row = target
+                self.visual.post_move()
             return True
 
         if ch == 8:  # Ctrl+H
@@ -110,6 +124,7 @@ class DfEditorDfMode:
                 target = max(0, self.ctx.grid.curr_col - step)
                 self.ctx.grid.curr_col = target
                 self.ctx.grid.adjust_col_viewport()
+                self.visual.post_move()
             return True
 
         if ch == 12:  # Ctrl+L
@@ -118,6 +133,7 @@ class DfEditorDfMode:
                 target = min(total_cols - 1, self.ctx.grid.curr_col + step)
                 self.ctx.grid.curr_col = target
                 self.ctx.grid.adjust_col_viewport()
+                self.visual.post_move()
             return True
 
         # normal vim movement
@@ -126,24 +142,68 @@ class DfEditorDfMode:
             target = max(0, self.ctx.grid.curr_col - count)
             self.ctx.grid.curr_col = target
             self.ctx.grid.adjust_col_viewport()
+            self.visual.post_move()
             return True
         if ch == ord("l"):
             target = min(total_cols - 1, self.ctx.grid.curr_col + count)
             self.ctx.grid.curr_col = target
             self.ctx.grid.adjust_col_viewport()
+            self.visual.post_move()
             return True
         if ch == ord("j") and total_rows > 0:
             target = min(total_rows - 1, self.ctx.grid.curr_row + count)
             self.ctx.paginator.ensure_row_visible(target)
             self.ctx.grid.row_offset = 0
             self.ctx.grid.curr_row = target
+            self.visual.post_move()
             return True
         if ch == ord("k") and total_rows > 0:
             target = max(0, self.ctx.grid.curr_row - count)
             self.ctx.paginator.ensure_row_visible(target)
             self.ctx.grid.row_offset = 0
             self.ctx.grid.curr_row = target
+            self.visual.post_move()
             return True
+
+        # visual-mode actions
+        if getattr(self.ctx, "visual_active", False):
+            if ch == ord("d"):
+                rect = self.visual.rect()
+                if not rect:
+                    self.visual.exit()
+                    return True
+                r0, r1, c0, c1 = rect
+                if r1 < r0 or c1 < c0 or total_rows == 0 or total_cols == 0:
+                    self.visual.exit()
+                    return True
+                self.undo_mgr.push_undo()
+                try:
+                    for cc in range(c0, c1 + 1):
+                        col_name = self.ctx.state.df.columns[cc]
+                        empty = coerce_cell_value(self.ctx.state.df, col_name, "")
+                        for rr in range(r0, r1 + 1):
+                            self.ctx.state.df.iloc[rr, cc] = empty
+                    self.ctx.grid.df = self.ctx.state.df
+                    self.ctx._set_status(
+                        f"Cleared {(r1 - r0 + 1) * (c1 - c0 + 1)} cells", 2
+                    )
+                    self.undo_mgr.set_last_action("cell_clear")
+                except Exception:
+                    self.ctx._set_status("Clear failed", 3)
+                self.visual.exit()
+                self.counts.reset()
+                return True
+            if ch == ord("i"):
+                rect = self.visual.rect()
+                if not rect:
+                    self.visual.exit()
+                    return True
+                self.external.queue_visual_fill(rect)
+                return True
+            if ch == 27:  # Esc exits visual
+                self.visual.exit()
+                self.counts.reset()
+                return True
 
         if ch == ord("x"):
             if total_rows == 0 or total_cols == 0:
@@ -309,6 +369,7 @@ class DfEditorDfMode:
             self.ctx.grid.row_offset = 0
             self.ctx.grid.curr_row = target
             self.ctx.grid.highlight_mode = "cell"
+            self.visual.post_move()
             self.counts.reset()
             return True
         if ch == ord("k"):
@@ -319,6 +380,7 @@ class DfEditorDfMode:
             self.ctx.grid.row_offset = 0
             self.ctx.grid.curr_row = 0
             self.ctx.grid.highlight_mode = "cell"
+            self.visual.post_move()
             self.counts.reset()
             return True
         if ch == ord("h"):
@@ -327,6 +389,7 @@ class DfEditorDfMode:
                 return True
             self.ctx.grid.curr_col = 0
             self.ctx.grid.adjust_col_viewport()
+            self.visual.post_move()
             self.counts.reset()
             return True
         if ch == ord("l"):
@@ -335,6 +398,7 @@ class DfEditorDfMode:
                 return True
             self.ctx.grid.curr_col = total_cols - 1
             self.ctx.grid.adjust_col_viewport()
+            self.visual.post_move()
             self.counts.reset()
             return True
         if ch == ord("x"):

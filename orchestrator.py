@@ -316,7 +316,7 @@ class Orchestrator:
                         text = f" {self.status_msg}"
                     else:
                         if self.focus == 0:
-                            mode = "DF"
+                            mode = "VISUAL" if getattr(self.grid, "visual_active", False) else "DF"
                         elif self.focus == 1:
                             mode = "CMD"
                         else:
@@ -529,6 +529,16 @@ class Orchestrator:
 
             if self.focus == 0:
                 if ch == ord(":"):
+                    # exit visual mode if active
+                    if getattr(self, "df_editor", None) is not None and hasattr(
+                        self.df_editor.ctx, "visual_active"
+                    ):
+                        self.df_editor.ctx.visual_active = False
+                        self.df_editor.ctx.visual_anchor = None
+                        if hasattr(self.grid, "visual_active"):
+                            self.grid.visual_active = False
+                        if hasattr(self.grid, "visual_rect"):
+                            self.grid.visual_rect = None
                     self.command.activate()
                     self.focus = 1
                 elif ch == ord("?"):

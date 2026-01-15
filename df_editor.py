@@ -48,6 +48,10 @@ class DfEditor:
                 set_last_action_cb=self._set_last_action,
             ),
         )
+        from df_editor_visual import DfEditorVisual
+
+        object.__setattr__(self, "visual", DfEditorVisual(self.ctx, self.grid))
+
         object.__setattr__(
             self,
             "df_mode",
@@ -57,6 +61,7 @@ class DfEditor:
                 undo_mgr=self.undo_mgr,
                 external=self.external,
                 df_ops=self.df_ops,
+                visual=self.visual,
                 show_leader_status_cb=self._show_leader_status,
                 leader_seq_cb=self._leader_seq,
                 open_json_preview_cb=self._open_cell_json_preview,

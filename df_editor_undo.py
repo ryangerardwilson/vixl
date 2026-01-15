@@ -37,6 +37,15 @@ class DfEditorUndo:
         self.ctx.cell_cursor = 0
         self.ctx.cell_hscroll = 0
         self.ctx.pending_count = None
+        # clear transient visual mode state
+        if hasattr(self.ctx, "visual_active"):
+            self.ctx.visual_active = False
+        if hasattr(self.ctx, "visual_anchor"):
+            self.ctx.visual_anchor = None
+        if hasattr(self.ctx.grid, "visual_active"):
+            self.ctx.grid.visual_active = False
+        if hasattr(self.ctx.grid, "visual_rect"):
+            self.ctx.grid.visual_rect = None
 
     # ---------- stack helpers ----------
     def push_undo(self):

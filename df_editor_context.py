@@ -23,6 +23,11 @@ class DfEditorContext:
     # External editor state
     pending_external_edit: bool = False
     pending_edit_snapshot: Optional[dict] = None
+    pending_external_kind: Optional[str] = None  # "cell" or "visual_fill"
+
+    # Visual mode state
+    visual_active: bool = False
+    visual_anchor: Optional[tuple[int, int]] = None
 
     # Callback to run interactive commands (e.g., external editor) in current terminal
     run_interactive: Optional[Callable[[list], int]] = None
@@ -41,6 +46,9 @@ CTX_ATTRS: Set[str] = {
     "last_action",
     "pending_external_edit",
     "pending_edit_snapshot",
+    "pending_external_kind",
+    "visual_active",
+    "visual_anchor",
     "run_interactive",
     "config",
 }

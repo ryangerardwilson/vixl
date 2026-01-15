@@ -42,7 +42,33 @@ class DfEditorExternal:
             "idx_label": idx_label,
         }
         self.ctx.pending_external_edit = True
+        self.ctx.pending_external_kind = "cell"
         self.ctx._set_status(f"Editing '{col}' at index {idx_label}", 600)
+        self.counts.reset()
+
+    def queue_visual_fill(self, rect):
+        if self.ctx.pending_external_edit:
+            self.ctx._set_status("Already editing externally", 3)
+            self.counts.reset()
+            return
+        if len(self.ctx.state.df.columns) == 0 or len(self.ctx.state.df) == 0:
+            self.ctx._set_status("No cells to fill", 3)
+            self.counts.reset()
+            return
+        if not rect:
+            self.ctx._set_status("No selection", 3)
+            self.counts.reset()
+            return
+        r0, r1, c0, c1 = rect
+        rows = max(0, r1 - r0 + 1)
+        cols = max(0, c1 - c0 + 1)
+        self.ctx.pending_edit_snapshot = {
+            "kind": "visual_fill",
+            "rect": (r0, r1, c0, c1),
+        }
+        self.ctx.pending_external_edit = True
+        self.ctx.pending_external_kind = "visual_fill"
+        self.ctx._set_status(f"Fill {rows}x{cols} cells (editor)", 600)
         self.counts.reset()
 
     def run_pending_external_edit(self):
@@ -50,13 +76,98 @@ class DfEditorExternal:
             return
 
         snap = self.ctx.pending_edit_snapshot or {}
+        kind = snap.get("kind") or getattr(self.ctx, "pending_external_kind", "cell")
+
+        # Reset pending flags early to avoid reentrancy
+        self.ctx.pending_external_edit = False
+        self.ctx.pending_external_kind = None
+        self.ctx.pending_edit_snapshot = None
+
+        if kind == "visual_fill":
+            rect = snap.get("rect")
+            if not rect:
+                self.ctx._set_status("No selection", 3)
+                return
+            r0, r1, c0, c1 = rect
+            tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8")
+            tmp_path = tmp.name
+            base = ""
+            try:
+                tmp.write(base)
+                tmp.flush()
+            finally:
+                tmp.close()
+
+            argv = self._build_editor_argv(tmp_path, read_only=False)
+            rc = self._run_editor(argv)
+
+            try:
+                with open(tmp_path, "r", encoding="utf-8") as fh:
+                    new_text = fh.read()
+            except Exception:
+                new_text = base
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+            if rc not in (0, None):
+                self.ctx._set_status("Fill canceled", 3)
+                return
+
+            new_text = (new_text or "").rstrip("\n")
+            if new_text == base:
+                self.ctx._set_status("No changes", 2)
+                self.counts.reset()
+                return
+
+            # Validate coercion per column first
+            coerced_per_col = {}
+            try:
+                for cc in range(c0, c1 + 1):
+                    col_name = self.ctx.state.df.columns[cc]
+                    coerced_per_col[cc] = coerce_cell_value(
+                        self.ctx.state.df, col_name, new_text
+                    )
+            except Exception as exc:
+                self.ctx._set_status(f"Fill failed: {exc}", 3)
+                return
+
+            try:
+                self._push_undo()
+                for cc in range(c0, c1 + 1):
+                    coerced = coerced_per_col[cc]
+                    for rr in range(r0, r1 + 1):
+                        self.ctx.state.df.iloc[rr, cc] = coerced
+                self.ctx.grid.df = self.ctx.state.df
+                self.ctx.paginator.update_total_rows(len(self.ctx.state.df))
+                self.ctx.paginator.ensure_row_visible(r0)
+                self._set_last_action("visual_fill", value=new_text)
+                self.ctx.pending_count = None
+                self.ctx._set_status(
+                    f"Filled {(r1 - r0 + 1) * (c1 - c0 + 1)} cells", 2
+                )
+            except Exception as exc:
+                self.ctx._set_status(f"Fill failed: {exc}", 3)
+            finally:
+                # exit visual mode if present
+                if hasattr(self.ctx, "visual_active"):
+                    self.ctx.visual_active = False
+                if hasattr(self.ctx, "visual_anchor"):
+                    self.ctx.visual_anchor = None
+                if hasattr(self.ctx.grid, "visual_active"):
+                    self.ctx.grid.visual_active = False
+                if hasattr(self.ctx.grid, "visual_rect"):
+                    self.ctx.grid.visual_rect = None
+                self.counts.reset()
+            return
+
+        # -------- cell edit flow (existing) --------
         r = snap.get("row", self.ctx.grid.curr_row)
         c = snap.get("col", self.ctx.grid.curr_col)
         cols = self.ctx.state.df.columns
         col_name = snap.get("col_name") or (cols[c] if len(cols) else "")
-
-        self.ctx.pending_external_edit = False
-        self.ctx.pending_edit_snapshot = None
 
         tmp_path, base = self._prepare_temp_file(r, c)
         if tmp_path is None:
