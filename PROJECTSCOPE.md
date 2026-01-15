@@ -149,7 +149,7 @@ Characteristics:
 - Layout: table + shared bottom strip (status/command/prompt); overlays for output/shortcuts (content-sized, ≤50% terminal height).
 - Execution: sandboxed `df`; router chooses local or remote interpreter automatically (see Section 6). Commits occur only when an extension explicitly commits or when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
-- History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N).
+- History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N). Successful command executions and successful `:%fz/...` / `:%fz#/...` loads are recorded so they can be recalled.
 - Extensions: defined in `~/.config/vixl/extensions.py`; config at `~/.config/vixl/config.json`.
 
 ### Features

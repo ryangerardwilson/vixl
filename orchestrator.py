@@ -391,6 +391,9 @@ class Orchestrator:
                 return
             self.command.set_buffer(expr)
             self.focus = 1
+            self.history_mgr.append(code)
+            self.command.set_history(self.history_mgr.items)
+            self.history_mgr.persist(code)
             self._set_status(f"Loaded: {expr}", 3)
             return
 
@@ -417,6 +420,9 @@ class Orchestrator:
                 return
             self.command.set_buffer(expr)
             self.focus = 1
+            self.history_mgr.append(code)
+            self.command.set_history(self.history_mgr.items)
+            self.history_mgr.persist(code)
             self._set_status(f"Loaded: {expr}", 3)
             return
 
