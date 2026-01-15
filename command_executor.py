@@ -239,6 +239,10 @@ class CommandExecutor:
             env = os.environ.copy()
             env.pop("PYTHONPATH", None)
             env.pop("PYTHONHOME", None)
+            env.pop("LD_LIBRARY_PATH", None)
+            env.pop("LD_PRELOAD", None)
+            env.pop("DYLD_LIBRARY_PATH", None)
+            env.pop("DYLD_FALLBACK_LIBRARY_PATH", None)
 
             env["VIXL_OUT_PARQUET"] = out_parquet
             env["VIXL_OUT_TEXT"] = out_text
