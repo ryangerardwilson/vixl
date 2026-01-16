@@ -236,6 +236,24 @@ class DfEditorDfMode:
 
         return False
 
+    def _copy_selection_to_clipboard(self, cmd, rect):
+        if not rect or cmd is None:
+            return False
+        r0, r1, c0, c1 = rect
+        try:
+            import subprocess
+
+            sel_df = self.ctx.state.df.iloc[r0 : r1 + 1, c0 : c1 + 1]
+            tsv_data = sel_df.to_csv(sep="\t", index=False)
+            subprocess.run(cmd, input=tsv_data, text=True, check=True)
+            self.ctx._set_status("Selection copied", 3)
+            return True
+        except FileNotFoundError:
+            self.ctx._set_status("Clipboard command not found", 3)
+        except Exception:
+            self.ctx._set_status("Copy failed", 3)
+        return False
+
     def _handle_df_leader(self, ch, total_rows, total_cols, r, c, base):
         state = self.ctx.df_leader_state
         self.ctx.df_leader_state = None
@@ -449,6 +467,14 @@ class DfEditorDfMode:
                 self.ctx._set_status("Clipboard not configured", 3)
                 self.counts.reset()
                 return True
+
+            # Visual selection copy
+            if getattr(self.ctx, "visual_active", False) and self.visual:
+                rect = self.visual.rect()
+                if rect and self._copy_selection_to_clipboard(cmd, rect):
+                    self.counts.reset()
+                    return True
+
             try:
                 import subprocess
 

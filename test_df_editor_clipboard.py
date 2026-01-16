@@ -63,3 +63,43 @@ def test_y_copies_df_and_yc_copies_cell():
         assert cell_call.args[0] == ["fake-clip"]
         assert cell_call.kwargs.get("text") is True
         assert cell_call.kwargs.get("input") == "1"
+
+
+def test_visual_yc_copies_selection():
+    df = pd.DataFrame(
+        {
+            "a": [1, 2, 3],
+            "b": [10, 20, 30],
+            "c": [100, 200, 300],
+        }
+    )
+    state = SimpleNamespace(
+        df=df,
+        expand_all_rows=False,
+        expanded_rows=set(),
+    )
+    grid = DummyGrid()
+    grid.df = df  # type: ignore[attr-defined]
+    paginator = DummyPaginator()
+    editor = DfEditor(
+        state, grid, paginator, lambda *args, **kwargs: None, column_prompt=None
+    )
+    editor.ctx.config = {"CLIPBOARD_INTERFACE_COMMAND": ["fake-clip"]}
+
+    with patch("subprocess.run") as run:
+        # Enter visual mode and select rows 0-1, cols 0-1
+        editor.handle_key(ord("v"))
+        editor.handle_key(ord("l"))
+        editor.handle_key(ord("j"))
+
+        editor.handle_key(ord(","))
+        editor.handle_key(ord("y"))
+        editor.handle_key(ord("c"))
+
+        assert run.call_count == 1
+        selection = df.iloc[0:2, 0:2]
+        expected = selection.to_csv(sep="\t", index=False)
+        call = run.call_args_list[0]
+        assert call.args[0] == ["fake-clip"]
+        assert call.kwargs.get("text") is True
+        assert call.kwargs.get("input") == expected
