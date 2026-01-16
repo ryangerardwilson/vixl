@@ -58,6 +58,72 @@ class GridPane:
     def get_rendered_col_width(self, col_idx):
         return self.rendered_col_widths.get(col_idx, self.get_col_width(col_idx))
 
+    @staticmethod
+    def _wrap_cell_line_count(text: str, width: int) -> int:
+        if width <= 0:
+            return 1
+        parts = text.split("\n") if text else [""]
+        lines = 0
+        for part in parts:
+            if part == "":
+                lines += 1
+            else:
+                words = part.split(" ")
+                current = ""
+                for word in words:
+                    if current == "":
+                        if len(word) <= width:
+                            current = word
+                        else:
+                            lines += max(1, (len(word) + width - 1) // width)
+                    else:
+                        if len(current) + 1 + len(word) <= width:
+                            current = f"{current} {word}"
+                        else:
+                            lines += 1
+                            if len(word) <= width:
+                                current = word
+                            else:
+                                lines += max(1, (len(word) + width - 1) // width)
+                                current = ""
+                if current or current == "":
+                    lines += 1
+        return max(1, lines)
+
+    def _compute_row_heights(
+        self,
+        page_rows,
+        cols_for_height,
+        widths,
+        rendered_widths,
+        row_lines,
+        expanded_rows,
+        expand_all_rows,
+    ):
+        expanded_rows = expanded_rows or set()
+        total_cols = len(widths)
+        heights: list[int] = []
+        for abs_r in page_rows:
+            base_height = max(1, row_lines)
+            is_expanded = expand_all_rows or (abs_r in expanded_rows)
+            if not is_expanded:
+                heights.append(base_height)
+                continue
+
+            max_lines = base_height
+            for c in cols_for_height:
+                if c < 0 or c >= total_cols:
+                    continue
+                eff_cw = max(1, rendered_widths.get(c, widths[c]))
+                try:
+                    val = self.df.iloc[abs_r, c]
+                except Exception:
+                    val = None
+                text = "" if (val is None or pd.isna(val)) else str(val)
+                max_lines = max(max_lines, self._wrap_cell_line_count(text, eff_cw))
+            heights.append(max_lines)
+        return heights
+
     def adjust_col_viewport(self, win=None):
         """Force column viewport adjustment so curr_col is visible.
         Call this after big cursor jumps (especially to last/first column)."""
@@ -193,8 +259,14 @@ class GridPane:
         visible_cols = range(
             self.col_offset, min(len(df_slice.columns), self.col_offset + max_cols)
         )
+        visible_cols = tuple(visible_cols)
 
         self.rendered_col_widths = {c: widths[c] for c in visible_cols}
+
+        total_cols = len(df_slice.columns)
+        cols_for_height = (
+            tuple(range(total_cols)) if expand_all_rows else visible_cols
+        )
 
         def _wrap_cell(text: str, width: int, max_lines: int):
             if width <= 0:
@@ -250,7 +322,7 @@ class GridPane:
                 lines.append("")
             return lines
 
-        def _wrap_cell_line_count(text: str, width: int) -> int:
+        def _wrap_line_count(text: str, width: int) -> int:
             if width <= 0:
                 return 1
             parts = text.split("\n") if text else [""]
@@ -281,6 +353,7 @@ class GridPane:
                         lines += 1
             return max(1, lines)
 
+
         # header
         x = row_w + 1
         for c in visible_cols:
@@ -303,11 +376,13 @@ class GridPane:
                 continue
 
             max_lines = base_height
-            for c in visible_cols:
-                eff_cw = self.rendered_col_widths.get(c, widths[c])
+            for c in cols_for_height:
+                if c < 0 or c >= total_cols:
+                    continue
+                eff_cw = widths[c]
                 val = self.df.iloc[abs_r, c]
                 text = "" if (val is None or pd.isna(val)) else str(val)
-                max_lines = max(max_lines, _wrap_cell_line_count(text, eff_cw))
+                max_lines = max(max_lines, self._wrap_cell_line_count(text, eff_cw))
             row_heights.append(max_lines)
 
         base_y = 2
@@ -354,6 +429,7 @@ class GridPane:
             self.row_offset = offset
 
         # rows
+        visible_cols = tuple(visible_cols)
         y_cursor = base_y
         for r in visible_rows:
             idx_in_page = r - page_start
