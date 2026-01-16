@@ -71,12 +71,19 @@ class DfEditorExternal:
         self.ctx._set_status(f"Fill {rows}x{cols} cells (editor)", 600)
         self.counts.reset()
 
+    def _trim_editor_text(self, text) -> str:
+        if text is None:
+            return ""
+        normalized = str(text).replace("\r\n", "\n").replace("\r", "\n")
+        return normalized.strip()
+
     def run_pending_external_edit(self):
         if not self.ctx.pending_external_edit:
             return
 
         snap = self.ctx.pending_edit_snapshot or {}
         kind = snap.get("kind") or getattr(self.ctx, "pending_external_kind", "cell")
+
 
         # Reset pending flags early to avoid reentrancy
         self.ctx.pending_external_edit = False
@@ -116,7 +123,7 @@ class DfEditorExternal:
                 self.ctx._set_status("Fill canceled", 3)
                 return
 
-            new_text = (new_text or "").rstrip("\n")
+            new_text = self._trim_editor_text(new_text)
             if new_text == base:
                 self.ctx._set_status("No changes", 2)
                 self.counts.reset()
@@ -200,7 +207,7 @@ class DfEditorExternal:
             self.ctx._set_status("Edit canceled", 3)
             return
 
-        new_text = (new_text or "").rstrip("\n")
+        new_text = self._trim_editor_text(new_text)
         if new_text == base:
             self.ctx._set_status("No changes", 2)
             self.counts.reset()

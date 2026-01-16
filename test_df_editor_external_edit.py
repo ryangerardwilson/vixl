@@ -68,14 +68,14 @@ def _tempfile_with_contents(text: str) -> str:
     return tmp.name
 
 
-def test_external_edit_updates_string_cell():
-    df = pd.DataFrame({"a": ["old"]})
+def test_external_edit_updates_cell_with_coercion():
+    df = pd.DataFrame({"a": pd.Series([1], dtype="Int64")})
     editor, grid, _ = _make_editor(df)
 
-    tmp_path = _tempfile_with_contents("new value")
+    tmp_path = _tempfile_with_contents("42")
 
     def fake_prepare(_r, _c):
-        return tmp_path, "old"
+        return tmp_path, "1"
 
     editor.external._prepare_temp_file = fake_prepare
 
@@ -89,4 +89,28 @@ def test_external_edit_updates_string_cell():
 
     assert editor.state.df.iloc[0, 0] == 42
     assert grid.df.iloc[0, 0] == 42
+    assert str(editor.state.df["a"].dtype) == "Int64"
+
+
+def test_external_edit_trims_whitespace_and_blank_lines():
+    df = pd.DataFrame({"a": pd.Series([1], dtype="Int64")})
+    editor, grid, _ = _make_editor(df)
+
+    tmp_path = _tempfile_with_contents(" \n  5 \t\n\n")
+
+    def fake_prepare(_r, _c):
+        return tmp_path, "1"
+
+    editor.external._prepare_temp_file = fake_prepare
+
+    editor.queue_external_edit()
+    editor.run_pending_external_edit()
+
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
+
+    assert editor.state.df.iloc[0, 0] == 5
+    assert grid.df.iloc[0, 0] == 5
     assert str(editor.state.df["a"].dtype) == "Int64"
