@@ -89,20 +89,19 @@ Commands are entered via the command bar (`:`) and executed in a sandbox with
 `df` (current DataFrame), `pd`, and `np` preloaded.
 
 - `%fz/<query>` – fuzzy-load the best expression from the expression register
-  (or matching registered command); loads the selection into the command buffer
-- `%fz#/<query>` – fuzzy-search comments/descriptions in the expression and
-  command registers
-- `!name [args...]` – invoke a registered external command; Vixl writes the
-  current DataFrame to disk and passes the temp path as the final argv
+  and insert it into the command buffer
+- `%fz#/<query>` – fuzzy-search comments/descriptions in the expression register
 - `df.vixl.some_extension(...)` – call a user-defined extension; returning
   `(df, True)` or mutating `df` commits the change
 - Assigning to `df` or returning `(df, True)` from arbitrary expressions commits
   the DataFrame; read-only commands leave it unchanged
 
 #### Debugging tips
-- "Unknown command" → name not present in `cmd_mode.command_register` or config JSON is invalid.
-- "Mutating command produced no parquet" → your command never wrote to `VIXL_OUT_PARQUET`.
-- Command prints nothing? Write to `VIXL_OUT_TEXT` or stdout so Vixl can show it.
+- `%fz` only searches expressions defined in the expression register; add
+  frequently used snippets there via `~/.config/vixl/config.json`.
+- No external command register exists—keep data transformations inside the
+  in-process Python sandbox.
+- Command prints nothing? Write to stdout so Vixl can show it.
 - SQL/text args with spaces: quote them (`"select * from users"`).
 
 - Example `~/.config/vixl/extensions.py`:

@@ -19,7 +19,8 @@ def test_load_config_defaults_without_json():
             cfg = config_paths.load_config()
             assert "AUTO_COMMIT" not in cfg
             assert cfg["EXPRESSION_REGISTER"] == []
-            assert cfg["COMMAND_REGISTER"] == {}
+            assert cfg["IGNORED_COMMAND_ENTRIES"] == []
+            assert "COMMAND_REGISTER" not in cfg
 
         finally:
             config_paths.CONFIG_DIR = orig_dir
@@ -63,8 +64,8 @@ def test_load_config_reads_json_overrides():
                 "df.vixl.foo()",
                 "df.bar()",
             ]
-            assert "foo" in cfg["COMMAND_REGISTER"]
-            assert cfg["COMMAND_REGISTER"]["foo"]["kind"] == "mutate"
+            assert cfg["IGNORED_COMMAND_ENTRIES"] == ["foo"]
+            assert "COMMAND_REGISTER" not in cfg
         finally:
             config_paths.CONFIG_DIR = orig_dir
             config_paths.CONFIG_JSON = orig_json

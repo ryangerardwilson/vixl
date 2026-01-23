@@ -4,8 +4,6 @@ import io
 import os
 import sys
 import types
-import tempfile
-import subprocess
 
 import numpy as np
 import pandas as pd
@@ -86,6 +84,14 @@ class CommandExecutor:
         ensure_config_dirs()
         self.config = load_config()
 
+        ignored_cmds = self.config.get("IGNORED_COMMAND_ENTRIES") or []
+        if ignored_cmds:
+            names = ", ".join(ignored_cmds)
+            plural = "ies" if len(ignored_cmds) != 1 else "y"
+            self.startup_warnings.append(
+                f"Ignored command register entr{plural}: {names}"
+            )
+
         self._warn_deprecated_extensions_dir()
         self._extensions = self._load_extensions()
         self._extension_names = sorted(self._extensions.keys())
@@ -160,148 +166,11 @@ class CommandExecutor:
     def get_extension_names(self):
         return list(self._extension_names)
 
-    def get_command_names(self):
-        return sorted(self.config.get("COMMAND_REGISTER", {}).keys())
-
     def _bind_extensions(self, df, ext_flag=None):
         try:
             setattr(df, "vixl", VixlExtensions(df, self._extensions, ext_flag))
         except Exception:
             pass
-
-    # ---------- external commands ----------
-    def _write_input_files(self, tmpdir):
-        in_csv = os.path.join(tmpdir, "in.csv")
-        in_parquet = os.path.join(tmpdir, "in.parquet")
-        try:
-            self.state.df.to_csv(in_csv, index=False)
-        except Exception:
-            in_csv = None
-        wrote_parquet = False
-        try:
-            self.state.df.to_parquet(in_parquet, index=False)
-            wrote_parquet = True
-        except Exception:
-            in_parquet = None
-        input_path = in_parquet if wrote_parquet else in_csv
-        return input_path, in_csv, in_parquet
-
-    def execute_registered_command(self, name, args):
-        registry = self.config.get("COMMAND_REGISTER", {}) or {}
-        spec = registry.get(name)
-        if not spec:
-            return [f"Unknown command: {name}"], None, False, None
-
-        kind = spec.get("kind", "print")
-        if kind not in {"print", "mutate"}:
-            kind = "print"
-        argv_tmpl = spec.get("argv") or []
-        if not (
-            isinstance(argv_tmpl, list) and all(isinstance(x, str) for x in argv_tmpl)
-        ):
-            return [f"Invalid argv for command: {name}"], None, False, kind
-        timeout = spec.get("timeout_seconds") or 30
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_parquet = os.path.join(tmpdir, "out.parquet")
-            out_text = os.path.join(tmpdir, "out.txt")
-            input_path, in_csv, in_parquet = self._write_input_files(tmpdir)
-            if not input_path:
-                return ["Failed to materialize input df"], None, False, kind
-
-            def _subst(tok):
-                if tok == "{out_parquet}":
-                    return out_parquet
-                if tok == "{out_text}":
-                    return out_text
-                if tok == "{cwd}":
-                    return tmpdir
-                if tok.startswith("{arg") and tok.endswith("}"):
-                    try:
-                        idx = int(tok[4:-1])
-                        return args[idx]
-                    except Exception:
-                        return ""
-                if tok == "{args}":
-                    return None  # marker to splice all args
-                return tok
-
-            argv = []
-            for tok in argv_tmpl:
-                if tok == "{args}":
-                    argv.extend(args)
-                    continue
-                val = _subst(tok)
-                if val is None:
-                    argv.extend(args)
-                else:
-                    argv.append(val)
-
-            # always append input_path as final arg
-            argv.append(input_path)
-
-            env = os.environ.copy()
-            env.pop("PYTHONPATH", None)
-            env.pop("PYTHONHOME", None)
-            env.pop("LD_LIBRARY_PATH", None)
-            env.pop("LD_PRELOAD", None)
-            env.pop("DYLD_LIBRARY_PATH", None)
-            env.pop("DYLD_FALLBACK_LIBRARY_PATH", None)
-
-            env["VIXL_OUT_PARQUET"] = out_parquet
-            env["VIXL_OUT_TEXT"] = out_text
-            env["VIXL_CWD"] = tmpdir
-            env["VIXL_IN"] = input_path
-            if in_csv:
-                env["VIXL_IN_CSV"] = in_csv
-            if in_parquet:
-                env["VIXL_IN_PARQUET"] = in_parquet
-
-            proc = subprocess.run(
-                argv,
-                text=True,
-                capture_output=True,
-                timeout=timeout,
-                cwd=tmpdir,
-                env=env,
-            )
-
-            lines = []
-            committed_df = None
-
-            if proc.returncode != 0:
-                if proc.stdout:
-                    lines.extend(proc.stdout.splitlines())
-                if proc.stderr:
-                    lines.extend(proc.stderr.splitlines())
-                return lines or ["Command failed"], None, False, kind
-
-            if kind == "mutate":
-                if os.path.exists(out_parquet):
-                    try:
-                        committed_df = pd.read_parquet(out_parquet)
-                    except Exception as e:
-                        lines.append(f"Failed to load parquet: {e}")
-                        return lines, None, False, kind
-                else:
-                    return ["Mutating command produced no parquet"], None, False, kind
-
-            # collect text output for both kinds
-            if os.path.exists(out_text):
-                try:
-                    with open(out_text, "r", encoding="utf-8") as f:
-                        lines.extend(f.read().splitlines())
-                except Exception:
-                    pass
-            if proc.stdout and not lines:
-                lines.extend(proc.stdout.splitlines())
-            if proc.stderr and not lines:
-                lines.extend(proc.stderr.splitlines())
-
-            if kind == "mutate" and committed_df is not None:
-                lines = []  # suppress successful mutate output
-
-            return lines, committed_df, True, kind
 
     # ---------- execution (local only) ----------
     def _execute_local(self, code, parsed):

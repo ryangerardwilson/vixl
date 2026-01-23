@@ -5,7 +5,6 @@ import os
 import subprocess
 import re
 import difflib
-import shlex
 
 from grid_pane import GridPane
 from command_pane import CommandPane
@@ -155,46 +154,6 @@ def fuzzy_best_match(query, entries):
     return valid_pairs[idx][0]
 
 
-def _build_command_entries(cmd_registry):
-    entries = []
-    for name, spec in (cmd_registry or {}).items():
-        if not isinstance(name, str):
-            continue
-        if not isinstance(spec, dict):
-            continue
-        desc = (
-            spec.get("description", "")
-            if isinstance(spec.get("description"), str)
-            else ""
-        )
-        match_text = f"{name} {desc}".strip()
-        entries.append(
-            {
-                "kind": "command",
-                "name": name,
-                "description": desc,
-                "match_text": match_text,
-            }
-        )
-    return entries
-
-
-def _fuzzy_best_command_match(query, entries):
-    valid_pairs = []
-    for e in entries or []:
-        mt = e.get("match_text", "")
-        if isinstance(mt, str) and mt.strip():
-            valid_pairs.append((e, mt))
-    if not valid_pairs:
-        return None, None
-    idx = _fuzzy_best_text_match(query, [text for _, text in valid_pairs])
-    if idx is None:
-        return None, None
-    # approximate score by reusing the ratio used inside _fuzzy_best_text_match
-    # (not exposed), so we just return a dummy score of 1.0 for the chosen idx.
-    return valid_pairs[idx][0], 1.0
-
-
 class Orchestrator:
     def __init__(self, stdscr, app_state):
         self.stdscr = stdscr
@@ -222,8 +181,6 @@ class Orchestrator:
             self.command.set_expression_register(
                 self.exec.config.get("EXPRESSION_REGISTER", [])
             )
-        if hasattr(self.command, "set_command_names"):
-            self.command.set_command_names(self.exec.get_command_names())
 
         self.focus = 0  # 0=df, 1=cmd, 2=overlay
 
@@ -402,13 +359,10 @@ class Orchestrator:
             query = code[len("%fz#/") :].strip()
             raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
             entries = parse_expression_register(raw_register)
-            command_entries = _build_command_entries(
-                self.exec.config.get("COMMAND_REGISTER", {})
-            )
             if not query:
                 self._set_status("Query required", 3)
                 return
-            if not entries and not command_entries:
+            if not entries:
                 self._set_status("No fuzzy sources", 3)
                 return
             # comments/descriptions only
@@ -419,11 +373,6 @@ class Orchestrator:
                 if comment:
                     comment_texts.append(comment)
                     comment_objs.append(entry)
-            for cmd in command_entries:
-                desc = cmd.get("description", "").strip()
-                if desc:
-                    comment_texts.append(desc)
-                    comment_objs.append(cmd)
             if not comment_texts:
                 self._set_status("No commented entries", 3)
                 return
@@ -432,18 +381,6 @@ class Orchestrator:
                 self._set_status(f"No comment match for: {query}", 3)
                 return
             best_entry = comment_objs[idx]
-            if isinstance(best_entry, dict) and best_entry.get("kind") == "command":
-                name = best_entry.get("name", "").strip()
-                if not name:
-                    self._set_status("No command to load", 3)
-                    return
-                self.command.set_buffer(f"!{name} ")
-                self.focus = 1
-                self.history_mgr.append(code)
-                self.command.set_history(self.history_mgr.items)
-                self.history_mgr.persist(code)
-                self._set_status(f"Loaded command: !{name}", 3)
-                return
             # expression path
             if getattr(best_entry, "kind", "expression") == "comment_only":
                 self._set_status("Matched comment-only entry", 3)
@@ -464,52 +401,16 @@ class Orchestrator:
             query = code[len("%fz/") :].strip()
             raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
             entries = parse_expression_register(raw_register)
-            command_entries = _build_command_entries(
-                self.exec.config.get("COMMAND_REGISTER", {})
-            )
             if not query:
                 self._set_status("Query required", 3)
                 return
-            if not entries and not command_entries:
+            if not entries:
                 self._set_status("No fuzzy sources", 3)
                 return
             # Build candidates
-            expr_best = fuzzy_best_match(query, entries) if entries else None
-            cmd_best, cmd_score = (
-                _fuzzy_best_command_match(query, command_entries)
-                if command_entries
-                else (None, None)
-            )
-
-            # choose with tie-breaker: prefer commands on tie
-            chosen_kind = None
-            chosen = None
-            if cmd_best and expr_best:
-                # no explicit score for expressions; prefer command on tie/ambiguity
-                chosen_kind = "command"
-                chosen = cmd_best
-            elif cmd_best:
-                chosen_kind = "command"
-                chosen = cmd_best
-            elif expr_best:
-                chosen_kind = "expression"
-                chosen = expr_best
-
+            chosen = fuzzy_best_match(query, entries) if entries else None
             if not chosen:
                 self._set_status(f"No match for: {query}", 3)
-                return
-
-            if chosen_kind == "command":
-                name = chosen.get("name", "").strip()
-                if not name:
-                    self._set_status("No command to load", 3)
-                    return
-                self.command.set_buffer(f"!{name} ")
-                self.focus = 1
-                self.history_mgr.append(code)
-                self.command.set_history(self.history_mgr.items)
-                self.history_mgr.persist(code)
-                self._set_status(f"Loaded command: !{name}", 3)
                 return
 
             # expression path
@@ -526,52 +427,6 @@ class Orchestrator:
             self.command.set_history(self.history_mgr.items)
             self.history_mgr.persist(code)
             self._set_status(f"Loaded: {expr}", 3)
-            return
-
-        # external commands starting with '!'
-        if code.startswith("!"):
-            parts = []
-            try:
-                parts = shlex.split(code[1:])
-            except Exception as e:
-                self._set_status(f"Parse error: {e}", 3)
-                return
-            if not parts:
-                self._set_status("Command name required", 3)
-                return
-            name, args = parts[0], parts[1:]
-            lines, committed_df, success, kind = self.exec.execute_registered_command(
-                name, args
-            )
-            if committed_df is not None and success:
-                self.state.df = committed_df
-                self.exec._bind_extensions(self.state.df)
-                if hasattr(self.state, "ensure_non_empty"):
-                    self.state.ensure_non_empty()
-            if lines:
-                self.overlay.open(lines)
-                self.focus = 2
-            else:
-                self.overlay.close()
-                self.focus = 0
-            if success:
-                self.history_mgr.append(code)
-                self.command.set_history(self.history_mgr.items)
-                self.history_mgr.persist(code)
-                self._set_status("Command executed", 3)
-            else:
-                self._set_status("Command failed", 3)
-
-            # sync grid with latest df and clamp cursor within bounds
-            self.grid.df = self.state.df
-            self.paginator.update_total_rows(len(self.state.df))
-            self.grid.curr_row = min(self.grid.curr_row, max(0, len(self.grid.df) - 1))
-            self.grid.curr_col = min(
-                self.grid.curr_col, max(0, len(self.grid.df.columns) - 1)
-            )
-            self.paginator.ensure_row_visible(self.grid.curr_row)
-
-            self.command.reset()
             return
 
         lines = self.exec.execute(code)

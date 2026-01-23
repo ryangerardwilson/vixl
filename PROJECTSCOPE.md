@@ -10,6 +10,10 @@ tight integration into the Python data ecosystem. Vixl is not an Excel UI
 clone; it is a power-user tool optimized for keyboard-driven workflows and
 inspectable data transformations.
 
+The scope is intentionally limited to editing and analyzing tabular datasets
+that already reside within Vixl. Orchestrating external data ingestion pipelines
+or shelling out to external commands is out of scope.
+
 ---
 
 ## 2. Core Design Principles
@@ -36,6 +40,7 @@ The following are intentionally out of scope:
 - Multiple sheets or workbooks
 - GUI or web interface
 - Real-time collaboration or multi-user editing
+- External command registration or data ingestion pipelines
 
 ---
 
@@ -90,6 +95,7 @@ Characteristics:
 - Output is captured and displayed
 - Errors do not mutate application state
 - Successful commands are persisted to history
+- No external command register or subprocess-based ingestion
 - Commit semantics: assigning to `df`, returning `(df, True)`, or setting `commit_df = True` updates the active DataFrame; otherwise the DataFrame is unchanged.
 
 ---
@@ -154,7 +160,8 @@ Characteristics:
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
 - History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N). Successful command executions and successful `:%fz/...` / `:%fz#/...` loads are recorded so they can be recalled.
 - Extensions: defined in `~/.config/vixl/extensions.py`; imports are disallowed (only builtins + `pd`/`np` are available); config at `~/.config/vixl/config.json`.
-- External commands: registered in `cmd_mode.command_register`, invoked as `!name ...`. Vixl writes the current df to a temp file and appends the input path as the final argv element. Commands declare `kind` (`mutate` requires writing `VIXL_OUT_PARQUET` to commit df and suppresses overlay output on success; `print` shows output only). Unknown command names are rejected.
+- External command invocation via a command register has been removed; all data
+  transformations occur inside the in-process sandbox.
 
 ### Features
 - No-arg launch: default df with cols col_a/col_b/col_c, 3 empty rows, unsaved buffer.

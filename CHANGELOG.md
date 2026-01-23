@@ -12,7 +12,9 @@
 - Release workflow now builds inside manylinux2014 via Docker, bundles NumPy/Pandas/PyArrow assets correctly, and uploads `vixl-linux-x64.tar.gz` on each tag.
 - `install.sh` auto-detects the latest release, handles version pinning, and adds `~/.vixl/bin` to PATH (unless suppressed).
 - Removed `python_path` and remote execution; all commands run in-process. Extensions must be pure Python using only builtins plus the provided `pd`/`np` symbols; imports in `extensions.py` are rejected. The legacy `extensions/*.py` layout remains deprecated; use a single `$XDG_CONFIG_HOME/vixl/extensions.py` file.
-- Added external commands registry `cmd_mode.command_register`: invoke with `!name ...` (registered-only). Vixl materializes the current df (Parquet preferred, CSV fallback) and appends the input path to argv. Commands declare `kind`: `mutate` must write `VIXL_OUT_PARQUET` (commits df and suppresses overlay output on success); `print` shows output only. `%fz`/`%fz#` fuzzy search now spans both expression and command registers (commands preferred on tie).
+- Removed the external commands registry (`cmd_mode.command_register`) and `!name`
+  invocation; `%fz`/`%fz#` now search the expression register only and all
+  transformations run inside the in-process Python sandbox.
 
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.

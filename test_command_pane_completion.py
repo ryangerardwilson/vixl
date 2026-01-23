@@ -42,3 +42,12 @@ def test_df_base_template_inserts_and_positions_cursor_from_expression_register(
     assert pane.get_buffer() == "df.pivot()"
     # Cursor should be at the end of the inserted template
     assert pane.cursor == len(pane.get_buffer())
+
+
+def test_exclamation_prefix_no_longer_completes_commands():
+    pane = CommandPane()
+    pane.set_expression_register(["df.foo()"])
+    pane.set_extension_names([])
+    pane.set_buffer("!foo")
+
+    assert pane._get_suggestion() is None

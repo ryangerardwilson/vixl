@@ -339,17 +339,26 @@ class DfEditorExternal:
             self.ctx._set_status("External editor unavailable", 3)
             return 1
         try:
-            return runner(argv)
+            result = runner(argv)
         except Exception:
             return 1
+        if isinstance(result, int):
+            return result
+        if result is None:
+            return 0
+        if isinstance(result, (float, str)):
+            try:
+                return int(result)
+            except Exception:
+                return 1
+        return 1
 
     def _default_config_contents(self) -> str:
         return (
             '{\n'
             '  "clipboard_interface_command": null,\n'
             '  "cmd_mode": {\n'
-            '    "expression_register": [],\n'
-            '    "command_register": {}\n'
+            '    "expression_register": []\n'
             '  }\n'
             '}\n'
         )

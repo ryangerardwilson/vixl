@@ -10,7 +10,6 @@ class CommandPane:
         self.history = []
         self.history_idx = None  # None means not navigating history
         self.extension_names = []
-        self.command_names = []
         self.expression_register_entries = []
         self.meta_pending = False
         self.ghost_attr = curses.A_DIM
@@ -35,7 +34,7 @@ class CommandPane:
 
     def activate(self):
         self.active = True
-        self.cursor = len(self.buffer)
+        self.cursor = max(0, min(self.cursor, len(self.buffer)))
         self.history_idx = None
 
     def get_buffer(self):
@@ -53,10 +52,6 @@ class CommandPane:
 
     def set_extension_names(self, names):
         self.extension_names = sorted(names or [])
-        self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
-
-    def set_command_names(self, names):
-        self.command_names = sorted(names or [])
         self.hscroll = min(self.hscroll, max(0, len(self.buffer)))
 
     def set_expression_register(self, expressions):
@@ -84,7 +79,7 @@ class CommandPane:
         if after and (after[0].isalnum() or after[0] == "_"):
             return None
 
-        markers = ["df.vixl.", "df.", "!"]
+        markers = ["df.vixl.", "df."]
         chosen = None
         for marker in markers:
             idx = prefix.rfind(marker)
@@ -143,17 +138,6 @@ class CommandPane:
             return chosen, display
         return None
 
-    def _choose_command_suggestion(self, token):
-        if not token or not self.command_names:
-            return None
-        prefix_matches = [name for name in self.command_names if name.startswith(token)]
-        if prefix_matches:
-            prefix_matches.sort(key=lambda x: (len(x), x))
-            chosen = prefix_matches[0]
-            display = chosen[len(token) :]
-            return chosen, display
-        return None
-
     def _get_suggestion(self):
         token_info = self._extract_df_token()
         if not token_info:
@@ -163,17 +147,6 @@ class CommandPane:
         suggestion = self._choose_expression_register_suggestion(token, marker)
         if not suggestion:
             suggestion = self._choose_extension_suggestion(token, marker)
-        if not suggestion and marker == "!":
-            suggestion = self._choose_command_suggestion(token)
-            if suggestion:
-                chosen, display = suggestion
-                return {
-                    "replacement": f"!{chosen}",
-                    "display": display,
-                    "start": start - 1,  # include the '!' in replacement
-                    "end": end,
-                    "marker": "!",
-                }
         if not suggestion:
             return None
 
