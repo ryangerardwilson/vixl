@@ -55,17 +55,17 @@ def _run_upgrade():
 def main():
     args = sys.argv[1:]
 
-    if "--version" in args or "-V" in args:
+    if "-v" in args or "-V" in args:
         print(__version__)
         return
 
-    if "--help" in args or "-h" in args:
+    if "-h" in args:
         print(
-            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl --version\n  vixl --upgrade\n"
+            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl -v\n  vixl -u\n"
         )
         return
 
-    if "--upgrade" in args:
+    if "-u" in args:
         rc = _run_upgrade()
         sys.exit(rc)
 
