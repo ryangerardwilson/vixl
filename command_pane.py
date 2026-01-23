@@ -177,13 +177,47 @@ class CommandPane:
 
     def _word_boundary_left(self):
         i = self.cursor
-        # skip separators immediately left
-        while i > 0 and not self._is_word_char(self.buffer[i - 1]):
+        # skip whitespace immediately left
+        while i > 0 and self.buffer[i - 1].isspace():
             i -= 1
-        # skip the word
+        # skip closing punctuation immediately left of the cursor
+        while (
+            i > 0
+            and not self._is_word_char(self.buffer[i - 1])
+            and not self.buffer[i - 1].isspace()
+        ):
+            i -= 1
+        # skip the word directly left of the cursor
         while i > 0 and self._is_word_char(self.buffer[i - 1]):
             i -= 1
-        return i
+        # include a single punctuation character that directly precedes the word (e.g., opening paren)
+        if (
+            i > 0
+            and not self._is_word_char(self.buffer[i - 1])
+            and not self.buffer[i - 1].isspace()
+        ):
+            i -= 1
+
+        boundary = i
+
+        # consume whitespace separating the previous chunk
+        while boundary > 0 and self.buffer[boundary - 1].isspace():
+            boundary -= 1
+
+        # if the chunk is preceded by punctuation, treat the preceding word as part of it
+        lookahead = boundary
+        while lookahead > 0 and self._is_word_char(self.buffer[lookahead - 1]):
+            lookahead -= 1
+
+        if (
+            lookahead < boundary
+            and lookahead > 0
+            and not self._is_word_char(self.buffer[lookahead - 1])
+            and not self.buffer[lookahead - 1].isspace()
+        ):
+            return lookahead
+
+        return boundary
 
     def _word_boundary_right(self):
         i = self.cursor
@@ -193,6 +227,18 @@ class CommandPane:
             i += 1
         # skip the word
         while i < n and self._is_word_char(self.buffer[i]):
+            i += 1
+        # include any immediate whitespace
+        while i < n and self.buffer[i].isspace():
+            i += 1
+        # include a single trailing punctuation character (e.g., closing paren)
+        while (
+            i < n
+            and not self._is_word_char(self.buffer[i])
+            and not self.buffer[i].isspace()
+            and i > 0
+            and self._is_word_char(self.buffer[i - 1])
+        ):
             i += 1
         return i
 
