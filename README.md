@@ -19,6 +19,85 @@ ships with each GitHub release:
 curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh | bash
   ```
 
+## Command-line usage
+
+```bash
+vixl [path]   # open an existing CSV or Parquet file (creates if missing)
+vixl -v       # print version
+vixl -u       # upgrade to the latest release
+vixl -h       # show help/usage summary
+```
+
+Launch without a path to start in an empty, unsaved workbook seeded with
+`col_a`/`col_b`/`col_c`.
+
+## Keyboard shortcuts
+
+Vixl is modal and follows Vim-inspired navigation. Shortcuts are grouped by the
+active context.
+
+### Global
+
+- `Ctrl+C`, `Ctrl+X`, or `q` (while the grid has focus) – exit immediately
+- `Ctrl+S` – save
+- `Ctrl+T` – save and exit (only exits after a successful save)
+- `?` – open the shortcuts overlay
+
+### Command bar (entered with `:`)
+
+- `Enter` – execute the current command buffer
+- `Esc` – cancel and return to DF mode
+- `Ctrl+P` / `Ctrl+N` – previous/next command history
+- Arrow keys / `Home` / `End` / `Backspace` – standard line editing
+
+### Output or shortcuts overlay
+
+- `Esc`, `q`, or `Enter` – close the overlay
+- `j` / `k` – scroll
+
+### DF mode navigation & editing
+
+- `h` / `j` / `k` / `l` – move left/down/up/right
+- `H` / `L` – expand highlight to column
+- `J` / `K` – expand highlight to row
+- `Ctrl+J` / `Ctrl+K` – jump ~5% rows down/up
+- `Ctrl+H` / `Ctrl+L` – jump ~20% columns left/right
+- `:` – open the command bar
+- `i` – edit the focused cell in Vim (visual selections bulk-fill)
+- `x` – clear the focused cell
+- `v` – toggle visual block selection
+- `d` (in visual) – clear all selected cells
+- `, y c` – copy the focused cell (or visual selection) as TSV
+- `, y a` – copy the full DataFrame as TSV
+- `, i r a` / `, i r b` – insert row above/below
+- `, d r` – delete focused row (or selected rows)
+- `, i c a` / `, i c b` – insert column left/right
+- `, d c` – delete focused column (or selected columns)
+- `, r n c` – rename current column
+- `,xr` – toggle expansion for the current row
+- `,xar` – toggle expansion for all rows
+- `,xc` – collapse all expanded rows
+- `,x+` / `,x-` – adjust row height up/down
+- `, h` / `, l` – jump to first/last column
+- `, k` / `, j` – jump to first/last row
+- `, p j` – preview the current cell as pretty JSON in Vim (read-only)
+
+## Special command syntax
+
+Commands are entered via the command bar (`:`) and executed in a sandbox with
+`df` (current DataFrame), `pd`, and `np` preloaded.
+
+- `%fz/<query>` – fuzzy-load the best expression from the expression register
+  (or matching registered command); loads the selection into the command buffer
+- `%fz#/<query>` – fuzzy-search comments/descriptions in the expression and
+  command registers
+- `!name [args...]` – invoke a registered external command; Vixl writes the
+  current DataFrame to disk and passes the temp path as the final argv
+- `df.vixl.some_extension(...)` – call a user-defined extension; returning
+  `(df, True)` or mutating `df` commits the change
+- Assigning to `df` or returning `(df, True)` from arbitrary expressions commits
+  the DataFrame; read-only commands leave it unchanged
+
 #### Debugging tips
 - "Unknown command" → name not present in `cmd_mode.command_register` or config JSON is invalid.
 - "Mutating command produced no parquet" → your command never wrote to `VIXL_OUT_PARQUET`.
