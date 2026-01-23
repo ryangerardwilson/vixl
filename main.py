@@ -2,6 +2,9 @@ import sys
 import os
 import curses
 import subprocess
+import json
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
 
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
@@ -19,6 +22,54 @@ except Exception:
 
 
 INSTALL_URL = "https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh"
+LATEST_RELEASE_API = "https://api.github.com/repos/ryangerardwilson/vixl/releases/latest"
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    if not version:
+        return (0,)
+    version = version.strip()
+    if version.startswith("v"):
+        version = version[1:]
+    parts: list[int] = []
+    for segment in version.split("."):
+        digits = ""
+        for ch in segment:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if digits == "":
+            break
+        parts.append(int(digits))
+    return tuple(parts) if parts else (0,)
+
+
+def _is_version_newer(candidate: str, current: str) -> bool:
+    cand_tuple = _version_tuple(candidate)
+    curr_tuple = _version_tuple(current)
+    # pad tuples to same length for comparison
+    length = max(len(cand_tuple), len(curr_tuple))
+    cand_tuple += (0,) * (length - len(cand_tuple))
+    curr_tuple += (0,) * (length - len(curr_tuple))
+    return cand_tuple > curr_tuple
+
+
+def _get_latest_version(timeout: float = 5.0) -> str | None:
+    try:
+        request = Request(LATEST_RELEASE_API, headers={"User-Agent": "vixl-updater"})
+        with urlopen(request, timeout=timeout) as resp:
+            data = resp.read().decode("utf-8", errors="replace")
+    except (URLError, HTTPError, TimeoutError):
+        return None
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return None
+    tag = payload.get("tag_name") or payload.get("name")
+    if isinstance(tag, str) and tag.strip():
+        return tag.strip()
+    return None
 
 
 def _run_upgrade():
@@ -70,6 +121,20 @@ def main():
         return
 
     if "-u" in args:
+        latest = _get_latest_version()
+        if latest is None:
+            print("Unable to determine latest version; attempting upgrade…", file=sys.stderr)
+            rc = _run_upgrade()
+            sys.exit(rc)
+
+        if __version__ and __version__ != "0.0.0" and not _is_version_newer(latest, __version__):
+            print(f"Already running the latest version ({__version__}).")
+            sys.exit(0)
+
+        if __version__ and __version__ != "0.0.0":
+            print(f"Upgrading from {__version__} to {latest}…")
+        else:
+            print(f"Upgrading to {latest}…")
         rc = _run_upgrade()
         sys.exit(rc)
 

@@ -18,6 +18,8 @@
 - Replaced the standalone `c` shortcut with the leader sequence `,conf` for
   editing `config.json`; the config is now reloaded automatically after the
   editor exits.
+- `vixl -u` now checks the latest GitHub release and skips the installer when
+  the local version is already up to date.
 
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
