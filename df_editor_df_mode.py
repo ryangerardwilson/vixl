@@ -137,20 +137,22 @@ class DfEditorDfMode:
             return True
 
         # normal vim movement
-        count = self.counts.consume()
         if ch == ord("h"):
+            count = self.counts.consume()
             target = max(0, self.ctx.grid.curr_col - count)
             self.ctx.grid.curr_col = target
             self.ctx.grid.adjust_col_viewport()
             self.visual.post_move()
             return True
         if ch == ord("l"):
+            count = self.counts.consume()
             target = min(total_cols - 1, self.ctx.grid.curr_col + count)
             self.ctx.grid.curr_col = target
             self.ctx.grid.adjust_col_viewport()
             self.visual.post_move()
             return True
         if ch == ord("j") and total_rows > 0:
+            count = self.counts.consume()
             target = min(total_rows - 1, self.ctx.grid.curr_row + count)
             self.ctx.paginator.ensure_row_visible(target)
             self.ctx.grid.row_offset = 0
@@ -158,6 +160,7 @@ class DfEditorDfMode:
             self.visual.post_move()
             return True
         if ch == ord("k") and total_rows > 0:
+            count = self.counts.consume()
             target = max(0, self.ctx.grid.curr_row - count)
             self.ctx.paginator.ensure_row_visible(target)
             self.ctx.grid.row_offset = 0
@@ -235,9 +238,11 @@ class DfEditorDfMode:
 
         # leader entry
         if ch == ord(","):
+            preserved_count = self.ctx.pending_count
             self.ctx.df_leader_state = "leader"
-            self.counts.reset()
             self._show_leader_status(self._leader_seq("leader"))
+            if preserved_count is not None:
+                self.ctx.pending_count = preserved_count
             return True
 
         return False
