@@ -68,5 +68,3 @@ def test_load_config_reads_json_overrides():
         finally:
             config_paths.CONFIG_DIR = orig_dir
             config_paths.CONFIG_JSON = orig_json
-
-

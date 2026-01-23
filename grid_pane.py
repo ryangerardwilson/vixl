@@ -264,9 +264,7 @@ class GridPane:
         self.rendered_col_widths = {c: widths[c] for c in visible_cols}
 
         total_cols = len(df_slice.columns)
-        cols_for_height = (
-            tuple(range(total_cols)) if expand_all_rows else visible_cols
-        )
+        cols_for_height = tuple(range(total_cols)) if expand_all_rows else visible_cols
 
         def _wrap_cell(text: str, width: int, max_lines: int):
             if width <= 0:
@@ -352,7 +350,6 @@ class GridPane:
                     if current or current == "":
                         lines += 1
             return max(1, lines)
-
 
         # header
         x = row_w + 1

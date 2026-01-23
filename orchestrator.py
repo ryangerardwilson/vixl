@@ -126,17 +126,11 @@ def _fuzzy_best_text_match(query, texts):
             score = max(score, 0.9 * phrase)
 
         cand_len = len(text)
-        if (
-            score > best_score
-            or (
-                score == best_score
-                and (
-                    phrase > best_phrase
-                    or (
-                        phrase == best_phrase
-                        and (best_len is None or cand_len < best_len)
-                    )
-                )
+        if score > best_score or (
+            score == best_score
+            and (
+                phrase > best_phrase
+                or (phrase == best_phrase and (best_len is None or cand_len < best_len))
             )
         ):
             best_score = score
@@ -168,14 +162,20 @@ def _build_command_entries(cmd_registry):
             continue
         if not isinstance(spec, dict):
             continue
-        desc = spec.get("description", "") if isinstance(spec.get("description"), str) else ""
+        desc = (
+            spec.get("description", "")
+            if isinstance(spec.get("description"), str)
+            else ""
+        )
         match_text = f"{name} {desc}".strip()
-        entries.append({
-            "kind": "command",
-            "name": name,
-            "description": desc,
-            "match_text": match_text,
-        })
+        entries.append(
+            {
+                "kind": "command",
+                "name": name,
+                "description": desc,
+                "match_text": match_text,
+            }
+        )
     return entries
 
 
@@ -353,7 +353,11 @@ class Orchestrator:
                         text = f" {self.status_msg}"
                     else:
                         if self.focus == 0:
-                            mode = "VISUAL" if getattr(self.grid, "visual_active", False) else "DF"
+                            mode = (
+                                "VISUAL"
+                                if getattr(self.grid, "visual_active", False)
+                                else "DF"
+                            )
                         elif self.focus == 1:
                             mode = "CMD"
                         else:
@@ -398,7 +402,9 @@ class Orchestrator:
             query = code[len("%fz#/") :].strip()
             raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
             entries = parse_expression_register(raw_register)
-            command_entries = _build_command_entries(self.exec.config.get("COMMAND_REGISTER", {}))
+            command_entries = _build_command_entries(
+                self.exec.config.get("COMMAND_REGISTER", {})
+            )
             if not query:
                 self._set_status("Query required", 3)
                 return
@@ -458,7 +464,9 @@ class Orchestrator:
             query = code[len("%fz/") :].strip()
             raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
             entries = parse_expression_register(raw_register)
-            command_entries = _build_command_entries(self.exec.config.get("COMMAND_REGISTER", {}))
+            command_entries = _build_command_entries(
+                self.exec.config.get("COMMAND_REGISTER", {})
+            )
             if not query:
                 self._set_status("Query required", 3)
                 return
@@ -467,7 +475,11 @@ class Orchestrator:
                 return
             # Build candidates
             expr_best = fuzzy_best_match(query, entries) if entries else None
-            cmd_best, cmd_score = _fuzzy_best_command_match(query, command_entries) if command_entries else (None, None)
+            cmd_best, cmd_score = (
+                _fuzzy_best_command_match(query, command_entries)
+                if command_entries
+                else (None, None)
+            )
 
             # choose with tie-breaker: prefer commands on tie
             chosen_kind = None
@@ -528,7 +540,9 @@ class Orchestrator:
                 self._set_status("Command name required", 3)
                 return
             name, args = parts[0], parts[1:]
-            lines, committed_df, success, kind = self.exec.execute_registered_command(name, args)
+            lines, committed_df, success, kind = self.exec.execute_registered_command(
+                name, args
+            )
             if committed_df is not None and success:
                 self.state.df = committed_df
                 self.exec._bind_extensions(self.state.df)

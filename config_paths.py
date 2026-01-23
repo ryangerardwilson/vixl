@@ -66,12 +66,21 @@ def load_config():
                         if not isinstance(spec, dict):
                             continue
                         argv = spec.get("argv")
-                        if not (isinstance(argv, list) and all(isinstance(x, str) for x in argv)):
+                        if not (
+                            isinstance(argv, list)
+                            and all(isinstance(x, str) for x in argv)
+                        ):
                             continue
                         timeout = spec.get("timeout_seconds")
-                        if timeout is not None and not isinstance(timeout, (int, float)):
+                        if timeout is not None and not isinstance(
+                            timeout, (int, float)
+                        ):
                             timeout = None
-                        desc = spec.get("description") if isinstance(spec.get("description"), str) else ""
+                        desc = (
+                            spec.get("description")
+                            if isinstance(spec.get("description"), str)
+                            else ""
+                        )
                         kind = spec.get("kind", "print")
                         if kind not in {"print", "mutate"}:
                             kind = "print"

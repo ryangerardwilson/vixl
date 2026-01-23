@@ -84,7 +84,6 @@ class DfEditorExternal:
         snap = self.ctx.pending_edit_snapshot or {}
         kind = snap.get("kind") or getattr(self.ctx, "pending_external_kind", "cell")
 
-
         # Reset pending flags early to avoid reentrancy
         self.ctx.pending_external_edit = False
         self.ctx.pending_external_kind = None
@@ -152,9 +151,7 @@ class DfEditorExternal:
                 self.ctx.paginator.ensure_row_visible(r0)
                 self._set_last_action("visual_fill", value=new_text)
                 self.ctx.pending_count = None
-                self.ctx._set_status(
-                    f"Filled {(r1 - r0 + 1) * (c1 - c0 + 1)} cells", 2
-                )
+                self.ctx._set_status(f"Filled {(r1 - r0 + 1) * (c1 - c0 + 1)} cells", 2)
             except Exception as exc:
                 self.ctx._set_status(f"Fill failed: {exc}", 3)
             finally:

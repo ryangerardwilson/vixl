@@ -25,7 +25,6 @@ def test_extension_completion_fallback_when_no_expression_register_match():
     pane.set_extension_names(["multiply_cols"])
     pane.set_buffer("df.vixl.mul")
 
-
     _apply_completion(pane)
 
     assert pane.get_buffer() == "df.vixl.multiply_cols"

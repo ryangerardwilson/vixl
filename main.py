@@ -24,7 +24,9 @@ INSTALL_URL = "https://raw.githubusercontent.com/ryangerardwilson/vixl/main/inst
 def _run_upgrade():
     try:
         curl = subprocess.Popen(
-            ["curl", "-fsSL", INSTALL_URL], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            ["curl", "-fsSL", INSTALL_URL],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
     except FileNotFoundError:
         print("Upgrade requires curl", file=sys.stderr)
@@ -44,7 +46,9 @@ def _run_upgrade():
     curl_rc = curl.wait()
 
     if curl_rc != 0:
-        stderr = curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
+        stderr = (
+            curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
+        )
         if stderr:
             sys.stderr.write(stderr)
         return curl_rc

@@ -76,7 +76,8 @@ Data invariants:
 
 ## 6. Command Execution Model
 
-Users manipulate data by executing Python expressions explicitly in a single in-process sandbox.
+Users manipulate data by executing Python expressions explicitly in a single
+in-process sandbox.
 
 Execution context provides:
 - `df`: active DataFrame

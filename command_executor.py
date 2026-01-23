@@ -6,7 +6,6 @@ import sys
 import types
 import tempfile
 import subprocess
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,28 +25,31 @@ _ESCAPE_HATCH_NAMES = {
     "vars",
     "importlib",
 }
-_SAFE_BUILTINS = {name: getattr(builtins, name) for name in [
-    "len",
-    "range",
-    "min",
-    "max",
-    "sum",
-    "sorted",
-    "list",
-    "dict",
-    "set",
-    "tuple",
-    "enumerate",
-    "zip",
-    "abs",
-    "all",
-    "any",
-    "bool",
-    "float",
-    "int",
-    "str",
-    "print",
-]}
+_SAFE_BUILTINS = {
+    name: getattr(builtins, name)
+    for name in [
+        "len",
+        "range",
+        "min",
+        "max",
+        "sum",
+        "sorted",
+        "list",
+        "dict",
+        "set",
+        "tuple",
+        "enumerate",
+        "zip",
+        "abs",
+        "all",
+        "any",
+        "bool",
+        "float",
+        "int",
+        "str",
+        "print",
+    ]
+}
 
 
 class VixlExtensions:
@@ -194,7 +196,9 @@ class CommandExecutor:
         if kind not in {"print", "mutate"}:
             kind = "print"
         argv_tmpl = spec.get("argv") or []
-        if not (isinstance(argv_tmpl, list) and all(isinstance(x, str) for x in argv_tmpl)):
+        if not (
+            isinstance(argv_tmpl, list) and all(isinstance(x, str) for x in argv_tmpl)
+        ):
             return [f"Invalid argv for command: {name}"], None, False, kind
         timeout = spec.get("timeout_seconds") or 30
 
@@ -331,7 +335,11 @@ class CommandExecutor:
             body = list(parsed.body)
             if body and isinstance(body[-1], ast.Expr):
                 expr = ast.Expression(body.pop().value)
-                exec(compile(ast.Module(body=body, type_ignores=[]), "<exec>", "exec"), env, env)
+                exec(
+                    compile(ast.Module(body=body, type_ignores=[]), "<exec>", "exec"),
+                    env,
+                    env,
+                )
                 last_value = eval(compile(expr, "<eval>", "eval"), env, env)
             else:
                 exec(compile(parsed, "<exec>", "exec"), env, env)
@@ -346,7 +354,9 @@ class CommandExecutor:
                 last_value = None
             elif env.get("commit_df") and isinstance(env.get("df"), pd.DataFrame):
                 committed_df = env.get("df")
-            elif env.get("_df_assignment", False) and isinstance(env.get("df"), pd.DataFrame):
+            elif env.get("_df_assignment", False) and isinstance(
+                env.get("df"), pd.DataFrame
+            ):
                 committed_df = env.get("df")
 
             if last_value is not None:

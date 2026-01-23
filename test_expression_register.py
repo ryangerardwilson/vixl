@@ -1,5 +1,4 @@
 from expression_register import (
-    ExpressionRegisterEntry,
     parse_expression_register_entry,
     parse_expression_register,
 )
@@ -24,7 +23,9 @@ def test_parse_expression_entry_with_comment_outside_quotes():
 
 
 def test_parse_expression_entry_ignores_hash_within_quotes():
-    entry = parse_expression_register_entry("df.foo(query='select # not comment') # real note")
+    entry = parse_expression_register_entry(
+        "df.foo(query='select # not comment') # real note"
+    )
     assert entry is not None
     assert entry.kind == "expression"
     assert entry.expr == "df.foo(query='select # not comment')"
