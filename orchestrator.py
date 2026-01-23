@@ -628,6 +628,9 @@ class Orchestrator:
             if ch in (3, 24):
                 break
 
+            if ch in (ord("q"), ord("Q")) and self.focus == 0:
+                break
+
             if self.overlay.visible:
                 self.overlay.handle_key(ch)
                 if not self.overlay.visible:
