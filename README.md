@@ -64,6 +64,7 @@ active context.
 - `Ctrl+H` / `Ctrl+L` – jump ~20% columns left/right
 - `:` – open the command bar
 - `i` – edit the focused cell in Vim (visual selections bulk-fill)
+- `c` – open the Vixl config (`~/.config/vixl/config.json`) in Vim
 - `x` – clear the focused cell
 - `v` – toggle visual block selection
 - `d` (in visual) – clear all selected cells

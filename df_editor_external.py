@@ -4,6 +4,7 @@ import tempfile
 import pandas as pd
 
 from cell_coercion import coerce_cell_value
+from config_paths import CONFIG_JSON, ensure_config_dirs
 
 
 class DfEditorExternal:
@@ -69,6 +70,31 @@ class DfEditorExternal:
         self.ctx.pending_external_edit = True
         self.ctx.pending_external_kind = "visual_fill"
         self.ctx._set_status(f"Fill {rows}x{cols} cells (editor)", 600)
+        self.counts.reset()
+
+    def open_config(self):
+        ensure_config_dirs()
+        config_path = CONFIG_JSON
+        created = False
+        if not os.path.exists(config_path):
+            try:
+                with open(config_path, "w", encoding="utf-8") as fh:
+                    fh.write(self._default_config_contents())
+                created = True
+            except Exception as exc:
+                self.ctx._set_status(f"Config open failed: {exc}", 3)
+                self.counts.reset()
+                return
+
+        argv = self._build_editor_argv(config_path, read_only=False)
+        rc = self._run_editor(argv)
+        if rc not in (0, None):
+            msg = "Config edit canceled"
+            if created:
+                msg = f"Config edit canceled (created at {config_path})"
+            self.ctx._set_status(msg, 3)
+        else:
+            self.ctx._set_status(f"Opened config at {config_path}", 3)
         self.counts.reset()
 
     def _trim_editor_text(self, text) -> str:
@@ -316,3 +342,14 @@ class DfEditorExternal:
             return runner(argv)
         except Exception:
             return 1
+
+    def _default_config_contents(self) -> str:
+        return (
+            '{\n'
+            '  "clipboard_interface_command": null,\n'
+            '  "cmd_mode": {\n'
+            '    "expression_register": [],\n'
+            '    "command_register": {}\n'
+            '  }\n'
+            '}\n'
+        )

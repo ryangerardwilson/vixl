@@ -223,6 +223,12 @@ class DfEditorDfMode:
             self.counts.reset()
             return True
 
+        if ch == ord("c"):
+            if getattr(self.visual, "exit", None) and getattr(self.ctx, "visual_active", False):
+                self.visual.exit()
+            self.external.open_config()
+            return True
+
         if ch == ord("i"):
             self.external.queue_external_edit()
             return True
