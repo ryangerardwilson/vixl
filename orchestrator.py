@@ -218,6 +218,7 @@ class Orchestrator:
         if hasattr(self.df_editor, "ctx"):
             self.df_editor.ctx.run_interactive = self._run_interactive_in_terminal
             self.df_editor.ctx.config = getattr(self.exec, "config", {})
+            self.df_editor.ctx.refresh_config = self._reload_config
         # wire undo into column prompt
         if hasattr(self.column_prompt, "set_push_undo"):
             self.column_prompt.set_push_undo(self.df_editor._push_undo)
@@ -260,6 +261,31 @@ class Orchestrator:
         except Exception:
             pass
         return result
+
+    def _reload_config(self):
+        try:
+            ignored = self.exec.reload_config()
+        except Exception as exc:
+            self._set_status(f"Config reload failed: {exc}", 4)
+            return
+
+        cfg = self.exec.config
+        if hasattr(self.command, "set_expression_register"):
+            self.command.set_expression_register(
+                cfg.get("EXPRESSION_REGISTER", [])
+            )
+        if hasattr(self.command, "set_extension_names"):
+            self.command.set_extension_names(self.exec.get_extension_names())
+
+        if hasattr(self.df_editor, "ctx"):
+            self.df_editor.ctx.config = cfg
+
+        message = "Config reloaded"
+        if ignored:
+            names = ", ".join(ignored)
+            suffix = "s" if len(ignored) != 1 else ""
+            message += f" (ignored command entry{suffix}: {names})"
+        self._set_status(message, 4)
 
     def _set_status(self, msg, seconds=3):
         self.status_msg = msg

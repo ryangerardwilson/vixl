@@ -1,10 +1,12 @@
 import os
 import tempfile
-from types import SimpleNamespace
+from types import SimpleNamespace, MethodType
 
 import pandas as pd
 
 from df_editor import DfEditor
+import config_paths
+import df_editor_external
 
 
 class DummyGrid:
@@ -114,3 +116,72 @@ def test_external_edit_trims_whitespace_and_blank_lines():
     assert editor.state.df.iloc[0, 0] == 5
     assert grid.df.iloc[0, 0] == 5
     assert str(editor.state.df["a"].dtype) == "Int64"
+
+
+def test_leader_conf_sequence_opens_config():
+    df = pd.DataFrame({"a": [1]})
+    editor, _, _ = _make_editor(df)
+
+    calls = []
+
+    def fake_open_config(self):
+        calls.append("open")
+
+    editor.external.open_config = MethodType(fake_open_config, editor.external)
+
+    editor.handle_key(ord("c"))
+    assert calls == []
+
+    for ch in ",conf":
+        editor.handle_key(ord(ch))
+
+    assert calls == ["open"]
+
+
+def test_open_config_invokes_refresh_on_success():
+    df = pd.DataFrame({"a": [1]})
+    editor, _, _ = _make_editor(df)
+    refresh_calls = []
+    editor.ctx.refresh_config = lambda: refresh_calls.append("refresh")
+
+    original_dir = config_paths.CONFIG_DIR
+    original_json = config_paths.CONFIG_JSON
+    original_module_json = df_editor_external.CONFIG_JSON
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_paths.CONFIG_DIR = tmp
+            config_paths.CONFIG_JSON = os.path.join(tmp, "config.json")
+            df_editor_external.CONFIG_JSON = config_paths.CONFIG_JSON
+
+            editor.external.open_config()
+    finally:
+        config_paths.CONFIG_DIR = original_dir
+        config_paths.CONFIG_JSON = original_json
+        df_editor_external.CONFIG_JSON = original_module_json
+
+    assert refresh_calls == ["refresh"]
+
+
+def test_open_config_does_not_refresh_on_cancel():
+    df = pd.DataFrame({"a": [1]})
+    editor, _, _ = _make_editor(df)
+    refresh_calls = []
+    editor.ctx.refresh_config = lambda: refresh_calls.append("refresh")
+    editor.ctx.run_interactive = lambda argv: 1  # simulate cancel
+
+    original_dir = config_paths.CONFIG_DIR
+    original_json = config_paths.CONFIG_JSON
+    original_module_json = df_editor_external.CONFIG_JSON
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_paths.CONFIG_DIR = tmp
+            config_paths.CONFIG_JSON = os.path.join(tmp, "config.json")
+            df_editor_external.CONFIG_JSON = config_paths.CONFIG_JSON
+
+            editor.external.open_config()
+    finally:
+        config_paths.CONFIG_DIR = original_dir
+        config_paths.CONFIG_JSON = original_json
+        df_editor_external.CONFIG_JSON = original_module_json
+
+    assert refresh_calls == []

@@ -226,12 +226,6 @@ class DfEditorDfMode:
             self.counts.reset()
             return True
 
-        if ch == ord("c"):
-            if getattr(self.visual, "exit", None) and getattr(self.ctx, "visual_active", False):
-                self.visual.exit()
-            self.external.open_config()
-            return True
-
         if ch == ord("i"):
             self.external.queue_external_edit()
             return True
@@ -285,6 +279,30 @@ class DfEditorDfMode:
                 self._show_leader_status(self._leader_seq("ir"))
                 return True
             self._show_leader_status("")
+            return True
+        if state == "conf_c":
+            if ch == ord("o"):
+                self.ctx.df_leader_state = "conf_co"
+                self._show_leader_status(self._leader_seq("conf_co"))
+                return True
+            self._show_leader_status("")
+            self.counts.reset()
+            return True
+        if state == "conf_co":
+            if ch == ord("n"):
+                self.ctx.df_leader_state = "conf_con"
+                self._show_leader_status(self._leader_seq("conf_con"))
+                return True
+            self._show_leader_status("")
+            self.counts.reset()
+            return True
+        if state == "conf_con":
+            if ch == ord("f"):
+                self._show_leader_status(",conf")
+                self.external.open_config()
+            else:
+                self._show_leader_status("")
+            self.counts.reset()
             return True
         if state == "ic":
             if ch == ord("a"):
@@ -437,6 +455,10 @@ class DfEditorDfMode:
         if ch == ord("i"):
             self.ctx.df_leader_state = "i"
             self._show_leader_status(self._leader_seq("i"))
+            return True
+        if ch == ord("c"):
+            self.ctx.df_leader_state = "conf_c"
+            self._show_leader_status(self._leader_seq("conf_c"))
             return True
         if ch == ord("d"):
             self.ctx.df_leader_state = "d"

@@ -167,6 +167,9 @@ class DfEditor:
             "xa": ",xa",
             "y": ",y",
             "p": ",p",
+            "conf_c": ",c",
+            "conf_co": ",co",
+            "conf_con": ",con",
         }
         return mapping.get(state, ",")
 

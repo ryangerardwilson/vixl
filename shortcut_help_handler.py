@@ -36,7 +36,7 @@ class ShortcutHelpHandler:
             "  Ctrl+H / Ctrl+L - jump ~20% cols left/right",
             "  : - open command bar",
             "  i - edit current cell in vim (current terminal)",
-            "  c - open config in vim",
+            "  ,conf - open config in vim (reloads on exit)",
             "  x - clear current cell",
             "  , i r a - insert row above",
             "  , i r b - insert row below",

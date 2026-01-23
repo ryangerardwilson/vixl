@@ -95,6 +95,12 @@ class DfEditorExternal:
             self.ctx._set_status(msg, 3)
         else:
             self.ctx._set_status(f"Opened config at {config_path}", 3)
+            refresh_cb = getattr(self.ctx, "refresh_config", None)
+            if callable(refresh_cb):
+                try:
+                    refresh_cb()
+                except Exception as exc:
+                    self.ctx._set_status(f"Config reload failed: {exc}", 3)
         self.counts.reset()
 
     def _trim_editor_text(self, text) -> str:

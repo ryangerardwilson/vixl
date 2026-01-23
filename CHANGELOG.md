@@ -15,6 +15,9 @@
 - Removed the external commands registry (`cmd_mode.command_register`) and `!name`
   invocation; `%fz`/`%fz#` now search the expression register only and all
   transformations run inside the in-process Python sandbox.
+- Replaced the standalone `c` shortcut with the leader sequence `,conf` for
+  editing `config.json`; the config is now reloaded automatically after the
+  editor exits.
 
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
 - Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.

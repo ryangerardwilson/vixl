@@ -32,6 +32,7 @@ class DfEditorContext:
     # Callback to run interactive commands (e.g., external editor) in current terminal
     run_interactive: Optional[Callable[[list], int]] = None
     config: Optional[dict] = None
+    refresh_config: Optional[Callable[[], None]] = None
 
 
 CTX_ATTRS: Set[str] = {
@@ -51,4 +52,5 @@ CTX_ATTRS: Set[str] = {
     "visual_anchor",
     "run_interactive",
     "config",
+    "refresh_config",
 }

@@ -82,15 +82,10 @@ class CommandExecutor:
         self.state = app_state
         self.startup_warnings = []
         ensure_config_dirs()
-        self.config = load_config()
+        self.config, ignored_cmds = self._load_config_data()
 
-        ignored_cmds = self.config.get("IGNORED_COMMAND_ENTRIES") or []
         if ignored_cmds:
-            names = ", ".join(ignored_cmds)
-            plural = "ies" if len(ignored_cmds) != 1 else "y"
-            self.startup_warnings.append(
-                f"Ignored command register entr{plural}: {names}"
-            )
+            self.startup_warnings.append(self._format_ignored_warning(ignored_cmds))
 
         self._warn_deprecated_extensions_dir()
         self._extensions = self._load_extensions()
@@ -106,6 +101,23 @@ class CommandExecutor:
                     "extensions directory is deprecated; move to ~/.config/vixl/extensions.py"
                 )
                 break
+
+    def _load_config_data(self):
+        cfg = load_config()
+        ignored = cfg.get("IGNORED_COMMAND_ENTRIES") or []
+        return cfg, ignored
+
+    def _format_ignored_warning(self, ignored):
+        names = ", ".join(ignored)
+        plural = "y" if len(ignored) == 1 else "ies"
+        return f"Ignored command register entr{plural}: {names}"
+
+    def reload_config(self):
+        self.config, ignored = self._load_config_data()
+        self.startup_warnings = []
+        if ignored:
+            self.startup_warnings.append(self._format_ignored_warning(ignored))
+        return ignored
 
     # ---------- AST helpers ----------
     def _roots_at_df(self, node):

@@ -64,7 +64,6 @@ active context.
 - `Ctrl+H` / `Ctrl+L` – jump ~20% columns left/right
 - `:` – open the command bar
 - `i` – edit the focused cell in Vim (visual selections bulk-fill)
-- `c` – open the Vixl config (`~/.config/vixl/config.json`) in Vim
 - `x` – clear the focused cell
 - `v` – toggle visual block selection
 - `d` (in visual) – clear all selected cells
@@ -79,6 +78,7 @@ active context.
 - `,xar` – toggle expansion for all rows
 - `,xc` – collapse all expanded rows
 - `,x+` / `,x-` – adjust row height up/down
+- `,conf` – open the Vixl config (`~/.config/vixl/config.json`) in Vim (auto-reload on exit)
 - `, h` / `, l` – jump to first/last column
 - `, k` / `, j` – jump to first/last row
 - `, p j` – preview the current cell as pretty JSON in Vim (read-only)
@@ -134,6 +134,7 @@ Commands are entered via the command bar (`:`) and executed in a sandbox with
 - The grid is for navigation and selection. Pressing `i` launches vim in the current terminal with the cell value in a temp file; exiting vim with status 0 commits the change (dtype-coerced), non-zero cancels.
 - Structural or multi-cell mutations remain explicit Python commands typed into the command bar (`:`).
 - There are no inline cell modes; the clipboard command is configurable via `clipboard_interface_command` in `$XDG_CONFIG_HOME/vixl/config.json` (default `~/.config/vixl/config.json`).
+- Use the leader sequence `,conf` to edit the application config; Vixl automatically reloads the file after you quit Vim.
 
 ---
 
