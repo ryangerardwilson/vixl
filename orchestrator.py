@@ -457,7 +457,7 @@ class Orchestrator:
 
         lines = self.exec.execute(code)
         if lines:
-            self.overlay.open(lines)
+            self.overlay.open_output(lines)
             self.focus = 2
         else:
             self.overlay.close()
@@ -580,7 +580,7 @@ class Orchestrator:
                     self.command.activate()
                     self.focus = 1
                 elif ch == ord("?"):
-                    self.overlay.open(ShortcutHelpHandler.get_lines())
+                    self.overlay.open_help(ShortcutHelpHandler.get_lines())
                     self.focus = 2
                 else:
                     self.df_editor.handle_key(ch)

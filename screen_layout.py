@@ -19,9 +19,5 @@ class ScreenLayout:
         # allow cursor to be positioned when command line is active
         self.status_win.leaveok(False)
 
-        # overlay is a centered modal window over the table region
-        self.overlay_h = max(3, min(self.H // 2, self.H - 2))
-        overlay_y = max(0, (self.table_h - self.overlay_h) // 2)
-        self.overlay_win = curses.newwin(self.overlay_h, self.W, overlay_y, 0)
-        # overlay should never own cursor
-        self.overlay_win.leaveok(True)
+        # overlay dimensions are computed dynamically when opened
+        self.overlay_h = self.table_h
