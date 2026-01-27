@@ -373,16 +373,6 @@ class DfEditorDfMode:
                 self._show_leader_status(",xc")
                 self.df_ops.collapse_all_rows()
                 return True
-            if ch == ord("+"):
-                count = self.counts.consume()
-                self._show_leader_status(",x+")
-                self.df_ops.adjust_row_lines(count)
-                return True
-            if ch == ord("-"):
-                count = self.counts.consume()
-                self._show_leader_status(",x-")
-                self.df_ops.adjust_row_lines(-count)
-                return True
             self._show_leader_status("")
             self.counts.reset()
             return True

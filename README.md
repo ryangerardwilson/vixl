@@ -77,7 +77,6 @@ active context.
 - `,xr` – toggle expansion for the current row
 - `,xar` – toggle expansion for all rows
 - `,xc` – collapse all expanded rows
-- `,x+` / `,x-` – adjust row height up/down
 - `,conf` – open the Vixl config (`~/.config/vixl/config.json`) in Vim (auto-reload on exit)
 - `, h` / `, l` – jump to first/last column
 - `, k` / `, j` – jump to first/last row

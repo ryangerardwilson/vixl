@@ -9,20 +9,7 @@ class DfEditorDfOps:
         self.counts = counts
         self.undo_mgr = undo_mgr
 
-    # ----- row height / expansion -----
-    def adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
-        current = self.ctx.state.row_lines
-        new_value = max(minimum, min(maximum, current + delta))
-        if new_value == current:
-            bound = "minimum" if delta < 0 else "maximum"
-            self.ctx._set_status(f"Row lines {bound} reached ({new_value})", 2)
-            return
-        applied_delta = new_value - current
-        self.ctx.state.row_lines = new_value
-        self.ctx.grid.row_offset = 0
-        self.ctx._set_status(f"Row lines set to {self.ctx.state.row_lines}", 2)
-        self.undo_mgr.set_last_action("adjust_row_lines", delta=applied_delta)
-
+    # ----- row expansion -----
     def toggle_row_expanded(self):
         if len(self.ctx.state.df) == 0:
             self.ctx._set_status("No rows to expand", 2)

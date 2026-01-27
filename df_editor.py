@@ -214,9 +214,6 @@ class DfEditor:
             elif t == "delete_rows":
                 count = act.get("count", 1)
                 self._delete_rows(count)
-            elif t == "adjust_row_lines":
-                delta = act.get("delta", 0)
-                self._adjust_row_lines(delta)
             elif t == "cell_set":
                 row = self.grid.curr_row
                 col = self.grid.curr_col
@@ -274,9 +271,6 @@ class DfEditor:
 
     def redo(self):
         self.undo_mgr.redo()
-
-    def _adjust_row_lines(self, delta: int, minimum: int = 1, maximum: int = 10):
-        self.df_ops.adjust_row_lines(delta, minimum=minimum, maximum=maximum)
 
     def _toggle_row_expanded(self):
         self.df_ops.toggle_row_expanded()
