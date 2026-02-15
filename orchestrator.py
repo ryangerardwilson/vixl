@@ -353,11 +353,22 @@ class Orchestrator:
                         sheet_text = ""
                         if getattr(self.state, "has_sheets", lambda: False)():
                             sheet_name = getattr(self.state, "active_sheet", None)
-                            if sheet_name:
-                                sheet_text = f" | Sheet: {sheet_name}"
+                            sheet_order = getattr(self.state, "sheet_order", [])
+                            if sheet_name and sheet_order:
+                                try:
+                                    sheet_idx = sheet_order.index(sheet_name) + 1
+                                except ValueError:
+                                    sheet_idx = 1
+                                sheet_total = len(sheet_order)
+                                sheet_text = f" | Sheet {sheet_idx}/{sheet_total}"
                         shape = f"{self.state.df.shape}"
                         page_total = self.paginator.page_count
-                        page_info = f"Page {self.paginator.page_index + 1}/{page_total} rows {self.paginator.page_start}-{max(self.paginator.page_start, self.paginator.page_end - 1)} of {self.paginator.total_rows}"
+                        row_start = self.paginator.page_start
+                        row_end = max(self.paginator.page_start, self.paginator.page_end - 1)
+                        page_info = (
+                            f"Page {self.paginator.page_index + 1}/{page_total}"
+                            f" | Rows {row_start}-{row_end}/{self.paginator.total_rows}"
+                        )
                         count_text = ""
                         if self.focus == 0 and getattr(
                             self.df_editor, "pending_count", None

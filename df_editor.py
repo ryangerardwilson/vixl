@@ -230,7 +230,16 @@ class DfEditor:
         if hasattr(self.grid, "visual_rect"):
             self.grid.visual_rect = None
 
-        self._set_status(f"Sheet: {new_name}", 3)
+        sheet_order = getattr(self.state, "sheet_order", [])
+        if sheet_order:
+            try:
+                sheet_idx = sheet_order.index(new_name) + 1
+            except ValueError:
+                sheet_idx = 1
+            sheet_total = len(sheet_order)
+            self._set_status(f"Sheet {sheet_idx}/{sheet_total}: {new_name}", 3)
+        else:
+            self._set_status(f"Sheet: {new_name}", 3)
         return True
 
     # ---------- counts ----------
