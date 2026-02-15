@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.
 ## Command-line usage
 
 ```bash
-vixl [path]   # open an existing CSV or Parquet file (creates if missing)
+vixl [path]   # open an existing CSV, Parquet, XLSX, or HDF5 file (creates if missing)
 vixl -v       # print version
 vixl -u       # upgrade to the latest release
 vixl -h       # show help/usage summary

@@ -34,14 +34,24 @@ class SavePrompt:
             if not path:
                 self._set_status("Path required", 3)
                 return
-            if not (path.lower().endswith(".csv") or path.lower().endswith(".parquet")):
-                self._set_status("Save failed: use .csv or .parquet", 4)
+            if not (
+                path.lower().endswith(".csv")
+                or path.lower().endswith(".parquet")
+                or path.lower().endswith(".xlsx")
+                or path.lower().endswith(".h5")
+            ):
+                self._set_status("Save failed: use .csv, .parquet, .xlsx, or .h5", 4)
                 return
             try:
                 handler = self.FileTypeHandler(path)
                 if hasattr(self.state, "ensure_non_empty"):
                     self.state.ensure_non_empty()
-                handler.save(self.state.df)
+                payload = self.state.df
+                if getattr(handler, "ext", None) in {".xlsx", ".h5"} and getattr(
+                    self.state, "sheets", None
+                ):
+                    payload = self.state.sheets
+                handler.save(payload)
                 self.state.file_handler = handler
                 self.state.file_path = path
                 self._set_status(f"Saved {path}", 3)

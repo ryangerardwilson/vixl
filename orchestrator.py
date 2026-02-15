@@ -350,6 +350,11 @@ class Orchestrator:
                             if self.state.file_path
                             else ""
                         )
+                        sheet_text = ""
+                        if getattr(self.state, "has_sheets", lambda: False)():
+                            sheet_name = getattr(self.state, "active_sheet", None)
+                            if sheet_name:
+                                sheet_text = f" | Sheet: {sheet_name}"
                         shape = f"{self.state.df.shape}"
                         page_total = self.paginator.page_count
                         page_info = f"Page {self.paginator.page_index + 1}/{page_total} rows {self.paginator.page_start}-{max(self.paginator.page_start, self.paginator.page_end - 1)} of {self.paginator.total_rows}"
@@ -359,7 +364,9 @@ class Orchestrator:
                         ):
                             count_val = self.df_editor.pending_count
                             count_text = f" | Count: {count_val}"
-                        text = f" {mode} | {fname} | {shape} | {page_info}{count_text}"
+                        text = (
+                            f" {mode} | {fname}{sheet_text} | {shape} | {page_info}{count_text}"
+                        )
 
                     try:
                         sw.addnstr(0, 0, text.ljust(w), w)
@@ -495,7 +502,12 @@ class Orchestrator:
         try:
             if hasattr(self.state, "ensure_non_empty"):
                 self.state.ensure_non_empty()
-            handler.save(self.state.df)
+            payload = self.state.df
+            if getattr(handler, "ext", None) in {".xlsx", ".h5"} and getattr(
+                self.state, "sheets", None
+            ):
+                payload = self.state.sheets
+            handler.save(payload)
             fname = self.state.file_path or ""
             self._set_status(f"Saved {fname}" if fname else "Saved", 3)
             if save_and_exit:

@@ -1,3 +1,5 @@
 numpy<2
 pandas
 pyarrow==13.0.0
+openpyxl
+tables

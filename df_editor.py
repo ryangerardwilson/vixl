@@ -65,6 +65,7 @@ class DfEditor:
                 show_leader_status_cb=self._show_leader_status,
                 leader_seq_cb=self._leader_seq,
                 open_json_preview_cb=self._open_cell_json_preview,
+                switch_sheet_cb=self.switch_sheet,
             ),
         )
 
@@ -192,6 +193,45 @@ class DfEditor:
 
     def _complete_external_edit_if_done(self):
         self.external.complete_external_edit_if_done()
+
+    def switch_sheet(self, delta: int):
+        if not hasattr(self.state, "switch_sheet"):
+            self._set_status("Sheets unavailable", 3)
+            return False
+        if not getattr(self.state, "has_sheets", lambda: False)():
+            self._set_status("Single sheet", 2)
+            return False
+
+        count = max(1, self.counts.consume())
+        new_name = self.state.switch_sheet(delta * count)
+        if not new_name:
+            self._set_status("No sheets", 3)
+            return False
+
+        self.grid.df = self.state.df
+        self.paginator.update_total_rows(len(self.state.df))
+        self.paginator.ensure_row_visible(0)
+        self.grid.curr_row = 0
+        self.grid.curr_col = 0
+        self.grid.row_offset = 0
+        self.grid.col_offset = 0
+        self.grid.highlight_mode = "cell"
+        self.grid.adjust_col_viewport()
+
+        self.state.expanded_rows = set()
+        self.state.expand_all_rows = False
+
+        if hasattr(self.ctx, "visual_active"):
+            self.ctx.visual_active = False
+        if hasattr(self.ctx, "visual_anchor"):
+            self.ctx.visual_anchor = None
+        if hasattr(self.grid, "visual_active"):
+            self.grid.visual_active = False
+        if hasattr(self.grid, "visual_rect"):
+            self.grid.visual_rect = None
+
+        self._set_status(f"Sheet: {new_name}", 3)
+        return True
 
     # ---------- counts ----------
     def _reset_last_action(self):

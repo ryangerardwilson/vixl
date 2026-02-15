@@ -18,6 +18,7 @@ class DfEditorDfMode:
         show_leader_status_cb,
         leader_seq_cb,
         open_json_preview_cb,
+        switch_sheet_cb,
     ):
         self.ctx = ctx
         self.counts = counts
@@ -28,6 +29,7 @@ class DfEditorDfMode:
         self._show_leader_status = show_leader_status_cb
         self._leader_seq = leader_seq_cb
         self._open_json_preview = open_json_preview_cb
+        self._switch_sheet = switch_sheet_cb
 
     def handle_key(self, ch: int) -> bool:
         total_rows = len(self.ctx.state.df)
@@ -40,6 +42,16 @@ class DfEditorDfMode:
         # numeric prefixes
         if ord("0") <= ch <= ord("9"):
             self.counts.push_digit(ch - ord("0"))
+            return True
+
+        if ch == ord("H"):
+            if callable(self._switch_sheet):
+                return bool(self._switch_sheet(-1))
+            return True
+
+        if ch == ord("L"):
+            if callable(self._switch_sheet):
+                return bool(self._switch_sheet(1))
             return True
 
         if total_cols == 0:
