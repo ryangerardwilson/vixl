@@ -87,11 +87,13 @@ complete -o filenames -F _vixl_files vixl
             or "complete -o filenames -F _vixl_files python3" in text
             or "complete -o filenames -F _vixl_files main.py" in text
         )
+        missing_exts = ".xlsx" not in text or ".h5" not in text
         return (
             "complete -o filenames -F _vixl_files vixl" not in text
             or "HIDE_DOTFILES" not in text
             or "HIDE_PYCACHE" not in text
             or legacy_bindings
+            or missing_exts
         )
 
     def _rc_paths(self) -> list[Path]:
