@@ -58,8 +58,7 @@ active context.
 ### DF mode navigation & editing
 
 - `h` / `j` / `k` / `l` – move left/down/up/right
-- `H` / `L` – expand highlight to column
-- `J` / `K` – expand highlight to row
+- `H` / `L` – previous/next sheet (multi-sheet files)
 - `Ctrl+J` / `Ctrl+K` – jump ~5% rows down/up
 - `Ctrl+H` / `Ctrl+L` – jump ~20% columns left/right
 - `:` – open the command bar
