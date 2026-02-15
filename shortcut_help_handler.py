@@ -22,6 +22,7 @@ class ShortcutHelpHandler:
             "",
             "Command bar",
             "  : (from df) - enter",
+            "  Example: :df.info() (and other df.* commands)",
             "  Enter - execute",
             "  Esc - cancel",
             "  Ctrl+P / Ctrl+N - history prev/next",
