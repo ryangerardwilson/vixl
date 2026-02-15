@@ -63,7 +63,7 @@ _vixl_files() {
         if [[ "$f_base" == "__pycache__" && "$cur" != __pycache__* ]]; then
             continue
         fi
-        if [[ -d "$f" || "$f" == *.csv || "$f" == *.parquet ]]; then
+        if [[ -d "$f" || "$f" == *.csv || "$f" == *.parquet || "$f" == *.xlsx || "$f" == *.h5 ]]; then
             COMPREPLY+=("$f")
         fi
     done < <(compgen -f -- "$cur")
@@ -125,7 +125,7 @@ complete -o filenames -F _vixl_files vixl
             f"1) Add this block to {rc_target}:\n{block}\n"
             f"   (Checked files: {rc_list})\n"
             f"2) Reload your shell or run: source {rc_target}\n"
-            "3) Re-run: python main.py <csv-or-parquet> (or vixl <csv-or-parquet>)\n"
+            "3) Re-run: python main.py <csv-parquet-xlsx-h5> (or vixl <csv-parquet-xlsx-h5>)\n"
             "4) (Optional) Create a symlink in your PATH for 'vixl', e.g.:\n"
             '   ln -s "$PWD/main.py" "$HOME/.local/bin/vixl"\n'
             f"To skip this warning, set {self.SKIP_CHECK_ENV}=1 in your environment.\n"
