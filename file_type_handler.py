@@ -86,7 +86,9 @@ class FileTypeHandler:
             return self._default_sheet_dict(df)
         return df
 
-    def _default_sheet_dict(self, df: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+    def _default_sheet_dict(
+        self, df: pd.DataFrame | None = None
+    ) -> dict[str, pd.DataFrame]:
         base = df if isinstance(df, pd.DataFrame) else self._default_df()
         return {self.DEFAULT_SHEET_NAME: base}
 

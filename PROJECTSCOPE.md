@@ -11,8 +11,8 @@ clone; it is a power-user tool optimized for keyboard-driven workflows and
 inspectable data transformations.
 
 The scope is intentionally limited to editing and analyzing tabular datasets
-that already reside within Vixl. Orchestrating external data ingestion pipelines
-or shelling out to external commands is out of scope.
+that already reside within Vixl. Orchestrating external data ingestion
+pipelines or shelling out to external commands is out of scope.
 
 ---
 

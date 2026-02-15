@@ -33,13 +33,14 @@ _SAFE_BUILTINS = {
         "print",
     ]
 }
+
+
 class CommandExecutor:
     def __init__(self, app_state):
         self.state = app_state
         self.startup_warnings = []
         ensure_config_dirs()
         self.config, ignored_cmds = self._load_config_data()
-
 
     # ---------- config / warnings ----------
     def _load_config_data(self):

@@ -22,7 +22,9 @@ except Exception:
 
 
 INSTALL_URL = "https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh"
-LATEST_RELEASE_API = "https://api.github.com/repos/ryangerardwilson/vixl/releases/latest"
+LATEST_RELEASE_API = (
+    "https://api.github.com/repos/ryangerardwilson/vixl/releases/latest"
+)
 
 
 def _version_tuple(version: str) -> tuple[int, ...]:
@@ -123,11 +125,18 @@ def main():
     if "-u" in args:
         latest = _get_latest_version()
         if latest is None:
-            print("Unable to determine latest version; attempting upgrade…", file=sys.stderr)
+            print(
+                "Unable to determine latest version; attempting upgrade…",
+                file=sys.stderr,
+            )
             rc = _run_upgrade()
             sys.exit(rc)
 
-        if __version__ and __version__ != "0.0.0" and not _is_version_newer(latest, __version__):
+        if (
+            __version__
+            and __version__ != "0.0.0"
+            and not _is_version_newer(latest, __version__)
+        ):
             print(f"Already running the latest version ({__version__}).")
             sys.exit(0)
 

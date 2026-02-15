@@ -100,5 +100,6 @@ class RowInsertLeaderTests(unittest.TestCase):
         self.assertEqual(len(editor.state.df), 2)
         self.assertEqual(editor.grid.curr_row, 1)
 
+
 if __name__ == "__main__":
     unittest.main()

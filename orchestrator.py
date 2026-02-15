@@ -212,7 +212,9 @@ class Orchestrator:
                         shape = f"{self.state.df.shape}"
                         page_total = self.paginator.page_count
                         row_start = self.paginator.page_start
-                        row_end = max(self.paginator.page_start, self.paginator.page_end - 1)
+                        row_end = max(
+                            self.paginator.page_start, self.paginator.page_end - 1
+                        )
                         page_info = (
                             f"Page {self.paginator.page_index + 1}/{page_total}"
                             f" | Rows {row_start}-{row_end}/{self.paginator.total_rows}"
@@ -223,9 +225,7 @@ class Orchestrator:
                         ):
                             count_val = self.df_editor.pending_count
                             count_text = f" | Count: {count_val}"
-                        text = (
-                            f" {mode} | {fname}{sheet_text} | {shape} | {page_info}{count_text}"
-                        )
+                        text = f" {mode} | {fname}{sheet_text} | {shape} | {page_info}{count_text}"
 
                     try:
                         sw.addnstr(0, 0, text.ljust(w), w)
@@ -246,7 +246,6 @@ class Orchestrator:
             self.focus = 0
             self._set_status("No command to execute", 3)
             return
-
 
         lines = self.exec.execute(code)
         if lines:
