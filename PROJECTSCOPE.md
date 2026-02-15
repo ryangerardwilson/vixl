@@ -158,10 +158,9 @@ Characteristics:
 ### Architecture
 - Entry: `main.py` → `LoadingScreen` → `Orchestrator`
 - Layout: table + shared bottom strip (status/command/prompt); overlays for output/shortcuts (content-sized, ≤50% terminal height).
-- Execution: single in-process sandboxed `df`. Commits occur only when an extension explicitly commits or when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`). Read-only commands leave the DataFrame unchanged.
+- Execution: single in-process sandboxed `df`. Commits occur only when the user assigns to `df` (e.g., `df[...] = ...`, `df = df.assign(...)`) or returns `(df, True)`; read-only commands leave the DataFrame unchanged.
 - Saving: Save-As prompt if no file handler; Ctrl+S/Ctrl+T handle save/save-exit.
-- History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N). Successful command executions and successful `:%fz/...` / `:%fz#/...` loads are recorded so they can be recalled.
-- Extensions: defined in `~/.config/vixl/extensions.py`; imports are disallowed (only builtins + `pd`/`np` are available); config at `~/.config/vixl/config.json`.
+- History: `~/.config/vixl/history.log`; history nav in command bar (Ctrl+P/Ctrl+N). Successful command executions are recorded so they can be recalled.
 - External command invocation via a command register has been removed; all data
   transformations occur inside the in-process sandbox.
 
@@ -182,7 +181,6 @@ Characteristics:
 
 ### File locations
 - History: `$XDG_CONFIG_HOME/vixl/history.log` (default `~/.config/vixl/history.log`)
-- Extensions: `$XDG_CONFIG_HOME/vixl/extensions.py`
 - Config: `$XDG_CONFIG_HOME/vixl/config.json`
 - Default df: created in `main.py` when no arg is provided.
 

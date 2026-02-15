@@ -27,7 +27,6 @@ class ShortcutHelpHandler:
             "  Esc - cancel",
             "  Ctrl+P / Ctrl+N - history prev/next",
             "  Backspace, Left/Right, Home/End - edit/move",
-            "  Tab - apply completion/expansion",
             "  Emacs-style: Alt+F/B (word fwd/back), Ctrl+W (delete word), Ctrl+U (kill to start), Ctrl+H/D (move left/right), Ctrl+A/E (line start/end)",
             "",
             "DF normal",

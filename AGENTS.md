@@ -17,11 +17,10 @@ Component responsibilities (1-2 lines each):
 - overlay.py: Modal overlay rendering for output/help and scroll handling.
 - shortcut_help_handler.py: Supplies the help/shortcuts text lines.
 - pagination.py: Row paging logic for large DataFrames.
-- command_executor.py: Sandboxed command execution, config loading, and extension registration.
-- expression_register.py: Parses expression-register entries and match text for fuzzy usage.
+- command_executor.py: Sandboxed command execution and config loading.
+- completions_handler.py: Generates bash completion script and prints activation instructions.
 - history_manager.py: Loads, appends, and persists command history to disk.
 - config_paths.py: Defines config paths and loads config defaults.
-- completions_handler.py: Generates bash completion script and prints activation instructions.
 - df_editor.py: Composes DF editor subsystems and exposes editing operations to the orchestrator.
 - df_editor_context.py: Shared context container for DF editor subsystems.
 - df_editor_counts.py: Tracks numeric prefix counts for DF-mode commands.

@@ -18,7 +18,6 @@ def test_load_config_defaults_without_json():
             cfg = config_paths.load_config()
             cfg = config_paths.load_config()
             assert "AUTO_COMMIT" not in cfg
-            assert cfg["EXPRESSION_REGISTER"] == []
             assert cfg["IGNORED_COMMAND_ENTRIES"] == []
             assert "COMMAND_REGISTER" not in cfg
 
@@ -32,26 +31,7 @@ def test_load_config_reads_json_overrides():
         cfg_dir = Path(tmp) / "vixl"
         cfg_dir.mkdir(parents=True, exist_ok=True)
         cfg_path = cfg_dir / "config.json"
-        cfg_path.write_text(
-            json.dumps(
-                {
-                    "cmd_mode": {
-                        "expression_register": [
-                            "df.vixl.foo()",
-                            "df.bar()",
-                        ],
-                        "command_register": {
-                            "foo": {
-                                "kind": "mutate",
-                                "argv": ["/bin/true"],
-                                "timeout_seconds": 5,
-                                "description": "desc",
-                            }
-                        },
-                    },
-                }
-            )
-        )
+        cfg_path.write_text(json.dumps({"clipboard_interface_command": ["pbcopy"]}))
 
         orig_dir = config_paths.CONFIG_DIR
         orig_json = config_paths.CONFIG_JSON
@@ -60,11 +40,8 @@ def test_load_config_reads_json_overrides():
             config_paths.CONFIG_JSON = str(cfg_path)
             cfg = config_paths.load_config()
             assert "AUTO_COMMIT" not in cfg
-            assert cfg["EXPRESSION_REGISTER"] == [
-                "df.vixl.foo()",
-                "df.bar()",
-            ]
-            assert cfg["IGNORED_COMMAND_ENTRIES"] == ["foo"]
+            assert cfg["IGNORED_COMMAND_ENTRIES"] == []
+            assert cfg["CLIPBOARD_INTERFACE_COMMAND"] == ["pbcopy"]
             assert "COMMAND_REGISTER" not in cfg
         finally:
             config_paths.CONFIG_DIR = orig_dir

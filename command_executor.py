@@ -1,28 +1,13 @@
 import ast
 import builtins
 import io
-import os
 import sys
-import types
 
 import numpy as np
 import pandas as pd
 
-from config_paths import EXTENSIONS_DIR, EXTENSIONS_PY, ensure_config_dirs, load_config
+from config_paths import ensure_config_dirs, load_config
 
-_ALLOWED_GLOBALS = {"df", "pd", "np", "commit_df"}
-_ESCAPE_HATCH_NAMES = {
-    "__import__",
-    "eval",
-    "exec",
-    "compile",
-    "open",
-    "input",
-    "globals",
-    "locals",
-    "vars",
-    "importlib",
-}
 _SAFE_BUILTINS = {
     name: getattr(builtins, name)
     for name in [
@@ -48,35 +33,6 @@ _SAFE_BUILTINS = {
         "print",
     ]
 }
-
-
-class VixlExtensions:
-    def __init__(self, df, extensions, ext_flag=None):
-        self._df = df
-        self._extensions = extensions
-        self._ext_flag = ext_flag
-        self._cache = {}
-
-    def __getattr__(self, name):
-        if name not in self._extensions:
-            raise AttributeError(f"No extension named '{name}'")
-        if name in self._cache:
-            return self._cache[name]
-
-        fn = self._extensions[name]
-
-        def _wrapped(*args, **kwargs):
-            if self._ext_flag is not None:
-                self._ext_flag[0] = True
-            return fn(self._df, *args, **kwargs)
-
-        self._cache[name] = _wrapped
-        return _wrapped
-
-    def __dir__(self):
-        return sorted(self._extensions.keys())
-
-
 class CommandExecutor:
     def __init__(self, app_state):
         self.state = app_state
@@ -84,40 +40,16 @@ class CommandExecutor:
         ensure_config_dirs()
         self.config, ignored_cmds = self._load_config_data()
 
-        if ignored_cmds:
-            self.startup_warnings.append(self._format_ignored_warning(ignored_cmds))
-
-        self._warn_deprecated_extensions_dir()
-        self._extensions = self._load_extensions()
-        self._extension_names = sorted(self._extensions.keys())
 
     # ---------- config / warnings ----------
-    def _warn_deprecated_extensions_dir(self):
-        if not os.path.isdir(EXTENSIONS_DIR):
-            return
-        for fname in os.listdir(EXTENSIONS_DIR):
-            if fname.endswith(".py"):
-                self.startup_warnings.append(
-                    "extensions directory is deprecated; move to ~/.config/vixl/extensions.py"
-                )
-                break
-
     def _load_config_data(self):
         cfg = load_config()
-        ignored = cfg.get("IGNORED_COMMAND_ENTRIES") or []
-        return cfg, ignored
-
-    def _format_ignored_warning(self, ignored):
-        names = ", ".join(ignored)
-        plural = "y" if len(ignored) == 1 else "ies"
-        return f"Ignored command register entr{plural}: {names}"
+        return cfg, []
 
     def reload_config(self):
-        self.config, ignored = self._load_config_data()
+        self.config, _ = self._load_config_data()
         self.startup_warnings = []
-        if ignored:
-            self.startup_warnings.append(self._format_ignored_warning(ignored))
-        return ignored
+        return []
 
     # ---------- AST helpers ----------
     def _roots_at_df(self, node):
@@ -146,63 +78,18 @@ class CommandExecutor:
                         return True
         return False
 
-    # ---------- extensions ----------
-    def _validate_extensions_ast(self, parsed):
-        for n in ast.walk(parsed):
-            if isinstance(n, (ast.Import, ast.ImportFrom)):
-                raise ValueError("imports are not allowed in extensions.py")
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
-                if n.id in _ESCAPE_HATCH_NAMES:
-                    raise ValueError(f"disallowed name in extensions.py: {n.id}")
-        return True
-
-    def _load_extensions(self):
-        funcs = {}
-        if not os.path.exists(EXTENSIONS_PY):
-            return funcs
-        try:
-            with open(EXTENSIONS_PY, "r", encoding="utf-8") as f:
-                src = f.read()
-            parsed = ast.parse(src, filename=EXTENSIONS_PY)
-            self._validate_extensions_ast(parsed)
-
-            g = {"__builtins__": _SAFE_BUILTINS, "pd": pd, "np": np}
-            exec(compile(parsed, EXTENSIONS_PY, "exec"), g, g)
-            for name, val in list(g.items()):
-                if isinstance(val, types.FunctionType) and not name.startswith("_"):
-                    funcs[name] = val
-        except Exception as e:
-            self.startup_warnings.append(f"failed to load extensions.py: {e}")
-        return funcs
-
-    def get_extension_names(self):
-        return list(self._extension_names)
-
-    def _bind_extensions(self, df, ext_flag=None):
-        try:
-            setattr(df, "vixl", VixlExtensions(df, self._extensions, ext_flag))
-        except Exception:
-            pass
-
     # ---------- execution (local only) ----------
     def _execute_local(self, code, parsed):
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        # ensure current df has extensions bound
-        self._bind_extensions(self.state.df)
-
         sandbox_df = self.state.df.copy(deep=True)
-        ext_called_flag = [False]
         env = {
             "df": sandbox_df,
             "np": np,
             "pd": pd,
             "commit_df": False,
-            "_ext_called": ext_called_flag,
         }
-        # bind extensions to sandbox df with flagging
-        self._bind_extensions(env["df"], ext_flag=ext_called_flag)
 
         old_out, old_err = sys.stdout, sys.stderr
         committed_df = None
@@ -264,7 +151,6 @@ class CommandExecutor:
 
         if committed_df is not None and success:
             self.state.df = committed_df
-            self._bind_extensions(self.state.df)
             if hasattr(self.state, "ensure_non_empty"):
                 self.state.ensure_non_empty()
 

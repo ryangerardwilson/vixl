@@ -1,8 +1,8 @@
 # Changelog
 
 ## [Unreleased]
-- Renamed cmd-mode `tab_fuzzy_expansions_register` to `expression_register`; Tab completion is prefix-only against that register.
-- Added `:%fz/<query>` and `:%fz#/<query>` to fuzzy-load expression register entries (phrase-aware). Trailing `# comments` and `%fz#/` tags participate in fuzzy search; comment-only matches never insert text. Successful `%fz` loads are now written to command history so they can be recalled via Ctrl+P/Ctrl+N.
+- Removed command bar tab completion and expression register support.
+- Removed expression register support (`%fz` / `%fz#`).
 - Added DF visual mode: `v` toggles a rectangular selection, Esc exits; `d` clears all selected cells and `i` bulk-fills the selection via Vim (single external edit). Visual selections render inline and the status bar shows `VISUAL` when active.
 - Added row expansion: `,xr` toggles expansion of the current row; `,xar` toggles expansion of all rows; `,xc` collapses all expansions. Expanded rows wrap on word boundaries (hard-break only for overlong words) to show full content without widening columns; collapsed default remains single-line.
 - Simplified editing: removed `cell_insert`/`cell_normal` modes and the `n`, `,e`, `,v`, `,c c` workflows. Pressing `i` now suspends curses, opens **vim** in the current terminal with the cell value, and commits on exit status 0 (non-zero cancels). External editing is synchronous—no background polling or Alacritty dependency.
@@ -11,10 +11,9 @@
 - Added a curl-installable Linux x86_64 binary (PyInstaller build) and documented the installer.
 - Release workflow now builds inside manylinux2014 via Docker, bundles NumPy/Pandas/PyArrow assets correctly, and uploads `vixl-linux-x64.tar.gz` on each tag.
 - `install.sh` auto-detects the latest release, handles version pinning, and adds `~/.vixl/bin` to PATH (unless suppressed).
-- Removed `python_path` and remote execution; all commands run in-process. Extensions must be pure Python using only builtins plus the provided `pd`/`np` symbols; imports in `extensions.py` are rejected. The legacy `extensions/*.py` layout remains deprecated; use a single `$XDG_CONFIG_HOME/vixl/extensions.py` file.
+- Removed `extensions.py` support; all commands run in-process without user-defined extension loading.
 - Removed the external commands registry (`cmd_mode.command_register`) and `!name`
-  invocation; `%fz`/`%fz#` now search the expression register only and all
-  transformations run inside the in-process Python sandbox.
+  invocation; all transformations run inside the in-process Python sandbox.
 - Replaced the standalone `c` shortcut with the leader sequence `,conf` for
   editing `config.json`; the config is now reloaded automatically after the
   editor exits.

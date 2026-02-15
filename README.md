@@ -86,41 +86,14 @@ active context.
 Commands are entered via the command bar (`:`) and executed in a sandbox with
 `df` (current DataFrame), `pd`, and `np` preloaded.
 
-- `%fz/<query>` – fuzzy-load the best expression from the expression register
-  and insert it into the command buffer
-- `%fz#/<query>` – fuzzy-search comments/descriptions in the expression register
-- `df.vixl.some_extension(...)` – call a user-defined extension; returning
-  `(df, True)` or mutating `df` commits the change
 - Assigning to `df` or returning `(df, True)` from arbitrary expressions commits
   the DataFrame; read-only commands leave it unchanged
 
 #### Debugging tips
-- `%fz` only searches expressions defined in the expression register; add
-  frequently used snippets there via `~/.config/vixl/config.json`.
 - No external command register exists—keep data transformations inside the
   in-process Python sandbox.
 - Command prints nothing? Write to stdout so Vixl can show it.
 - SQL/text args with spaces: quote them (`"select * from users"`).
-
-- Example `~/.config/vixl/extensions.py`:
-
-
-  ```python
-  def multiply_cols(df, col_a, col_b, out_col="product"):
-      df[out_col] = df[col_a] * df[col_b]
-      return df, True
-
-  def top_n(df, col, n=5):
-      return df.sort_values(col, ascending=False).head(n)
-
-  def add_ratio(df, num_col, den_col, out_col="ratio"):
-      df[out_col] = df[num_col] / df[den_col]
-      return df, True
-  ```
-- Usage examples in cmd:
-  - `df.vixl.multiply_cols("col_a", "col_b", out_col="prod")` (commits via tuple)
-  - `df.vixl.top_n("col_a", 3)` (read-only; output modal)
-  - `df.vixl.add_ratio("col_a", "col_b")`
 
 ### Removed / changed features
 - Leader commands (`,ya`, `,yap`, `,yio`, `,o`, `,df`) removed.

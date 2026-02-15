@@ -362,9 +362,6 @@ class DfEditorExternal:
     def _default_config_contents(self) -> str:
         return (
             '{\n'
-            '  "clipboard_interface_command": null,\n'
-            '  "cmd_mode": {\n'
-            '    "expression_register": []\n'
-            '  }\n'
+            '  "clipboard_interface_command": null\n'
             '}\n'
         )

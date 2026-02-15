@@ -3,15 +3,12 @@ import curses
 import time
 import os
 import subprocess
-import re
-import difflib
 
 from grid_pane import GridPane
 from command_pane import CommandPane
 from command_executor import CommandExecutor
 from screen_layout import ScreenLayout
 from config_paths import HISTORY_PATH, ensure_config_dirs
-from expression_register import parse_expression_register
 from file_type_handler import FileTypeHandler
 from pagination import Paginator
 from history_manager import HistoryManager
@@ -20,138 +17,6 @@ from save_prompt import SavePrompt
 from column_prompt import ColumnPrompt
 from overlay import OverlayView
 from shortcut_help_handler import ShortcutHelpHandler
-
-
-_PUNCT_TO_SPACE = re.compile(r"[\(\)\[\]\{\},.:/+=-]")
-_WHITESPACE = re.compile(r"\s+")
-_VOWELS = re.compile(r"[aeiou]")
-
-
-def _normalize_text(text):
-    if not isinstance(text, str):
-        return ""
-    lowered = text.lower()
-    lowered = _PUNCT_TO_SPACE.sub(" ", lowered)
-    lowered = _WHITESPACE.sub(" ", lowered).strip()
-    return lowered
-
-
-def _skeleton_word(word):
-    return _VOWELS.sub("", word)
-
-
-def _skeleton_text(text):
-    words = _normalize_text(text).split()
-    return " ".join(_skeleton_word(w) for w in words)
-
-
-def _is_subsequence(needle, haystack):
-    it = iter(haystack)
-    for ch in needle:
-        for val in it:
-            if val == ch:
-                break
-        else:
-            return False
-    return True
-
-
-def _token_score(q_word, c_word):
-    qs = _skeleton_word(q_word)
-    cs = _skeleton_word(c_word)
-    if not qs or not cs:
-        return 0.0
-
-    score = 0.0
-    if cs.startswith(qs):
-        score = 1.0
-    elif _is_subsequence(qs, cs):
-        score = 0.7
-
-    # If the non-skeletonized words also prefix-match, honor that strongly.
-    ql = q_word.lower()
-    cl = c_word.lower()
-    if cl.startswith(ql):
-        score = max(score, 0.9)
-    return score
-
-
-def _phrase_score(q_words, c_words):
-    m = len(q_words)
-    n = len(c_words)
-    if m == 0 or n == 0 or m > n:
-        return 0.0
-
-    best = 0.0
-    for i in range(n - m + 1):
-        window = c_words[i : i + m]
-        scores = [_token_score(qw, cw) for qw, cw in zip(q_words, window)]
-        avg = sum(scores) / m if m else 0.0
-        if avg > best:
-            best = avg
-    return best
-
-
-def _fuzzy_best_text_match(query, texts):
-    if not isinstance(query, str):
-        return None
-    normalized_query = _normalize_text(query)
-    if not normalized_query:
-        return None
-
-    q_words = normalized_query.split()
-    q_skel = _skeleton_text(query)
-    best_index = None
-    best_score = -1.0
-    best_phrase = -1.0
-    best_len = None
-
-    for idx, text in enumerate(texts or []):
-        if not isinstance(text, str):
-            continue
-        if not text.strip():
-            continue
-        norm_cand = _normalize_text(text)
-        if not norm_cand:
-            continue
-        c_words = norm_cand.split()
-        c_skel = _skeleton_text(text)
-
-        overall = difflib.SequenceMatcher(None, q_skel, c_skel).ratio()
-        phrase = _phrase_score(q_words, c_words)
-
-        score = 0.7 * overall + 0.3 * phrase
-        if phrase >= 0.92:
-            score = max(score, 0.9 * phrase)
-
-        cand_len = len(text)
-        if score > best_score or (
-            score == best_score
-            and (
-                phrase > best_phrase
-                or (phrase == best_phrase and (best_len is None or cand_len < best_len))
-            )
-        ):
-            best_score = score
-            best_phrase = phrase
-            best_len = cand_len
-            best_index = idx
-
-    return best_index
-
-
-def fuzzy_best_match(query, entries):
-    valid_pairs = []
-    for entry in entries or []:
-        match_text = getattr(entry, "match_text", None)
-        if isinstance(match_text, str) and match_text.strip():
-            valid_pairs.append((entry, match_text))
-    if not valid_pairs:
-        return None
-    idx = _fuzzy_best_text_match(query, [text for _, text in valid_pairs])
-    if idx is None:
-        return None
-    return valid_pairs[idx][0]
 
 
 class Orchestrator:
@@ -175,12 +40,6 @@ class Orchestrator:
         self.exec = CommandExecutor(app_state)
         if getattr(self.exec, "startup_warnings", None):
             self._set_status(self.exec.startup_warnings[0], seconds=6)
-        if hasattr(self.command, "set_extension_names"):
-            self.command.set_extension_names(self.exec.get_extension_names())
-        if hasattr(self.command, "set_expression_register"):
-            self.command.set_expression_register(
-                self.exec.config.get("EXPRESSION_REGISTER", [])
-            )
 
         self.focus = 0  # 0=df, 1=cmd, 2=overlay
 
@@ -270,22 +129,11 @@ class Orchestrator:
             return
 
         cfg = self.exec.config
-        if hasattr(self.command, "set_expression_register"):
-            self.command.set_expression_register(
-                cfg.get("EXPRESSION_REGISTER", [])
-            )
-        if hasattr(self.command, "set_extension_names"):
-            self.command.set_extension_names(self.exec.get_extension_names())
 
         if hasattr(self.df_editor, "ctx"):
             self.df_editor.ctx.config = cfg
 
-        message = "Config reloaded"
-        if ignored:
-            names = ", ".join(ignored)
-            suffix = "s" if len(ignored) != 1 else ""
-            message += f" (ignored command entry{suffix}: {names})"
-        self._set_status(message, 4)
+        self._set_status("Config reloaded", 4)
 
     def _set_status(self, msg, seconds=3):
         self.status_msg = msg
@@ -399,79 +247,6 @@ class Orchestrator:
             self._set_status("No command to execute", 3)
             return
 
-        if code.startswith("%fz#/"):
-            query = code[len("%fz#/") :].strip()
-            raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
-            entries = parse_expression_register(raw_register)
-            if not query:
-                self._set_status("Query required", 3)
-                return
-            if not entries:
-                self._set_status("No fuzzy sources", 3)
-                return
-            # comments/descriptions only
-            comment_texts = []
-            comment_objs = []
-            for entry in entries:
-                comment = getattr(entry, "comment", "").strip()
-                if comment:
-                    comment_texts.append(comment)
-                    comment_objs.append(entry)
-            if not comment_texts:
-                self._set_status("No commented entries", 3)
-                return
-            idx = _fuzzy_best_text_match(query, comment_texts)
-            if idx is None:
-                self._set_status(f"No comment match for: {query}", 3)
-                return
-            best_entry = comment_objs[idx]
-            # expression path
-            if getattr(best_entry, "kind", "expression") == "comment_only":
-                self._set_status("Matched comment-only entry", 3)
-                return
-            expr = getattr(best_entry, "expr", "").strip()
-            if not expr:
-                self._set_status("No expression to load", 3)
-                return
-            self.command.set_buffer(expr)
-            self.focus = 1
-            self.history_mgr.append(code)
-            self.command.set_history(self.history_mgr.items)
-            self.history_mgr.persist(code)
-            self._set_status(f"Loaded: {expr}", 3)
-            return
-
-        if code.startswith("%fz/"):
-            query = code[len("%fz/") :].strip()
-            raw_register = self.exec.config.get("EXPRESSION_REGISTER", [])
-            entries = parse_expression_register(raw_register)
-            if not query:
-                self._set_status("Query required", 3)
-                return
-            if not entries:
-                self._set_status("No fuzzy sources", 3)
-                return
-            # Build candidates
-            chosen = fuzzy_best_match(query, entries) if entries else None
-            if not chosen:
-                self._set_status(f"No match for: {query}", 3)
-                return
-
-            # expression path
-            if getattr(chosen, "kind", "expression") == "comment_only":
-                self._set_status("Matched comment-only entry", 3)
-                return
-            expr = getattr(chosen, "expr", "").strip()
-            if not expr:
-                self._set_status("No expression to load", 3)
-                return
-            self.command.set_buffer(expr)
-            self.focus = 1
-            self.history_mgr.append(code)
-            self.command.set_history(self.history_mgr.items)
-            self.history_mgr.persist(code)
-            self._set_status(f"Loaded: {expr}", 3)
-            return
 
         lines = self.exec.execute(code)
         if lines:
