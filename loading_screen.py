@@ -3,14 +3,17 @@ import curses
 import threading
 import time
 import random
+import multiprocessing
+from typing import Any
 from ascii_art import AsciiArt
 
 
 class LoadState:
     def __init__(self):
-        self.loaded = False
-        self.aborted = False
-        self.df = None
+        self.loaded: bool = False
+        self.aborted: bool = False
+        self.df: Any | None = None
+        self.error: str | None = None
 
 
 class _Stream:
@@ -75,18 +78,53 @@ class LoadingScreen:
                     self.logo_mask[(top + iy, left + ix)] = ch
         self.logo_cols = sorted({x for (_, x) in self.logo_mask})
         self.takeover_idx = 0
+        self.proc = None
+        self.conn = None
+        self.thread = None
 
     def start_loader(self):
-        t = threading.Thread(target=self._load, daemon=True)
-        t.start()
+        if self.state.aborted:
+            return
+        try:
+            ctx = multiprocessing.get_context("fork")
+        except ValueError:
+            ctx = None
+        if ctx is not None:
+            parent_conn, child_conn = ctx.Pipe(duplex=False)
+            self.conn = parent_conn
+            self.proc = ctx.Process(target=self._load_worker, args=(child_conn,))
+            self.proc.daemon = True
+            self.proc.start()
+        else:
+            t = threading.Thread(target=self._load, daemon=True)
+            t.start()
+            self.thread = t
 
     def _load(self):
         if self.state.aborted:
             return
-        df = self.loader_fn()
+        try:
+            df = self.loader_fn()
+        except Exception as exc:
+            if not self.state.aborted:
+                self.state.error = str(exc)
+                self.state.aborted = True
+            return
         if not self.state.aborted:
             self.state.df = df
             self.state.loaded = True
+
+    def _load_worker(self, conn):
+        try:
+            df = self.loader_fn()
+            conn.send(("ok", df))
+        except Exception as exc:
+            conn.send(("error", str(exc)))
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def run(self):
         curses.curs_set(0)
@@ -98,12 +136,33 @@ class LoadingScreen:
             if ch in (17, ord("q"), ord("Q")):  # Ctrl+Q / q
                 self.state.aborted = True
                 break
+            if self.conn is not None and self.conn.poll():
+                try:
+                    status, payload = self.conn.recv()
+                except EOFError:
+                    status, payload = ("error", "Loader terminated")
+                if status == "ok":
+                    self.state.df = payload
+                    self.state.loaded = True
+                else:
+                    self.state.error = payload
+                    self.state.aborted = True
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
             now = time.time()
             if self.phase == self.PHASE_HOLD and self.state.loaded:
                 t0 = self.logo_fully_revealed_time
                 if t0 is not None and now - t0 >= self.min_logo_duration:
                     break
             time.sleep(0.03)
+        if self.state.aborted and self.proc is not None and self.proc.is_alive():
+            self.proc.terminate()
+            self.proc.join(timeout=0.2)
+        elif self.proc is not None:
+            self.proc.join(timeout=0.2)
 
     def draw(self):
         now = time.time()

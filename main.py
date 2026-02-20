@@ -166,6 +166,8 @@ def main():
         loader = LoadingScreen(stdscr, load_df, load_state)
         loader.run()
         if load_state.aborted:
+            if load_state.error:
+                print(f"Load failed: {load_state.error}", file=sys.stderr)
             return
         state = AppState(load_state.df, path, handler)
         Orchestrator(stdscr, state).run()
