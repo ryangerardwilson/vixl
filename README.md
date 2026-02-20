@@ -38,7 +38,7 @@ active context.
 
 ### Global
 
-- `Ctrl+C`, `Ctrl+X`, or `q` (while the grid has focus) – exit immediately
+- `Ctrl+C`, `Ctrl+Q`, or `q` (while the grid has focus) – exit immediately
 - `Ctrl+S` – save
 - `Ctrl+T` – save and exit (only exits after a successful save)
 - `?` – open the shortcuts overlay

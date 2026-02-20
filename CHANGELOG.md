@@ -21,7 +21,7 @@
   the local version is already up to date.
 
 - Removed leader commands and multi-line command pane; output pane no longer side-by-side (modal-only output).
-- Exit keys (Ctrl+C/Ctrl+X) now work even when overlays are open.
+- Exit keys (Ctrl+C/Ctrl+Q) now work even when overlays are open.
 
 
 ## 2026-01-09

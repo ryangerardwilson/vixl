@@ -317,7 +317,7 @@ class Orchestrator:
                 self.df_editor._complete_external_edit_if_done()
                 self.df_editor.run_pending_external_edit()
 
-            if ch in (3, 24):
+            if ch in (3, 17):
                 break
 
             if ch in (ord("q"), ord("Q")) and self.focus == 0:
@@ -350,7 +350,7 @@ class Orchestrator:
                 self.redraw()
                 continue
 
-            if ch in (3, 24):
+            if ch in (3, 17):
                 break
 
             if self.focus == 0 and ch in (19, 20):  # Ctrl+S / Ctrl+T

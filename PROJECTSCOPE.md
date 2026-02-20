@@ -174,7 +174,7 @@ Characteristics:
 - Parquet support requires `pyarrow` (installed via requirements.txt).
 
 ### Keymap (canonical)
-- Global: Ctrl+C/Ctrl+X, or `q` while the grid has focus, exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
+- Global: Ctrl+C/Ctrl+Q, or `q` while the grid has focus, exit; Ctrl+S save; Ctrl+T save & exit (after save); ? shortcuts.
 - Command bar: `:` enter; Enter execute; Esc cancel; Ctrl+P/Ctrl+N history; arrows/Home/End/Backspace edit.
 - Output/shortcuts overlay: Esc/q/Enter close; j/k scroll.
 - DF mode: h/j/k/l move; H/L prev/next sheet (multi-sheet files); Ctrl+J / Ctrl+K (~5% rows) and Ctrl+H / Ctrl+L (~20% cols) big jumps; `:` command bar; `i` open vim for current cell; `,conf` open config in vim; `x` clear cell; `, i r a` / `, i r b` insert rows; `, d r` delete row; `, i c a` / `, i c b` insert columns; `, d c` delete column; `, r n c` rename column; `,xr` toggle current row expansion; `,xar` toggle all rows; `,xc` collapse all expansions; `,x+` / `,x-` adjust row height; `, h` first column; `, l` last column; `, k` first row; `, j` last row; `, y a` copies the full dataframe; `, y c` copies the focused cell or (in visual mode) the selected rectangle as TSV; `, p j` preview cell as pretty JSON (vim read-only flags); `?` shortcuts.

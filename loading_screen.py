@@ -95,7 +95,7 @@ class LoadingScreen:
         while not self.state.aborted:
             self.draw()
             ch = self.stdscr.getch()
-            if ch == 24:  # Ctrl+X
+            if ch in (17, ord("q"), ord("Q")):  # Ctrl+Q / q
                 self.state.aborted = True
                 break
             now = time.time()
