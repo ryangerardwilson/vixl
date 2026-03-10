@@ -3,9 +3,11 @@ import os
 import curses
 import subprocess
 import json
+import shlex
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
+import config_paths
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
 from default_df_initializer import DefaultDfInitializer
@@ -109,6 +111,18 @@ def _run_upgrade():
     return bash_rc
 
 
+def _open_config_in_editor() -> int:
+    config_paths.ensure_config_dirs()
+    if not os.path.exists(config_paths.CONFIG_JSON):
+        with open(config_paths.CONFIG_JSON, "w", encoding="utf-8") as handle:
+            handle.write("{}\n")
+    editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim").strip()
+    editor_cmd = shlex.split(editor) if editor else ["vim"]
+    if not editor_cmd:
+        editor_cmd = ["vim"]
+    return subprocess.run([*editor_cmd, config_paths.CONFIG_JSON], check=False).returncode
+
+
 def main():
     args = sys.argv[1:]
 
@@ -118,9 +132,12 @@ def main():
 
     if "-h" in args:
         print(
-            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl -v\n  vixl -u\n"
+            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl conf\n  vixl -v\n  vixl -u\n"
         )
         return
+
+    if args == ["conf"]:
+        sys.exit(_open_config_in_editor())
 
     if "-u" in args:
         latest = _get_latest_version()
