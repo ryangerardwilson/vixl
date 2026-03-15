@@ -1,6 +1,6 @@
-numpy<2
+numpy==2.4.3
 pandas
-pyarrow==13.0.0
+pyarrow==23.0.1
 openpyxl
 tables
 rgw-cli-contract==0.1.1
