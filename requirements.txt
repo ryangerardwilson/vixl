@@ -3,3 +3,4 @@ pandas
 pyarrow==13.0.0
 openpyxl
 tables
+rgw-cli-contract==0.1.1

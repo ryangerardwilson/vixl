@@ -1,169 +1,48 @@
 import sys
 import os
 import curses
-import subprocess
-import json
-import shlex
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from pathlib import Path
 
 import config_paths
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
 from default_df_initializer import DefaultDfInitializer
+from rgw_cli_contract import AppSpec, resolve_install_script_path, run_app
 
 # Make ESC snappy
 os.environ.setdefault("ESCDELAY", "25")
 from orchestrator import Orchestrator
 from app_state import AppState
 
-try:
-    from _version import __version__
-except Exception:
-    __version__ = "0.0.0"
+from _version import __version__
 
 
-INSTALL_URL = "https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh"
-LATEST_RELEASE_API = (
-    "https://api.github.com/repos/ryangerardwilson/vixl/releases/latest"
-)
+INSTALL_SCRIPT = resolve_install_script_path(__file__)
+HELP_TEXT = """vixl
+
+flags:
+  vixl -h
+    show this help
+  vixl -v
+    print the installed version
+  vixl -u
+    upgrade to the latest release
+  vixl conf
+    open the config in $VISUAL/$EDITOR
+
+features:
+  open the spreadsheet editor on a path or a new sheet
+  # vixl [path]
+  vixl
+  vixl data.csv
+"""
 
 
-def _version_tuple(version: str) -> tuple[int, ...]:
-    if not version:
-        return (0,)
-    version = version.strip()
-    if version.startswith("v"):
-        version = version[1:]
-    parts: list[int] = []
-    for segment in version.split("."):
-        digits = ""
-        for ch in segment:
-            if ch.isdigit():
-                digits += ch
-            else:
-                break
-        if digits == "":
-            break
-        parts.append(int(digits))
-    return tuple(parts) if parts else (0,)
+def _config_path() -> Path:
+    return Path(config_paths.CONFIG_JSON)
 
 
-def _is_version_newer(candidate: str, current: str) -> bool:
-    cand_tuple = _version_tuple(candidate)
-    curr_tuple = _version_tuple(current)
-    # pad tuples to same length for comparison
-    length = max(len(cand_tuple), len(curr_tuple))
-    cand_tuple += (0,) * (length - len(cand_tuple))
-    curr_tuple += (0,) * (length - len(curr_tuple))
-    return cand_tuple > curr_tuple
-
-
-def _get_latest_version(timeout: float = 5.0) -> str | None:
-    try:
-        request = Request(LATEST_RELEASE_API, headers={"User-Agent": "vixl-updater"})
-        with urlopen(request, timeout=timeout) as resp:
-            data = resp.read().decode("utf-8", errors="replace")
-    except (URLError, HTTPError, TimeoutError):
-        return None
-    try:
-        payload = json.loads(data)
-    except json.JSONDecodeError:
-        return None
-    tag = payload.get("tag_name") or payload.get("name")
-    if isinstance(tag, str) and tag.strip():
-        return tag.strip()
-    return None
-
-
-def _run_upgrade():
-    try:
-        curl = subprocess.Popen(
-            ["curl", "-fsSL", INSTALL_URL],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except FileNotFoundError:
-        print("Upgrade requires curl", file=sys.stderr)
-        return 1
-
-    try:
-        bash = subprocess.Popen(["bash"], stdin=curl.stdout)
-        if curl.stdout is not None:
-            curl.stdout.close()
-    except FileNotFoundError:
-        print("Upgrade requires bash", file=sys.stderr)
-        curl.terminate()
-        curl.wait()
-        return 1
-
-    bash_rc = bash.wait()
-    curl_rc = curl.wait()
-
-    if curl_rc != 0:
-        stderr = (
-            curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
-        )
-        if stderr:
-            sys.stderr.write(stderr)
-        return curl_rc
-
-    return bash_rc
-
-
-def _open_config_in_editor() -> int:
-    config_paths.ensure_config_dirs()
-    if not os.path.exists(config_paths.CONFIG_JSON):
-        with open(config_paths.CONFIG_JSON, "w", encoding="utf-8") as handle:
-            handle.write("{}\n")
-    editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim").strip()
-    editor_cmd = shlex.split(editor) if editor else ["vim"]
-    if not editor_cmd:
-        editor_cmd = ["vim"]
-    return subprocess.run([*editor_cmd, config_paths.CONFIG_JSON], check=False).returncode
-
-
-def main():
-    args = sys.argv[1:]
-
-    if "-v" in args or "-V" in args:
-        print(__version__)
-        return
-
-    if "-h" in args:
-        print(
-            "vixl - terminal-native spreadsheet editor\n\nUsage:\n  vixl [path]\n  vixl conf\n  vixl -v\n  vixl -u\n"
-        )
-        return
-
-    if args == ["conf"]:
-        sys.exit(_open_config_in_editor())
-
-    if "-u" in args:
-        latest = _get_latest_version()
-        if latest is None:
-            print(
-                "Unable to determine latest version; attempting upgrade…",
-                file=sys.stderr,
-            )
-            rc = _run_upgrade()
-            sys.exit(rc)
-
-        if (
-            __version__
-            and __version__ != "0.0.0"
-            and not _is_version_newer(latest, __version__)
-        ):
-            print(f"Already running the latest version ({__version__}).")
-            sys.exit(0)
-
-        if __version__ and __version__ != "0.0.0":
-            print(f"Upgrading from {__version__} to {latest}…")
-        else:
-            print(f"Upgrading to {latest}…")
-        rc = _run_upgrade()
-        sys.exit(rc)
-
+def _dispatch(args: list[str]) -> int:
     CompletionHandler().ensure_ready()
 
     has_path = len(args) == 1
@@ -190,6 +69,22 @@ def main():
         Orchestrator(stdscr, state).run()
 
     curses.wrapper(curses_main)
+    return 0
+
+
+APP_SPEC = AppSpec(
+    app_name="vixl",
+    version=__version__,
+    help_text=HELP_TEXT,
+    install_script_path=INSTALL_SCRIPT,
+    no_args_mode="dispatch",
+    config_path_factory=_config_path,
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    return run_app(APP_SPEC, args, _dispatch)
 
 
 if __name__ == "__main__":
