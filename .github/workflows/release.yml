@@ -66,6 +66,7 @@ jobs:
                 --collect-all pandas \
                 --collect-all pyarrow \
                 main.py
+              "$PYBIN" .github/scripts/clear-execstack.py dist/vixl
               cp install.sh dist/vixl/
               tar -C dist -czf vixl-linux-x64.tar.gz vixl
             '
