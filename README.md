@@ -17,7 +17,14 @@ ships with each GitHub release:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/vixl/main/install.sh | bash
-  ```
+```
+
+Manually add this to `~/.bashrc`, then reload your shell:
+
+```bash
+export PATH="$HOME/.vixl/bin:$PATH"
+source ~/.bashrc
+```
 
 ## Command-line usage
 
