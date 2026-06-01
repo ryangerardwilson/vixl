@@ -32,9 +32,9 @@ source ~/.bashrc
 ```bash
 vixl open [path]  # open an existing CSV, Parquet, XLSX, or HDF5 file (creates if missing)
 vixl config       # open the user config in $VISUAL, $EDITOR, or vim
-vixl -v           # print version
-vixl -u           # upgrade to the latest release
-vixl -h           # show help
+vixl version           # print version
+vixl upgrade           # upgrade to the latest release
+vixl help           # show help
 ```
 
 Run `vixl open` without a path to start in an empty, unsaved workbook seeded

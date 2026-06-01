@@ -20,12 +20,12 @@ from _version import __version__
 HELP_TEXT = """vixl
 terminal spreadsheet editor for CSV, Parquet, XLSX, and HDF5 files
 
-flags:
-  vixl -h
+global actions:
+  vixl help
     show this help
-  vixl -v
+  vixl version
     print the installed version
-  vixl -u
+  vixl upgrade
     upgrade to the latest release
   vixl config
     open the config in $VISUAL/$EDITOR
@@ -61,7 +61,7 @@ def _install_script_path() -> Path:
 
 def _upgrade() -> int:
     return subprocess.run(
-        ["/usr/bin/env", "bash", str(_install_script_path()), "-u"],
+        ["/usr/bin/env", "bash", str(_install_script_path()), "upgrade"],
         check=False,
     ).returncode
 
@@ -77,6 +77,9 @@ def _open_config() -> int:
 
 def _dispatch(args: list[str]) -> int:
     if not args or args[0] != "open" or len(args) > 2:
+        if args and args[0].startswith("-"):
+            print("Use declarative commands. Run: vixl help", file=sys.stderr)
+            return 1
         print("Usage: vixl open [path]")
         return 1
 
@@ -110,13 +113,13 @@ def _dispatch(args: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    if not args or args == ["-h"]:
+    if not args or args == ["help"]:
         _print_help()
         return 0
-    if args == ["-v"]:
+    if args == ["version"]:
         print(__version__)
         return 0
-    if args == ["-u"]:
+    if args == ["upgrade"]:
         return _upgrade()
     if args and args[0] == "config":
         if len(args) != 1:
@@ -127,4 +130,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

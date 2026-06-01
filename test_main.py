@@ -32,7 +32,7 @@ class MainContractTests(unittest.TestCase):
         module = load_main_module()
 
         with mock.patch("builtins.print") as print_mock:
-            rc = module.main(["-v"])
+            rc = module.main(["version"])
 
         self.assertEqual(rc, 0)
         print_mock.assert_called_once_with(load_version())
@@ -54,6 +54,13 @@ class MainContractTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         dispatch.assert_called_once_with(["open", "data.csv"])
+
+    def test_old_dash_meta_flags_are_rejected(self):
+        module = load_main_module()
+
+        for arg in ("-h", "-v", "-u"):
+            with self.subTest(arg=arg):
+                self.assertEqual(module.main([arg]), 1)
 
     def test_config_opens_config_path(self):
         module = load_main_module()

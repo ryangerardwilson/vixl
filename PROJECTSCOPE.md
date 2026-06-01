@@ -52,7 +52,7 @@ Responsibilities:
 - Parse CLI arguments
 - Initialize file handling and application state
 - Hand control to the orchestrator
-- Handle CLI flags for version (`-v`), upgrade (`-u`), and help (`-h`).
+- Handle declarative CLI actions for `version`, `upgrade`, and `help`.
 
 `main.py` contains no rendering, key handling, or business logic and is
 expected to remain thin.
