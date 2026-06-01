@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -8,11 +9,8 @@ from unittest import mock
 APP_DIR = Path(__file__).resolve().parent
 MAIN_PATH = APP_DIR / "main.py"
 VERSION_PATH = APP_DIR / "_version.py"
-CONTRACT_SRC = APP_DIR.parent / "rgw_cli_contract" / "src"
 
 sys.path.insert(0, str(APP_DIR))
-if CONTRACT_SRC.exists():
-    sys.path.insert(0, str(CONTRACT_SRC))
 
 
 def load_main_module():
@@ -30,31 +28,50 @@ def load_version():
 
 
 class MainContractTests(unittest.TestCase):
-    def test_app_spec_uses_single_version_source(self):
+    def test_version_uses_single_version_source(self):
         module = load_main_module()
 
-        self.assertEqual(module.APP_SPEC.version, load_version())
-        self.assertEqual(module.APP_SPEC.app_name, "vixl")
-        self.assertEqual(module.APP_SPEC.no_args_mode, "dispatch")
-
-    def test_config_path_factory_returns_config_json_path(self):
-        module = load_main_module()
-
-        self.assertEqual(
-            module.APP_SPEC.config_path_factory(),
-            Path(module.config_paths.CONFIG_JSON),
-        )
-
-    def test_main_delegates_to_contract_runtime(self):
-        module = load_main_module()
-
-        with mock.patch.object(module, "run_app", return_value=0) as run_app:
-            rc = module.main(["data.csv"])
+        with mock.patch("builtins.print") as print_mock:
+            rc = module.main(["-v"])
 
         self.assertEqual(rc, 0)
-        self.assertEqual(run_app.call_args.args[0], module.APP_SPEC)
-        self.assertEqual(run_app.call_args.args[1], ["data.csv"])
-        self.assertIs(run_app.call_args.args[2], module._dispatch)
+        print_mock.assert_called_once_with(load_version())
+
+    def test_no_args_prints_help(self):
+        module = load_main_module()
+
+        with mock.patch.object(module, "_print_help") as print_help:
+            rc = module.main([])
+
+        self.assertEqual(rc, 0)
+        print_help.assert_called_once_with()
+
+    def test_main_dispatches_open_command(self):
+        module = load_main_module()
+
+        with mock.patch.object(module, "_dispatch", return_value=0) as dispatch:
+            rc = module.main(["open", "data.csv"])
+
+        self.assertEqual(rc, 0)
+        dispatch.assert_called_once_with(["open", "data.csv"])
+
+    def test_config_opens_config_path(self):
+        module = load_main_module()
+
+        with mock.patch.object(module.config_paths, "ensure_config_dirs") as ensure_dirs:
+            with mock.patch.object(module.config_paths, "CONFIG_JSON", "/tmp/vixl-config.json"):
+                with mock.patch.object(Path, "exists", return_value=True):
+                    with mock.patch("subprocess.run") as run:
+                        run.return_value.returncode = 0
+                        with mock.patch.dict(os.environ, {"EDITOR": "/usr/bin/true"}, clear=True):
+                            rc = module.main(["config"])
+
+        self.assertEqual(rc, 0)
+        ensure_dirs.assert_called_once_with()
+        run.assert_called_once_with(
+            ["/usr/bin/true", "/tmp/vixl-config.json"],
+            check=False,
+        )
 
 
 if __name__ == "__main__":

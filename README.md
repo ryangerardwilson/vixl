@@ -30,14 +30,15 @@ source ~/.bashrc
 ## Command-line usage
 
 ```bash
-vixl [path]   # open an existing CSV, Parquet, XLSX, or HDF5 file (creates if missing)
-vixl -v       # print version
-vixl -u       # upgrade to the latest release
-vixl -h       # show help/usage summary
+vixl open [path]  # open an existing CSV, Parquet, XLSX, or HDF5 file (creates if missing)
+vixl config       # open the user config in $VISUAL, $EDITOR, or vim
+vixl -v           # print version
+vixl -u           # upgrade to the latest release
+vixl -h           # show help
 ```
 
-Launch without a path to start in an empty, unsaved workbook seeded with
-`col_a`/`col_b`/`col_c`.
+Run `vixl open` without a path to start in an empty, unsaved workbook seeded
+with `col_a`/`col_b`/`col_c`.
 
 ## Keyboard shortcuts
 

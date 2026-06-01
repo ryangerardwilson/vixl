@@ -1,5 +1,6 @@
-import sys
 import os
+import subprocess
+import sys
 import curses
 from pathlib import Path
 
@@ -7,7 +8,6 @@ import config_paths
 from file_type_handler import FileTypeHandler
 from completions_handler import CompletionHandler
 from default_df_initializer import DefaultDfInitializer
-from rgw_cli_contract import AppSpec, resolve_install_script_path, run_app
 
 # Make ESC snappy
 os.environ.setdefault("ESCDELAY", "25")
@@ -17,8 +17,9 @@ from app_state import AppState
 from _version import __version__
 
 
-INSTALL_SCRIPT = resolve_install_script_path(__file__)
+INSTALL_SCRIPT = Path(__file__).resolve().with_name("install.sh")
 HELP_TEXT = """vixl
+terminal spreadsheet editor for CSV, Parquet, XLSX, and HDF5 files
 
 flags:
   vixl -h
@@ -27,26 +28,49 @@ flags:
     print the installed version
   vixl -u
     upgrade to the latest release
-  vixl conf
+  vixl config
     open the config in $VISUAL/$EDITOR
 
 features:
-  open the spreadsheet editor on a path or a new sheet
-  # vixl [path]
-  vixl
-  vixl data.csv
+  open the spreadsheet editor on a new sheet or an existing path
+  # vixl open [path]
+  vixl open
+  vixl open data.csv
+
+  edit command history, clipboard integration, and other local settings
+  # vixl config
+  vixl config
 """
 
 
-def _config_path() -> Path:
-    return Path(config_paths.CONFIG_JSON)
+def _print_help() -> None:
+    print(HELP_TEXT.rstrip())
+
+
+def _upgrade() -> int:
+    return subprocess.run(
+        ["/usr/bin/env", "bash", str(INSTALL_SCRIPT), "-u"],
+        check=False,
+    ).returncode
+
+
+def _open_config() -> int:
+    config_paths.ensure_config_dirs()
+    config_path = Path(config_paths.CONFIG_JSON)
+    if not config_path.exists():
+        config_path.write_text("{}\n", encoding="utf-8")
+    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim"
+    return subprocess.run([editor, str(config_path)], check=False).returncode
 
 
 def _dispatch(args: list[str]) -> int:
+    if not args or args[0] != "open" or len(args) > 2:
+        print("Usage: vixl open [path]")
+        return 1
+
     CompletionHandler().ensure_ready()
 
-    has_path = len(args) == 1
-    path = args[0] if has_path else None
+    path = args[1] if len(args) == 2 else None
     handler = FileTypeHandler(path) if path else None
 
     from loading_screen import LoadingScreen, LoadState
@@ -72,19 +96,22 @@ def _dispatch(args: list[str]) -> int:
     return 0
 
 
-APP_SPEC = AppSpec(
-    app_name="vixl",
-    version=__version__,
-    help_text=HELP_TEXT,
-    install_script_path=INSTALL_SCRIPT,
-    no_args_mode="dispatch",
-    config_path_factory=_config_path,
-)
-
-
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    return run_app(APP_SPEC, args, _dispatch)
+    if not args or args == ["-h"]:
+        _print_help()
+        return 0
+    if args == ["-v"]:
+        print(__version__)
+        return 0
+    if args == ["-u"]:
+        return _upgrade()
+    if args and args[0] == "config":
+        if len(args) != 1:
+            print("Usage: vixl config")
+            return 1
+        return _open_config()
+    return _dispatch(args)
 
 
 if __name__ == "__main__":

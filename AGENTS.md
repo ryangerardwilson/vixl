@@ -1,8 +1,8 @@
 # Vixl Agent Guide
 
 ## Workspace Defaults
-- Follow `/home/ryan/Documents/agent_context/CLI_TUI_STYLE_GUIDE.md` for CLI/TUI taste and help shape.
-- Follow `/home/ryan/Documents/agent_context/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `-h`, `-v`, `-u`, installer behavior, release workflow expectations, and regression expectations.
+- Follow `/home/ryan/Subagents/cpo/CLI_TUI_STYLE_GUIDE.md` for CLI/TUI taste and help shape.
+- Follow `/home/ryan/Subagents/cto/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `-h`, `-v`, `-u`, installer behavior, release workflow expectations, and regression expectations.
 - This file only records `vixl`-specific constraints or durable deviations.
 
 This file is optimized for coding agents working in this repo.
@@ -28,7 +28,7 @@ Current known mismatches to watch:
 - `df_editor.py` composes editing subsystems and is the integration surface for DF-mode key handling.
 
 ## Canonical Components (what to open first)
-- `main.py`: CLI entrypoint (`-h`, `-v`, `-u`), file/bootstrap setup, curses startup.
+- `main.py`: CLI entrypoint (`-h`, `-v`, `-u`, `config`, `open`), file/bootstrap setup, curses startup.
 - `orchestrator.py`: Main controller loop and UI coordination.
 - `app_state.py`: Central mutable state (`df`, sheets, undo/redo stacks, row expansion invariants).
 - `command_executor.py`: Python sandbox execution, df commit semantics.
@@ -95,7 +95,7 @@ When changing key handling, prompts, or editor behavior, run the nearest focused
 - If you discover conflicting instructions, follow running code and leave a note in your summary.
 
 ## Quick Commands
-- Launch app: `python main.py [optional-path]`
+- Launch app: `python main.py open [optional-path]`
 - Show help/version: `python main.py -h` / `python main.py -v`
 - Run upgrade path logic: `python main.py -u`
 
