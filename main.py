@@ -17,7 +17,6 @@ from app_state import AppState
 from _version import __version__
 
 
-INSTALL_SCRIPT = Path(__file__).resolve().with_name("install.sh")
 HELP_TEXT = """vixl
 terminal spreadsheet editor for CSV, Parquet, XLSX, and HDF5 files
 
@@ -47,9 +46,22 @@ def _print_help() -> None:
     print(HELP_TEXT.rstrip())
 
 
+def _app_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _install_script_path() -> Path:
+    override = os.environ.get("VIXL_INSTALL_SCRIPT")
+    if override:
+        return Path(override)
+    return _app_root() / "install.sh"
+
+
 def _upgrade() -> int:
     return subprocess.run(
-        ["/usr/bin/env", "bash", str(INSTALL_SCRIPT), "-u"],
+        ["/usr/bin/env", "bash", str(_install_script_path()), "-u"],
         check=False,
     ).returncode
 
