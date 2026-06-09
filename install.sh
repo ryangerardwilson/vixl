@@ -79,8 +79,11 @@ write_public_launcher() {
   if [[ -e "$PUBLIC_LAUNCHER" && ! -L "$PUBLIC_LAUNCHER" && ! -f "$PUBLIC_LAUNCHER" ]]; then
     die "Refusing to overwrite non-file launcher: $PUBLIC_LAUNCHER"
   fi
-  if [[ -f "$PUBLIC_LAUNCHER" ]] && ! grep -Fq "Managed by ${APP} installer" "$PUBLIC_LAUNCHER" 2>/dev/null; then
-    die "Refusing to overwrite existing launcher: $PUBLIC_LAUNCHER"
+  if [[ -f "$PUBLIC_LAUNCHER" ]]; then
+    if ! grep -Fq "Managed by ${APP} installer" "$PUBLIC_LAUNCHER" 2>/dev/null \
+      && ! grep -Fq "Managed by ${APP} local-bin launcher" "$PUBLIC_LAUNCHER" 2>/dev/null; then
+      die "Refusing to overwrite existing launcher: $PUBLIC_LAUNCHER"
+    fi
   fi
   cat > "$PUBLIC_LAUNCHER" <<EOF
 #!/usr/bin/env bash
