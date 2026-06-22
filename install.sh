@@ -5,6 +5,8 @@ APP=vixl
 REPO="ryangerardwilson/vixl"
 APP_HOME="$HOME/.${APP}"
 INSTALL_DIR="$APP_HOME/bin"
+HDF_RUNTIME_DIR="$APP_HOME/hdf"
+HDF_PYTHON="$HDF_RUNTIME_DIR/bin/python"
 PUBLIC_BIN_DIR="$HOME/.local/bin"
 PUBLIC_LAUNCHER="$PUBLIC_BIN_DIR/${APP}"
 FILENAME="vixl-linux-x64.tar.gz"
@@ -101,12 +103,39 @@ print_manual_shell_steps() {
   fi
 }
 
+hdf_runtime_ok() {
+  [[ -x "$HDF_PYTHON" ]] || return 1
+  "$HDF_PYTHON" - <<'PY' >/dev/null 2>&1
+import pandas
+import tables
+PY
+}
+
+provision_hdf_runtime() {
+  if [[ "${VIXL_SKIP_HDF_RUNTIME:-}" == "1" ]]; then
+    return 0
+  fi
+  if hdf_runtime_ok; then
+    return 0
+  fi
+  require_command python3
+  printf '%s\n' "Provisioning HDF5 runtime in $HDF_RUNTIME_DIR"
+  rm -rf "$HDF_RUNTIME_DIR"
+  python3 -m venv "$HDF_RUNTIME_DIR" || die "Unable to create HDF5 Python runtime"
+  "$HDF_PYTHON" -m pip install --upgrade pip >/dev/null \
+    || die "Unable to upgrade pip in HDF5 runtime"
+  "$HDF_PYTHON" -m pip install pandas tables >/dev/null \
+    || die "Unable to install pandas/PyTables in HDF5 runtime"
+  hdf_runtime_ok || die "HDF5 runtime verification failed"
+}
+
 install_from_binary() {
   local binary_path=$1
   mkdir -p "$INSTALL_DIR"
   cp "$binary_path" "${INSTALL_DIR}/${APP}"
   chmod 755 "${INSTALL_DIR}/${APP}"
   write_public_launcher
+  provision_hdf_runtime
 }
 
 source_build_version() {
@@ -133,6 +162,7 @@ install_from_source() {
     -o "${INSTALL_DIR}/${APP}" ./cmd/vixl)
   chmod 755 "${INSTALL_DIR}/${APP}"
   write_public_launcher
+  provision_hdf_runtime
 }
 
 install_release() {
@@ -167,6 +197,7 @@ upgrade_release() {
   installed="$(read_installed_version)"
   if [[ -n "$installed" && "$installed" == "$latest" ]]; then
     write_public_launcher
+    provision_hdf_runtime
     printf '%s %s already installed\n' "$APP" "$latest"
     return 0
   fi

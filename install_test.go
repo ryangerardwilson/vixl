@@ -16,7 +16,7 @@ func TestInstallerLocalBinaryWritesManagedLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("bash", "./install.sh", "from", sourceBinary)
-	cmd.Env = append(os.Environ(), "HOME="+home)
+	cmd.Env = append(os.Environ(), "HOME="+home, "VIXL_SKIP_HDF_RUNTIME=1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("installer failed: %v\n%s", err, string(out))
