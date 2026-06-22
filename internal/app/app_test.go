@@ -571,6 +571,27 @@ func TestLeaderREPLTogglesRightSidebar(t *testing.T) {
 	}
 }
 
+func TestREPLLayoutUsesThreeFifthsWidth(t *testing.T) {
+	m := model{width: 100}
+	grid, sidebar := m.replLayoutWidths()
+	if sidebar != 60 {
+		t.Fatalf("sidebar width = %d, want 60", sidebar)
+	}
+	if grid != 39 {
+		t.Fatalf("grid width = %d, want 39", grid)
+	}
+
+	m.width = 20
+	grid, sidebar = m.replLayoutWidths()
+	minGrid := rowNumberWidth + minColumnWidth
+	if grid < minGrid {
+		t.Fatalf("narrow grid width = %d, want at least %d", grid, minGrid)
+	}
+	if grid+sidebar+1 != m.width {
+		t.Fatalf("layout widths grid=%d sidebar=%d total=%d, want %d", grid, sidebar, grid+sidebar+1, m.width)
+	}
+}
+
 func TestREPLPromptFollowsHistoryLikeTerminal(t *testing.T) {
 	m := model{
 		inputMode: "repl",

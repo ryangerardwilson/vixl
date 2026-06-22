@@ -204,16 +204,10 @@ func (m model) renderMain() string {
 }
 
 func (m model) replLayoutWidths() (int, int) {
-	sidebar := min(48, max(32, m.width/3))
-	if m.width < 72 {
-		sidebar = max(20, m.width/2)
-	}
+	sidebar := max(1, (m.width*3)/5)
 	minGrid := rowNumberWidth + minColumnWidth
 	if sidebar > m.width-minGrid-1 {
-		sidebar = max(12, m.width-minGrid-1)
-	}
-	if sidebar < 12 {
-		sidebar = max(1, m.width/2)
+		sidebar = max(1, m.width-minGrid-1)
 	}
 	grid := max(1, m.width-sidebar-1)
 	return grid, sidebar
